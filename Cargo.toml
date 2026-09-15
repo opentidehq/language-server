@@ -8,6 +8,8 @@ members = [
     "crates/opentide-spl",
     "crates/opentide-tide",
     "crates/opentide-analysis",
+    "crates/opentide-lsp",
+    "crates/opentide-wasm",
 ]
 
 [workspace.package]
