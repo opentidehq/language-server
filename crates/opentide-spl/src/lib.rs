@@ -217,6 +217,7 @@ fn collect_highlights(node: Node, _source: &str, out: &mut Vec<(ByteSpan, &'stat
         "number" => Some("number"),
         "boolean" => Some("boolean"),
         "|" => Some("operator.pipe"),
+        "catalog_command_name" => Some("keyword"),
         "search" | "where" | "eval" | "stats" | "rex" | "table" | "rename" | "fields" | "dedup"
         | "sort" | "head" | "tail" | "join" | "lookup" | "makemv" | "mvexpand" | "tstats"
         | "AS" | "by" | "from" => Some("keyword"),
@@ -332,6 +333,15 @@ pub fn hover(source: &str, position: opentide_core::Position) -> Option<String> 
             c.docs.clone().unwrap_or_default()
         ));
     }
+    if let Some(f) = catalog.function(&word) {
+        let kind = f.kind.clone().unwrap_or_else(|| "function".into());
+        return Some(format!(
+            "**{}** ({})\n\n{}",
+            f.name,
+            kind,
+            f.docs.clone().unwrap_or_default()
+        ));
+    }
     None
 }
 
@@ -403,6 +413,26 @@ mod tests {
             opentide_core::Position::new(0, 14),
         );
         assert!(h.unwrap().to_lowercase().contains("stats"));
+    }
+
+    #[test]
+    fn hover_function_from_catalog() {
+        let h = hover(
+            "index=main | eval x=lower(user)",
+            opentide_core::Position::new(0, 22),
+        );
+        let text = h.expect("hover");
+        assert!(text.to_lowercase().contains("lower"), "{text}");
+    }
+
+    #[test]
+    fn catalog_includes_trig_and_stats_aliases() {
+        let c = Catalog::load();
+        assert!(c.function("sin").is_some());
+        assert!(c.function("acos").is_some());
+        assert!(c.function("c").is_some());
+        assert!(c.function("distinct_count").is_some());
+        assert!(c.functions.len() >= 140, "{}", c.functions.len());
     }
 
     #[test]

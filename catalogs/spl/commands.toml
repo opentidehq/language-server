@@ -633,60 +633,79 @@ citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/
 [[commands]]
 name = "collect"
 kind = "streaming"
+docs = "Write results to a summary index (stash). Rare inside detection bodies."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Collect"
 
 [[commands]]
 name = "delete"
 kind = "streaming"
+docs = "Permanently delete matching events. Never use in a detection."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Delete"
 
 [[commands]]
 name = "sendemail"
 kind = "streaming"
+docs = "Email search results. Alert action, not query logic."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Sendemail"
 
 [[commands]]
 name = "script"
 kind = "streaming"
+docs = "Run an external script (alias: run). Not portable in OpenTide rules."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Script"
 
 [[commands]]
 name = "outputcsv"
 kind = "streaming"
+docs = "Write results to a CSV on the search head."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Outputcsv"
 
 [[commands]]
 name = "kmeans"
 kind = "streaming"
+docs = "K-means clustering on selected fields. Occasional anomaly detections."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/ListOfSearchCommands"
 
 [[commands]]
 name = "highlight"
 kind = "streaming"
+docs = "Highlight terms in the UI event display."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Highlight"
 
 [[commands]]
 name = "history"
-kind = "streaming"
+kind = "generating"
+docs = "Return a history of searches as events or a table."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/History"
 
 [[commands]]
 name = "mcollect"
 kind = "streaming"
+docs = "Convert results into metric data on the search head."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Mcollect"
 
 [[commands]]
 name = "geom"
 kind = "streaming"
+docs = "Add a geom field for choropleth map polygons."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Geom"
 
 [[commands]]
 name = "makecontinuous"
 kind = "streaming"
+docs = "Make an x-axis field continuous for chart/timechart."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Makecontinuous"
 
 [[commands]]
 name = "localize"
 kind = "streaming"
+docs = "Return time ranges where results were found."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Localize"
 
 [[commands]]
 name = "scrub"
 kind = "streaming"
+docs = "Anonymize results (PII scrubbing)."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Scrub"
 
 [[functions]]
@@ -1318,3 +1337,93 @@ docs = "Values per minute."
 name = "per_second"
 kind = "aggregate"
 docs = "Values per second."
+
+[[functions]]
+name = "acos"
+kind = "eval"
+docs = "Arc cosine."
+
+[[functions]]
+name = "acosh"
+kind = "eval"
+docs = "Inverse hyperbolic cosine."
+
+[[functions]]
+name = "asin"
+kind = "eval"
+docs = "Arc sine."
+
+[[functions]]
+name = "asinh"
+kind = "eval"
+docs = "Inverse hyperbolic sine."
+
+[[functions]]
+name = "atan"
+kind = "eval"
+docs = "Arc tangent."
+
+[[functions]]
+name = "atan2"
+kind = "eval"
+docs = "Arc tangent of Y/X."
+
+[[functions]]
+name = "atanh"
+kind = "eval"
+docs = "Inverse hyperbolic tangent."
+
+[[functions]]
+name = "cos"
+kind = "eval"
+docs = "Cosine."
+
+[[functions]]
+name = "cosh"
+kind = "eval"
+docs = "Hyperbolic cosine."
+
+[[functions]]
+name = "hypot"
+kind = "eval"
+docs = "Hypotenuse (sqrt(x^2+y^2))."
+
+[[functions]]
+name = "sin"
+kind = "eval"
+docs = "Sine."
+
+[[functions]]
+name = "sinh"
+kind = "eval"
+docs = "Hyperbolic sine."
+
+[[functions]]
+name = "tan"
+kind = "eval"
+docs = "Tangent."
+
+[[functions]]
+name = "tanh"
+kind = "eval"
+docs = "Hyperbolic tangent."
+
+[[functions]]
+name = "c"
+kind = "aggregate"
+docs = "Alias of count."
+
+[[functions]]
+name = "distinct_count"
+kind = "aggregate"
+docs = "Alias of dc (distinct count)."
+
+[[functions]]
+name = "p"
+kind = "aggregate"
+docs = "Alias of perc (percentile)."
+
+[[functions]]
+name = "percentile"
+kind = "aggregate"
+docs = "Alias of perc (percentile)."
