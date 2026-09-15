@@ -1,208 +1,150 @@
-# Coverage gap: `catalogs/kql` vs this inventory
+# Coverage gap: `catalogs/kql` vs Microsoft Learn inventory
 
-This file compares the machine-readable catalogs under [`/workspace/catalogs/kql/`](../../catalogs/kql/) with the Microsoft Learn–backed inventory in [`/workspace/docs/kql/`](./).
+This file compares the machine-readable catalogs under [`/workspace/catalogs/kql/`](../../catalogs/kql/) with the Microsoft Learn–backed inventory in [`/workspace/docs/kql/`](./), plus grammar / highlights / LSP surface gaps.
 
-Catalog files examined:
+**Snapshot date:** 2026-09-15 (catalogs already expanded; replaces the stale “16 operators / 8 functions” counts).
 
-- [`catalogs/kql/core/operators.toml`](../../catalogs/kql/core/operators.toml) — 16 tabular operators
-- [`catalogs/kql/core/functions.toml`](../../catalogs/kql/core/functions.toml) — 8 scalar + 8 aggregate names
-- [`catalogs/kql/core/types.toml`](../../catalogs/kql/core/types.toml) — 9 types
-- [`catalogs/kql/sentinel/tables.toml`](../../catalogs/kql/sentinel/tables.toml) — 18 tables
-- [`catalogs/kql/defender/tables.toml`](../../catalogs/kql/defender/tables.toml) — 20 tables
+## Current catalog counts
 
-No catalog exists today for scalar operators, syntax, aggregation-as-its-own-file, evaluate plugins, or control commands.
+| Catalog file | Count | Notes |
+| --- | --- | --- |
+| [`core/operators.toml`](../../catalogs/kql/core/operators.toml) | **53** | Tabular ops + aliases (`filter`, `limit`, `order`, `mvexpand`) |
+| [`core/operators-scalar.toml`](../../catalogs/kql/core/operators-scalar.toml) | **54** | Includes `between`, `!between`, `-`, `*` |
+| [`core/functions.toml`](../../catalogs/kql/core/functions.toml) | **409** | 364 `scalar` + 45 `aggregate` (includes `series_*` / `geo_*` / `convert_*`) |
+| [`core/types.toml`](../../catalogs/kql/core/types.toml) | **10** | Full scalar type set |
+| [`core/evaluate-plugins.toml`](../../catalogs/kql/core/evaluate-plugins.toml) | **22** | `evaluate` plugin names + AM-no warnings |
+| [`sentinel/tables.toml`](../../catalogs/kql/sentinel/tables.toml) | **99** | Common first-party + selected connectors |
+| [`defender/tables.toml`](../../catalogs/kql/defender/tables.toml) | **65** | Advanced hunting schema tables |
+
+**Still no catalog file for:** control/management commands (parsed + diagnosed as unsupported), syntax constructs.
 
 ---
 
-## Inventory vs catalog counts
+## Inventory vs catalog (remaining gaps)
 
-| Area | Catalog now | Inventory | Gap (approx.) |
+| Area | Catalog now | Inventory / Learn | Remaining gap |
 | --- | --- | --- | --- |
-| Tabular operators (primary names) | 16 | **55** | **39** missing |
-| Evaluate plugins | 0 | **21** | 21 |
-| Control commands (unsupported list) | 0 | 7 families | not modeled |
-| Scalar operators (`has`, `in`, `matches regex`, …) | 0 | **50+** | entire file |
-| Scalar functions | 8 | **~280 official + aliases (~325)** | **~270+** |
-| Aggregation functions | 8 (mixed into functions.toml) | **45** | **37** |
-| Scalar types | 9 | **10** | **`decimal`** |
-| Sentinel tables (common first-party) | 18 | **~95** named here / **600+** connector catalog | **77+** common; 500+ `_CL` |
-| Defender XDR schema tables | 20 | **~65** | **~45** |
+| Tabular operators | **53** | **~55** primary (+ aliases) | **~0** for hunting/detections |
+| Evaluate plugins | **22** | **22** | **0** names |
+| Control commands | **0** (diagnostics only) | **7** families in [`control-commands.md`](control-commands.md) | Catalog optional |
+| Scalar operators | **54** | **~54** documented | **~0** |
+| Scalar functions | **364** scalar rows | Learn index **~329** + AM helpers | **~0** vs hunting inventory |
+| Aggregation functions | **45** | Learn **46** names | **`hll_merge` kind** (present as `scalar`, should be `aggregate`) |
+| Scalar types | **10** | **10** | **0** |
+| Sentinel tables | **99** | Inventory ~60 named; Learn connectors **600+** | Inventory covered; long-tail `_CL` out of scope |
+| Defender tables | **65** | Learn schema **~65–66** | Truncated `KB`/`Profiles` renamed; watch Learn drift |
 
 ---
 
 ## Tabular operators
 
-### Present in `operators.toml`
+Essentially complete vs [`operators.md`](operators.md), including aliases `filter`, `limit`, `order`, `mvexpand`.
 
-`where`, `project`, `project-away`, `project-rename`, `extend`, `summarize`, `join`, `union`, `parse`, `lookup`, `take`, `limit`, `sort`, `order`, `distinct`, `render` (marked `not_valid_in_detections`).
+Validity flags exist on a subset (`search`, `externaldata`, `consume`, `render`). Still worth encoding `search *` / `union *`, Defender NRT bans, and multi-result `fork`/`facet`.
 
-### Missing (high priority for hunting/detections)
-
-These appear constantly in Sentinel/Defender rule packs:
-
-| Operator | Why it matters |
-| --- | --- |
-| `filter` | Documented alias of `where` |
-| `project-keep`, `project-reorder` | Column shaping |
-| `top` | `top 100 by Timestamp` in every hunting sample |
-| `count` (operator) | `T \| count` |
-| `mv-expand`, `mv-apply` | JSON/array explosion |
-| `parse-where`, `parse-kv` | Unstructured CEF/syslog |
-| `search`, `find` | Cross-column/table search (`search *` must be flagged **invalid** in Sentinel analytics) |
-| `invoke` | Parser/UDF style |
-| `evaluate` + `bag_unpack` | Entra `LocationDetails`, dynamic bags |
-| `make-series` | Anomaly/time-series rules |
-| `serialize`, `scan` | Sequences (pass-the-hash chains, etc.) |
-| `as` | Named subqueries / `union withsource` |
-| `datatable`, `print`, `range` | IOC tables / debug |
-| `partition` | Per-entity subqueries |
-| `externaldata` | Must be marked NRT-banned / often blocked |
-| `materialize` (function used like an operator) | Query performance |
-
-### Missing (hunting / specialized)
-
-`sample`, `sample-distinct`, `top-hitters`, `top-nested`, `fork`, `facet`, `consume` (invalid in detections), `getschema`, `reduce`, `make-graph`, `graph-match`, `graph-shortest-paths`, `graph-to-table`, `graph-mark-components`.
-
-### Missing validity flags
-
-Only `render` has `warning = "not_valid_in_detections"`. Catalogs should also encode:
-
-- Sentinel ban: `search *`, `union *`
-- Defender NRT ban: `join`, `union`, `externaldata`, comments
-- Multi-result: `fork`, `facet`
-- AM-no: `cluster()`, Python/`sql_request` plugins
-- Control commands: `.show`, `.create`, … as **unsupported**
+Not operators (correctly elsewhere): `materialize()` (function); `workspace()`/`app()`/`resource()` (functions); evaluate plugin names.
 
 ---
 
-## Scalar operators (no catalog file)
+## Scalar operators
 
-[`operators-scalar.md`](operators-scalar.md) is entirely absent from TOML. Top gaps for a future `operators-scalar.toml`:
+### Catalog
 
-**Must-have for detections:** `==`, `!=`, `=~`, `!~`, `has`, `has_cs`, `has_any`, `has_all`, `contains`, `startswith`, `endswith`, `in`, `in~`, `!in`, `!in~`, `matches regex`, `between`, `and`, `or`, `not()`, `<` `>` `<=` `>=`, `+ - * / %`.
+Equality, string (`has` / `contains` / `startswith` / `endswith` / `hasprefix` / `hassuffix` + `_cs` / `!` variants), `in` / `in~`, `matches regex`, IPv4 text ops, `and` / `or` / `not()`, arithmetic `+ - * / %`, comparisons, `between` / `!between`.
 
-**Should-have:** `!has`, `contains_cs`, `hasprefix`, `hassuffix` and `_cs`/`!` variants, IPv4 text operators `has_ipv4*`.
+### Grammar (`grammars/tree-sitter-opentide-kql/grammar.js`) gaps
 
----
+Parsed today: equality, `has`/`contains`/`startswith`/`endswith` (+ many `_cs` / `!` forms), `in`/`in~`, `between`, `matches regex`, arithmetic.
 
-## Scalar functions
+**Not tokenized in `comparison_expression`:**
 
-### Present in `functions.toml`
+- `hasprefix`, `!hasprefix`, `hasprefix_cs`, `!hasprefix_cs`
+- `hassuffix`, `!hassuffix`, `hassuffix_cs`, `!hassuffix_cs`
+- `has_ipv4`, `has_ipv4_prefix`, `has_any_ipv4`, `has_any_ipv4_prefix`
+- `!between`
 
-`ago`, `now`, `tostring`, `toint`, `tolong`, `todatetime`, `strcat`, `strlen`.
+### Highlights
 
-### Top gaps (appear in public hunting/detection samples)
+Canonical: [`highlights/queries/kql/highlights.scm`](../../highlights/queries/kql/highlights.scm) (synced to grammar `queries/`).
 
-| Function | Typical use |
-| --- | --- |
-| `iff` / `iif`, `case`, `coalesce` | Bucketing / nulls |
-| `parse_json` / `todynamic`, `extract`, `extract_json` | Dynamic fields |
-| `split`, `substring`, `tolower`, `replace_string`, `replace_regex` | Command-line / URL |
-| `base64_decode_tostring` | PowerShell `-enc` |
-| `parse_command_line` | MDE argv |
-| `parse_url`, `parse_path` | URL/path intel |
-| `hash_sha256`, `hash_md5`, `hash_sha1` | Hash computed values |
-| `ipv4_is_private`, `ipv4_is_in_range`, `ipv4_is_in_any_range` | RFC1918 / allowlists |
-| `bin`, `floor` | Time buckets |
-| `ingestion_time` | Custom detection lookback |
-| `toscalar`, `materialize` | Lets / watchlist scalars |
-| `isempty`, `isnotempty`, `isnull` | Null-safe filters |
-| `array_length`, `bag_keys`, `bag_pack` / `pack` | Dynamic |
-| `geo_info_from_ip_address` | Geo hunting |
-| `column_ifexists` | `bag_unpack` + Sentinel analytics |
-| `_GetWatchlist` | Sentinel watchlists (AM-only) |
-
-Hundreds of additional documented functions (geo, series_*, math, conversion aliases `toreal`/`toboolean`) are listed in [`scalar-functions.md`](scalar-functions.md) and missing from the catalog.
+Literal `@operator` rules include `startswith_cs` / `endswith_cs` / `hasprefix*` / `hassuffix*` / `has_ipv4*`. Rules for tokens absent from the grammar will not match until `grammar.js` + generated parser are updated.
 
 ---
 
-## Aggregation functions
+## Scalar + aggregation functions
 
-### Present (as `kind = "aggregate"`)
+Core conversion/datetime/string/dynamic/hash/IP/math/conditionals/window helpers and detection aggregations are present.
 
-`count`, `sum`, `avg`, `min`, `max`, `dcount`, `arg_max`, `arg_min`.
+### Missing from `functions.toml` (111 Learn scalars)
 
-### Missing (high priority)
+| Family | Count missing | Inventory |
+| --- | --- | --- |
+| `series_*` | **51** | Named in [`scalar-functions.md`](scalar-functions.md); full list in [`scalar-functions-geo-series.md`](scalar-functions-geo-series.md) |
+| `geo_*` | **52** | Mostly prose in scalar-functions; full Learn list in geo-series doc |
+| `convert_*` | **8** | Named in scalar-functions.md |
 
-`countif`, `sumif`, `avgif`, `minif`, `maxif`, `dcountif`, `count_distinct`, `make_set`, `make_list`, `make_bag`, `make_set_if`, `make_list_if`, `take_any`, `percentile` / `percentiles`, `stdev`, `variance`, `hll`, `tdigest`.
+Low frequency in classic detections; required for 100% KQL completion/hover.
 
-Defender custom-detection docs **explicitly** use `arg_max` (already cataloged) plus `count()`; `make_set` is named in the advanced-hunting operator table as `makeset`.
+### Kind quirk
+
+`hll_merge` cataloged as `kind = "scalar"`; Learn lists it under [aggregation functions](https://learn.microsoft.com/kusto/query/aggregation-functions).
 
 ---
 
 ## Types
 
-Catalog has: `string`, `int`, `long`, `real`, `datetime`, `timespan`, `bool`, `dynamic`, `guid`.
+**Complete:** `bool`, `datetime`, `decimal`, `dynamic`, `guid`, `int`, `long`, `real`, `string`, `timespan`.
 
-**Missing:** `decimal` (and documented aliases `boolean`, `date`, `double`, `uuid`/`uniqueid`, `time`).
-
-No catalog fields for nullability (`string` is not null) or literal syntax.
+LSP still does not hover/complete type names.
 
 ---
 
-## Sentinel tables
+## Tables
 
-### Present (18)
+### Sentinel
 
-`SecurityEvent`, `SecurityAlert`, `SecurityIncident`, `Syslog`, `CommonSecurityLog`, `SigninLogs`, `AuditLogs`, `AzureActivity`, plus MDE/XDR names `Device*`, `EmailEvents`, `IdentityLogonEvents`, `CloudAppEvents`, `AADSignInEventsBeta`.
+Catalog (**99**) ⊇ inventory first-party list. Remaining Learn surface is connector / `_CL` long-tail.
 
-### Top missing first-party tables used in detections
+### Defender
 
-| Area | Missing tables |
+Catalog (**65**). `DEFENDER_TABLES_MAP` in `opentide-kql` still hard-codes ~18 names for required-column heuristics — out of sync with TOML.
+
+---
+
+## Syntax / control / plugins
+
+| Topic | Docs | Catalog | Engine |
+| --- | --- | --- | --- |
+| `let`, comments, strings, timespans | [`syntax.md`](syntax.md) | none | grammar parses subset |
+| Evaluate plugins | [`evaluate-plugins.md`](evaluate-plugins.md) | **none** | `evaluate` op only |
+| Control commands | [`control-commands.md`](control-commands.md) | **none** | unsupported diagnostic |
+
+---
+
+## Completions / hover / diagnostics
+
+From [`crates/opentide-kql/src/lib.rs`](../../crates/opentide-kql/src/lib.rs):
+
+| Feature | Uses |
 | --- | --- |
-| Entra | `AADNonInteractiveUserSignInLogs`, `AADServicePrincipalSignInLogs`, `AADManagedIdentitySignInLogs`, `ADFSSignInLogs`, `AADUserRiskEvents`, `AADRiskyUsers`, `AADServicePrincipalRiskEvents`, `MicrosoftGraphActivityLogs`, `AADProvisioningLogs` |
-| Windows / logs | `WindowsEvent`, `Event`, `DnsEvents`, `W3CIISLog` |
-| Azure | `AzureDiagnostics`, `AZFWNetworkRule`, `AZFWApplicationRule`, `AZFWIdpsSignature`, `StorageBlobLogs` |
-| AWS | `AWSCloudTrail`, `AWSGuardDuty`, `AWSVPCFlow`, `AWSWAF` |
-| GCP | `GCPAuditLogs`, `GCPVPCFlow` |
-| M365 | `OfficeActivity` (**very high**), `UrlClickEvents`, `EmailAttachmentInfo` |
-| TI / UEBA | `ThreatIntelligenceIndicator`, `ThreatIntelIndicators`, `BehaviorAnalytics`, `IdentityInfo`, `Anomalies`, `Watchlist` |
-| ASIM | `ASimDnsActivityLogs`, `ASimNetworkSessionLogs`, `ASimAuthenticationEventLogs`, … + `_Im_*` parsers |
-| Ops | `Heartbeat`, `LAQueryLogs` |
-| Defender extras in Sentinel | `AlertEvidence`, `DeviceNetworkInfo`, `IdentityDirectoryEvents`, `IdentityQueryEvents` |
+| Completions after `\|` | tabular `operators` |
+| Completions elsewhere | `functions` + `tables` + `scalar_operators` |
+| Hover | operators, scalar_operators, functions, tables |
+| Diagnostics | unknown tabular op, render warning, control command, unknown table, fuzzy unknown function |
 
-Partner `_CL` tables (Okta, Proofpoint, SAP, …) are in the [600+ connector list](https://learn.microsoft.com/azure/sentinel/sentinel-tables-connectors-reference) and are **not** in the catalog; inventory intentionally only samples NRT-relevant ones.
+**Not wired:** types; evaluate plugin names; syntax keyword docs; Defender map from TOML; rich validity beyond a few `warning` strings.
+
+`word_at` only walks `[A-Za-z0-9_-]`, so hover on `matches regex`, `!between`, or `not()` is unreliable.
 
 ---
 
-## Defender tables
+## Recommended backfill order
 
-### Present (20)
+1. Grammar tokens for `hasprefix*` / `hassuffix*` / `has_ipv4*` / `!between` + regenerate parser.
+2. Catalog `functions.toml`: all `series_*`, then `geo_*`, then `convert_*`.
+3. New `catalogs/kql/core/evaluate-plugins.toml`; wire completions after `evaluate`.
+4. Fix `hll_merge` kind; expand operator validity flags.
+5. Drive Defender required-column map from `defender/tables.toml`.
+6. Optional: control-command catalog; type name completions.
 
-Core MDE (`DeviceEvents`, `DeviceProcessEvents`, `DeviceNetworkEvents`, `DeviceFileEvents`, `DeviceRegistryEvents`, `DeviceLogonEvents`, `DeviceImageLoadEvents`, `DeviceInfo`, `DeviceNetworkInfo`, `DeviceFileCertificateInfo`), alerts (`AlertInfo`, `AlertEvidence`), email (`EmailEvents`, `EmailAttachmentInfo`, `EmailUrlInfo`, `UrlClickEvents`), identity (`IdentityLogonEvents`, `IdentityQueryEvents`, `IdentityDirectoryEvents`), `CloudAppEvents`, `AADSignInEventsBeta`.
-
-### Missing schema tables (Learn catalog)
-
-High-value: `EmailPostDeliveryEvents`, `IdentityInfo`, `AADSpnSignInEventsBeta`, `EntraIdSignInEvents`, `GraphAPIAuditEvents`, `OAuthAppInfo`, `MessageEvents`, TVM family (`DeviceTvmSoftwareVulnerabilities`, `DeviceTvmSoftwareInventory`, …), `ExposureGraphNodes`/`Edges`, `CloudAuditEvents`, `CloudProcessEvents`, `BehaviorInfo`, `CampaignInfo`.
-
-### Missing metadata in the catalog
-
-- Required custom-detection output columns (`Timestamp`/`ReportId`/`DeviceId`)
-- NRT eligibility per table
-- `TimeGenerated` vs `Timestamp`
-- Action-specific columns (`NetworkMessageId` + `RecipientEmailAddress` for email actions)
-
----
-
-## Syntax (no catalog)
-
-[`syntax.md`](syntax.md) covers `let`, comments, `@""` verbatim strings, timespan suffixes, pipes, `datatable`, `print`. None of this is in TOML today. Highest-impact for a parser/linter catalog:
-
-- `let` + semicolon + no blank lines
-- `//` comments banned in Defender NRT
-- timespan literals `1d` `5m` `1h`
-- verbatim `@'…'` for regex and Windows paths
-- control commands starting with `.` as **unsupported**
-
----
-
-## Recommended catalog backfill order
-
-1. Scalar operators (`has`, `in`, `matches regex`, `between`) + validity.
-2. High-frequency functions: `parse_json`, `iff`, `bin`, `extract`, `split`, `ipv4_is_private`, `base64_decode_tostring`, `ingestion_time`, `make_set`, `countif`.
-3. Operators: `top`, `mv-expand`, `search` (with `search *` illegal), `evaluate`/`bag_unpack`, `datatable`.
-4. Tables: `OfficeActivity`, Entra non-interactive/SP tables, `AWSCloudTrail`, `ThreatIntelligenceIndicator`, Defender `EmailPostDeliveryEvents`.
-5. Type `decimal`; mark control commands unsupported.
-6. Encode Sentinel/Defender/NRT restriction flags instead of a single `render` warning.
-
-See also [`README.md`](README.md) for how catalogs map to these docs.
+See [`IMPLEMENTATION-GAPS.md`](IMPLEMENTATION-GAPS.md) for exact missing names.

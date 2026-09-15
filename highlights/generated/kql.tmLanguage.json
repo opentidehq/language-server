@@ -29,12 +29,17 @@
     },
     {
       "comment": "capture:operator",
-      "match": "(?i)(?<![A-Za-z0-9_])(?:\\-|between|contains|contains_cs|endswith|has|has_all|has_any|has_cs|in|matches|not|or|regex|startswith)(?![A-Za-z0-9_])",
+      "match": "(?i)(?<![A-Za-z0-9_])(?:\\-|between|contains|contains_cs|endswith|endswith_cs|has|has_all|has_any|has_any_ipv4|has_any_ipv4_prefix|has_cs|has_ipv4|has_ipv4_prefix|hasprefix|hasprefix_cs|hassuffix|hassuffix_cs|in|matches|not|or|regex|startswith|startswith_cs)(?![A-Za-z0-9_])",
       "name": "keyword.operator.opentide"
     },
     {
       "comment": "capture:operator",
       "match": "!=",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!between",
       "name": "keyword.operator.opentide"
     },
     {
@@ -54,12 +59,37 @@
     },
     {
       "comment": "capture:operator",
+      "match": "!endswith_cs",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
       "match": "!has",
       "name": "keyword.operator.opentide"
     },
     {
       "comment": "capture:operator",
       "match": "!has_cs",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!hasprefix",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!hasprefix_cs",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!hassuffix",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!hassuffix_cs",
       "name": "keyword.operator.opentide"
     },
     {
@@ -75,6 +105,11 @@
     {
       "comment": "capture:operator",
       "match": "!startswith",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "match": "!startswith_cs",
       "name": "keyword.operator.opentide"
     },
     {

@@ -4,206 +4,156 @@ Comparison of this docs inventory against the **current** catalog compiled into 
 
 [`catalogs/spl/commands.toml`](../../catalogs/spl/commands.toml)
 
-The catalog is `searchbnf`-informed; OpenTide still owns the grammar. Unknown command tokens become `spl.unknown` / `spl_unknown_command` (`docs/LANGUAGE.md`). Functions not in the catalog simply have no hover / completion / validation.
+The catalog is `searchbnf`-informed; OpenTide still owns the grammar. Unknown command tokens become `spl.unknown` / `spl_unknown_command` (`docs/LANGUAGE.md`). Catalog functions drive completions and hover.
 
-**Do not treat this file as a mandate to expand the grammar in this change.** It is an inventory of gaps.
+**Authored SPL is never rewritten with an implicit `| search`.** That prefix is a Splunk runtime default only (see [README.md](README.md)).
 
-## Headline counts
+## Headline counts (current)
 
-| Surface | In catalog today | Documented in `docs/spl` | Missing from catalog |
+| Surface | In catalog today | Documented in `docs/spl` | Remaining gap |
 | --- | --- | --- | --- |
-| Commands (`[[commands]]`) | **17** | **115** unique table names in [commands.md](commands.md) | **98** names (includes aliases / dual rows / adjacent) |
-| Eval functions (`kind = "eval"`) | **13** | **107** (93 table rows + 14 trig) | **94** |
-| Stats aggregations (`kind = "aggregate"`) | **6** | **35** primary names in [stats-functions.md](stats-functions.md) | **29** primary |
-| Search syntax (booleans, macros, comments, subsearches) | not modeled | [search-syntax.md](search-syntax.md) | entire layer |
-| CIM / ES fields | not modeled | [common-fields.md](common-fields.md) | entire layer |
+| Commands (`[[commands]]`) | **150** | Search Reference primary names in [commands.md](commands.md) | Detection-relevant + previously missing 32 rare commands. App/SPL2-only remain out of classic scope. |
+| Eval functions (`kind = "eval"`) | **109** | **107** (93 table rows + 14 trig in prose) | Trig now in catalog. Newer portal/SPL2-only names remain out of classic scope. |
+| Stats aggregations (`kind = "aggregate"`) | **35** | **35** primary names (+ aliases) | Alias rows `c` / `distinct_count` / `p` / `percentile` added. `sum`/`avg`/`min`/`max` remain **eval** rows only (name-unique lookup). |
+| Functions total | **144** | — | — |
+| Search syntax | not catalogued (grammar partial) | [search-syntax.md](search-syntax.md), [macros.md](macros.md), [subsearches.md](subsearches.md), [comments.md](comments.md) | Knowledge OK; grammar/LSP modeling incomplete — [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md) |
+| CIM / ES fields | not catalogued | [common-fields.md](common-fields.md), [cim-fields.md](cim-fields.md) | Inventory present; no field catalog / completion |
 
-Catalog commands (17): `search`, `where`, `eval`, `stats`, `rex`, `table`, `rename`, `fields`, `dedup`, `sort`, `head`, `tail`, `join`, `lookup`, `makemv`, `mvexpand`, `tstats`.
+**Catalog ↔ grammar:** 150 commands = 17 dedicated parse rules + 133 `catalog_command_name` literals.
 
-Catalog eval (13): `len`, `lower`, `upper`, `replace`, `strftime`, `strptime`, `if`, `coalesce`, `tonumber`, `tostring`, `md5`, `sha1`, `sha256`.
+**Completions:** after `|` → all catalog commands; otherwise → all catalog functions.
 
-Catalog aggregates (6): `count`, `sum`, `avg`, `min`, `max`, `dc`.
+**Hover:** commands + functions (from catalog docs).
 
----
-
-## Top gaps (prioritized for ES / OpenTide detections)
-
-These are the highest-impact misses: they appear constantly in ESCU-style `splunk.query` blocks and will currently tokenize as unknown commands or uncatalogued functions.
-
-### 1. Generating commands beyond `search` / `tstats`
-
-| Missing command | Why it matters |
-| --- | --- |
-| `inputlookup` | Watchlists, threat intel, baselines as the **first** command |
-| `makeresults` | Synthetic rows / test detections |
-| `from` | Datamodel / lookup / savedsearch datasets |
-| `rest` | Splunk audit detections (`/services/...`) |
-| `metadata` | Inventory of hosts/sourcetypes |
-| `multisearch` | Parallel streaming legs |
-| `datamodel` | Datamodel inspection / search |
-
-`tstats` **is** catalogued, which covers the most common ES generator. Bare `search` is catalogued. Everything else that can legally start a pipeline is a gap.
-
-### 2. Transforming / correlation commands
-
-| Missing command | Why it matters |
-| --- | --- |
-| `timechart` | Time-binned detections / trending |
-| `chart` | Split-by reporting |
-| `top` / `rare` | Frequency detections |
-| `transaction` | Sessionization (auth bursts, multi-event chains) |
-| `eventstats` | Attach population stats then `where` outliers |
-| `streamstats` | Sliding-window brute-force / rate |
-| `fillnull` | Required before `stats` on sparse CIM fields |
-| `bin` / `bucket` | Time/numeric bucketing without `timechart` |
-| `xyseries` / `untable` | Table reshape |
-
-### 3. Extraction / filter streaming
-
-| Missing command | Why it matters |
-| --- | --- |
-| `regex` / `regex field=` | Filter on CommandLine / `_raw` without extracting |
-| `spath` | JSON (CloudTrail, kube, o365) |
-| `extract` / `kv` | Ad-hoc KV |
-| `xmlkv` | XML WinEventLog leftovers |
-| `strcat` | Build composite keys |
-| `convert` | `ctime`/`mktime` on ES `firstTime`/`lastTime` |
-| `outputlookup` | Write baselines |
-| `append` / `appendcols` / `appendpipe` | Union-style detections |
-| `return` / `format` | Subsearch result shaping |
-| `foreach` | Field-wildcard eval |
-| `nomv` / `mvcombine` | Mv normalize |
-| `rangemap` | Bucket labels |
-| `multikv` | Table events |
-
-`rex` is catalogued; `regex` (the **filter** command) is not. That name collision is a parser hazard.
-
-### 4. Eval functions (detection-common, not in catalog)
-
-| Missing | Typical use |
-| --- | --- |
-| `case` | Multi-way classification |
-| `cidrmatch` | RFC1918 / corp ranges in `where` |
-| `match` / `like` / `searchmatch` / `in` | Command-line / path matching in `where` |
-| `now` / `relative_time` | Age of event, time windows |
-| `split` / `mvindex` / `mvcount` / `mvjoin` / `mvfilter` | Parse `process`, hashes, argv |
-| `substr` / `trim` | Path / domain slices |
-| `isnull` / `isnotnull` / `isnum` / `isstr` / `typeof` | Guard evals |
-| `json_extract` / `json_object` | Cloud JSON |
-| `round` / `abs` / `ceil` / `floor` / `log` / `pow` / `random` | Numeric / sampling |
-| `urldecode` | Encoded URLs / command lines |
-| `true` / `false` | Default `case` arm |
-| `null` / `coalesce` is present; `null` is not | |
-
-`if` and `coalesce` are catalogued; `case` is the usual next step and is missing.
-
-### 5. Stats aggregations (detection-common, not in catalog)
-
-| Missing | Typical use |
-| --- | --- |
-| `values` | Collect distinct `src` / `user` onto the notable |
-| `list` | Ordered sample of command lines (`stats` only) |
-| `earliest` / `latest` | Chronological first/last (≠ `first`/`last`) |
-| `first` / `last` | Pipeline-order samples |
-| `median` / `perc` / `stdev` / `var` | Outlier thresholds with `eventstats` |
-| `mode` / `range` | |
-| `estdc` / `exactperc` / `upperperc` | High-cardinality / percentiles |
-| `mean` / `stdevp` / `varp` / `sumsq` | |
-| `earliest_time` / `latest_time` / `rate` | Counter rates |
-
-ES correlation-search idiom `min(_time) AS firstTime max(_time) AS lastTime` works today because `min`/`max` are catalogued. `values(src) AS src` and `dc(user)` (dc **is** catalogued) are the next most common.
-
-### 6. Syntax the catalog does not describe
-
-The grammar has `bare_search` and pipes; the catalog has no entries for:
-
-- Implied vs authored `search` (policy is documented in [README.md](README.md); catalog `search.docs` currently says “Implicit at the start of a pipeline,” which is the **runtime** fact and must not be implemented as a source rewrite)
-- Macros `` `security_content_summariesonly` ``
-- Comments ` ```...``` `
-- Subsearches `[ ]`
-- `IN (...)`
-- `TERM()` / `CASE()`
-- `AND`/`OR`/`NOT` (and the `search` vs `eval` precedence split)
-
-### 7. Kind mismatches already in the catalog
-
-| Command | Catalog `kind` | Splunk Command types | Notes |
-| --- | --- | --- | --- |
-| `search` | generating | generating **or** streaming | Correct as primary; later-pipeline `\| search` is streaming |
-| `sort` | transforming | **dataset processing** | Catalog follows “reporting-ish”; Splunk does not call `sort` transforming |
-| `tail` | streaming | **dataset processing** | Needs the full set |
-| `join` | dataset | centralized streaming **or** dataset | Reasonable |
-| `dedup` | streaming | streaming, or dataset if `sortby`/`keepevents` | OK for default |
-| `table` | transforming | transforming | OK |
-| `lookup` | streaming | streaming, or orchestrating if `local=true` | OK for default |
-
-Several catalog rows lack `citation` (`table`, `rename`, `fields`, `dedup`, `sort`, `head`, `tail`, `join`, `lookup`, `makemv`, `mvexpand`, `tstats`, and all `[[functions]]`). Inventory URLs are in [commands.md](commands.md) / [eval-functions.md](eval-functions.md) / [stats-functions.md](stats-functions.md).
+**Highlights:** `highlights.scm` colors dedicated commands + `(catalog_command (catalog_command_name) @keyword)`. AST fallback also treats `catalog_command_name` as `keyword`.
 
 ---
 
-## Commands in the catalog (covered)
-
-These 17 are the only command names the engine currently treats as first-class:
-
-`search` `tstats` `eval` `where` `stats` `rex` `table` `rename` `fields` `dedup` `sort` `head` `tail` `join` `lookup` `makemv` `mvexpand`
-
-Everything in [commands.md](commands.md) not in that list is a gap. Highest-frequency remaining names, as a punch list:
+## Covered in catalog (118 commands)
 
 ```
-inputlookup makeresults from rest metadata
-timechart chart top rare transaction eventstats streamstats
-fillnull bin bucket regex spath extract kv xmlkv
-strcat convert outputlookup append appendcols return
-foreach nomv mvcombine rangemap multikv untable
-localop require
+addinfo addtotals anomalydetection append appendcols appendpipe bin bucket
+chart cluster collect concurrency contingency convert datamodel dbinspect
+dedup delete erex eval eventcount eventstats extract fieldformat fields
+fieldsummary filldown fillnull foreach format from fromjson gentimes geom
+geostats head highlight history inputcsv inputlookup iplocation join kmeans
+kv kvform loadjob localize localop lookup makecontinuous makemv makeresults
+map mcollect metadata metasearch mpreview mstats multikv multisearch
+mvcombine mvexpand nomv noop outlier outputcsv outputlookup pivot rangemap
+rare redistribute regex reltime rename replace require rest return reverse
+rex savedsearch script scrub search searchtxn selfjoin sendemail set
+setfields sichart sirare sistats sitimechart sitop sort spath stats strcat
+streamstats table tags tail timechart timewrap tojson top transaction
+transpose tstats union uniq untable walklex where xmlkv xmlunescape xpath
+xyseries
 ```
 
-## Eval functions in the catalog (covered)
+## Eval in catalog (109)
 
-`if` `coalesce` `len` `lower` `upper` `replace` `strftime` `strptime` `tonumber` `tostring` `md5` `sha1` `sha256`
+Includes detection-common and trig: `if` `case` `coalesce` `cidrmatch` `match` `like` `searchmatch` `in` `true` `false` `null` … JSON `json_*` … math `round` `abs` `ceil`/`ceiling` `floor` … `sum` `random` `min` `max` `avg` bitwise `bit_*`, plus trig/hyperbolic `acos` `acosh` `asin` `asinh` `atan` `atan2` `atanh` `cos` `cosh` `hypot` `sin` `sinh` `tan` `tanh`.
 
-Punch list of remaining detection-common evals:
-
-```
-case cidrmatch match like searchmatch in true false
-now relative_time split mvindex mvcount mvjoin mvfilter
-substr trim isnull isnotnull isnum isstr typeof
-json_extract json_object round abs ceil floor log pow random
-urldecode null
-```
-
-## Aggregates in the catalog (covered)
-
-`count` `sum` `avg` `min` `max` `dc`
-
-Punch list:
+## Aggregates in catalog (35)
 
 ```
-values list earliest latest first last
-median perc stdev var mode range
-estdc exactperc upperperc
+count dc median perc stdev var list values earliest latest first last mode
+range estdc exactperc upperperc mean stdevp varp sumsq estdc_error
+earliest_time latest_time rate rate_avg rate_sum per_day per_hour
+per_minute per_second c distinct_count p percentile
 ```
+
+`min` / `max` / `sum` / `avg` are catalogued under **eval** (dual-use names; see gap notes).
 
 ---
 
-## Suggested catalog expansion order (docs only; not done here)
+## Remaining gaps (prioritized)
 
-1. **Commands:** `regex`, `fillnull`, `spath`, `timechart`, `eventstats`, `streamstats`, `inputlookup`, `bin`, `append`, `outputlookup`, `where` already present — then `transaction`, `top`, `makeresults`, `from`, `convert`, `foreach`.
-2. **Eval:** `case`, `match`, `cidrmatch`, `now`, `split`, `mvindex`, `isnull`, `json_extract`, `true`.
-3. **Stats:** `values`, `earliest`, `latest`, `list`, `perc`, `stdev`.
-4. Fill missing `citation` keys on existing rows using Search Reference `latest` URLs.
-5. Do **not** add an implicit `| search` rewrite when expanding `search`; keep authored tokenization.
+### 1. Search Reference commands not in catalog (~38)
+
+From [List of search commands](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/ListOfSearchCommands) / Command quick reference — uncommon in ES correlation searches:
+
+```
+abstract accum addcoltotals analyzefields anomalies anomalousvalue
+arules associate autoregress bucketdir cofilter correlate
+delta diff findtypes folderize gauge geomfilter iconify
+meventcollect msearch outputtext overlap predict rtorder
+sendalert trendline tscollect typeahead typelearner typer x11
+```
+
+Aliases not present as separate catalog rows (canonical may already exist):
+
+```
+af              → analyzefields
+ctable, counttable → contingency   (contingency is catalogued)
+discretize      → bin              (bin/bucket catalogued)
+run             → script           (script catalogued)
+stash           → collect          (collect catalogued)
+msearch         → mpreview         (mpreview catalogued)
+```
+
+App / third-party commands (`dbxquery`, ESCU customs, …) stay out of scope.
+
+### 2. Eval still missing
+
+Trig / hyperbolic (**done in catalog**): `acos` `acosh` `asin` `asinh` `atan` `atan2` `atanh` `cos` `cosh` `hypot` `sin` `sinh` `tan` `tanh`.
+
+**Still deferred:** newer portal / SPL2-oriented names (e.g. `toarray` `tobool` `tomv` `isarray` `ismv`) — not part of the classic detection dialect.
+
+### 3. Stats alias / dual-kind notes
+
+| Name | Status |
+| --- | --- |
+| `c` `distinct_count` `p` `percentile` | **Added** as aggregate alias rows |
+| `sum` `avg` `min` `max` | still only `kind = "eval"` (name-unique `function()` lookup) |
+
+### 4. Syntax / LSP modeling
+
+| Feature | Docs | Engine |
+| --- | --- | --- |
+| Implied vs authored `search` | [README.md](README.md) | **Must not** rewrite; `bare_search` stays bare |
+| Macros `` `name` `` | [macros.md](macros.md) | Grammar `comment` overlaps single-backtick forms |
+| Comments `` ```…``` `` | [comments.md](comments.md) | Partial / incorrect delimiters |
+| Subsearches `[ ]` | [subsearches.md](subsearches.md) | Full pipeline only inside `join`; otherwise punctuation |
+| `IN` / `TERM()` / `CASE()` | [search-syntax.md](search-syntax.md) | `IN`/`LIKE` in comparisons; `TERM`/`CASE` not first-class |
+| `AND`/`OR`/`NOT` precedence | [search-syntax.md](search-syntax.md) | Modeled for eval/where, not full search-clause AST |
+
+### 5. Hover / highlight quirks
+
+| Surface | Status |
+| --- | --- |
+| Command completions after `\|` | OK (118) |
+| Function completions | OK (all catalog functions) |
+| Command hover | OK |
+| Function hover | Wired from catalog docs |
+| scm via `catalog_command_name` | OK |
+| AST fallback highlighter | Handles `catalog_command_name` as `keyword` |
+| Extra explicit scm keyword strings | Redundant with `catalog_command_name` (harmless) |
+
+### 6. Catalog quality nits
+
+Adjacent command rows now have `docs` + `citation`. Re-check if any new adjacent commands are added without them.
+
+### 7. Kind mismatches (policy)
+
+| Command | Catalog `kind` | Splunk notes |
+| --- | --- | --- |
+| `search` | generating | also streaming mid-pipeline |
+| `sort` | transforming | dataset processing in Splunk |
+| `tail` | streaming | dataset processing in Splunk |
+| `join` | dataset | centralized streaming or dataset |
+| `lookup` | streaming | orchestrating if `local=true` |
+| `fillnull` | dataset | streaming when field list given |
 
 ---
 
-## Out of catalog on purpose (for now)
+## Suggested next expansion order
 
-Still documented in the inventory so implementers can recognize them:
+1. ~~Add 14 trig eval rows + stats alias rows~~ **done**.
+2. ~~Wire function hover~~ **done**.
+3. ~~AST fallback `catalog_command_name`~~ **done**.
+4. Fix grammar comment vs macro tokens; broaden subsearch parsing.
+5. Add ~32 rare commands only if scope expands past detections.
+6. Optional CIM field catalog from [cim-fields.md](cim-fields.md).
+7. Kind-aware function lookup if `sum`/`avg`/`min`/`max` need aggregate docs distinct from eval.
+8. **Never** add an implicit `| search` rewrite.
 
-- Orchestrating: `noop`, `redistribute`, `localop` (low frequency in detections)
-- Anomaly/ML: `kmeans`, `predict`, `anomalydetection`
-- Destructive / side-effect: `delete`, `collect`, `script`, `sendemail`
-- App commands: `dbxquery`, ESCU custom commands
-- Full trig / bitwise eval sets (needed for completeness, not for v1 completion)
-
-Those are **inventory-complete** and **catalog-deferred**.
+Exact missing names for implementers: [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md).

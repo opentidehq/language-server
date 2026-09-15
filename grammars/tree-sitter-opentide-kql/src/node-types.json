@@ -1178,6 +1178,10 @@
     "named": false
   },
   {
+    "type": "!between",
+    "named": false
+  },
+  {
     "type": "!contains",
     "named": false
   },
@@ -1199,6 +1203,22 @@
   },
   {
     "type": "!has_cs",
+    "named": false
+  },
+  {
+    "type": "!hasprefix",
+    "named": false
+  },
+  {
+    "type": "!hasprefix_cs",
+    "named": false
+  },
+  {
+    "type": "!hassuffix",
+    "named": false
+  },
+  {
+    "type": "!hassuffix_cs",
     "named": false
   },
   {
@@ -1419,7 +1439,39 @@
     "named": false
   },
   {
+    "type": "has_any_ipv4",
+    "named": false
+  },
+  {
+    "type": "has_any_ipv4_prefix",
+    "named": false
+  },
+  {
     "type": "has_cs",
+    "named": false
+  },
+  {
+    "type": "has_ipv4",
+    "named": false
+  },
+  {
+    "type": "has_ipv4_prefix",
+    "named": false
+  },
+  {
+    "type": "hasprefix",
+    "named": false
+  },
+  {
+    "type": "hasprefix_cs",
+    "named": false
+  },
+  {
+    "type": "hassuffix",
+    "named": false
+  },
+  {
+    "type": "hassuffix_cs",
     "named": false
   },
   {

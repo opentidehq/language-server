@@ -72,8 +72,13 @@ Bare field-value searches are the common case. Generating commands other than im
 | [eval-functions.md](eval-functions.md) | Evaluation functions used with `eval`, `where`, `fieldformat` |
 | [stats-functions.md](stats-functions.md) | Aggregations for `stats` / `eventstats` / `streamstats` / `tstats` / `chart` / `timechart` |
 | [search-syntax.md](search-syntax.md) | Field-value pairs, booleans, wildcards, pipes, subsearches, macros, comments |
+| [macros.md](macros.md) | Search macros (`` `name` `` / `` `name(args)` ``), ES/ESCU examples |
+| [subsearches.md](subsearches.md) | Bracket subsearches, `return` / `format` / join-append patterns |
+| [comments.md](comments.md) | `` ```comment``` `` form vs macros; placement limits |
 | [common-fields.md](common-fields.md) | Default Splunk fields plus CIM / ES fields used in detections |
-| [coverage-gap.md](coverage-gap.md) | Inventory vs current `catalogs/spl/commands.toml` |
+| [cim-fields.md](cim-fields.md) | CIM data-model coverage checklist and critical field set |
+| [coverage-gap.md](coverage-gap.md) | Inventory vs current `catalogs/spl/commands.toml` (live counts) |
+| [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md) | Exact missing names across catalog / grammar / scm / hover / completions |
 
 ## Canonical citations
 
@@ -92,12 +97,15 @@ Newer portal mirrors live under `help.splunk.com`; citations in this inventory k
 
 ## Counts (this revision)
 
-Measured from the tables in this directory (aliases and dual-kind rows included; trig evals listed in prose are counted):
+Measured from the tables in this directory (aliases and dual-kind rows included; trig evals listed in prose are counted) against the **current** catalog:
 
 | Surface | Documented here | In `catalogs/spl/commands.toml` |
 | --- | --- | --- |
-| Commands | **115** unique table names | **17** `[[commands]]` |
-| Eval functions | **107** (93 table rows + 14 trig) | **13** `kind = "eval"` |
-| Stats aggregations | **35** primary table names | **6** `kind = "aggregate"` |
+| Commands | **~115** unique primary table names (+ aliases / adjacent) | **118** `[[commands]]` |
+| Eval functions | **107** (93 table rows + 14 trig) | **109** `kind = "eval"` (includes trig + dual-use math) |
+| Stats aggregations | **35** primary table names (+ aliases) | **35** `kind = "aggregate"` (includes `c` / `distinct_count` / `p` / `percentile`) |
+| Functions total | — | **144** (`eval` + `aggregate`) |
 
-Top gaps are listed in [coverage-gap.md](coverage-gap.md).
+Remaining gaps (including ~32 rare Search Reference commands still absent): [coverage-gap.md](coverage-gap.md), [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md).
+
+Grammar `catalog_command_name` matches the catalog (no command drift). Authored SPL is still never rewritten with implicit `| search`.

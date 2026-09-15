@@ -274,12 +274,16 @@ profile = "defender"
 category = "endpoint"
 
 [[tables]]
-name = "KB"
+name = "DeviceBaselineComplianceAssessmentKB"
 profile = "defender"
+category = "endpoint"
+citation = "https://learn.microsoft.com/defender-xdr/advanced-hunting-devicebaselinecomplianceassessmentkb-table"
 
 [[tables]]
-name = "Profiles"
+name = "DeviceBaselineComplianceProfiles"
 profile = "defender"
+category = "endpoint"
+citation = "https://learn.microsoft.com/defender-xdr/advanced-hunting-devicebaselinecomplianceprofiles-table"
 
 [[tables]]
 name = "ExposureGraphNodes"
