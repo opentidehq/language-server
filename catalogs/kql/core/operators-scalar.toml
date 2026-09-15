@@ -151,3 +151,24 @@ name = "<="
 
 [[scalar_operators]]
 name = ">="
+
+
+[[scalar_operators]]
+name = "between"
+docs = "Inclusive range: expr between (from .. to)"
+citation = "https://learn.microsoft.com/kusto/query/between-operator"
+
+[[scalar_operators]]
+name = "!between"
+docs = "Negated inclusive range"
+citation = "https://learn.microsoft.com/kusto/query/not-between-operator"
+
+[[scalar_operators]]
+name = "-"
+docs = "Subtraction / unary negation"
+citation = "https://learn.microsoft.com/kusto/query/numerical-operators"
+
+[[scalar_operators]]
+name = "*"
+docs = "Multiplication"
+citation = "https://learn.microsoft.com/kusto/query/numerical-operators"
