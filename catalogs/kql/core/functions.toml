@@ -93,6 +93,6 @@ kind = "aggregate"
 
 [[functions]]
 name = "arg_min"
-signature = "arg_max(expr, * )"
+signature = "arg_min(expr, * )"
 docs = "Pick the row with the minimum expr."
 kind = "aggregate"
