@@ -2,6 +2,8 @@
 
 Fields that appear in Splunk Enterprise Security detections, CIM-normalized data, and OpenTide `splunk.query` blocks. Default Splunk fields are always present; CIM fields exist when a TA / datamodel maps them.
 
+Data-model coverage checklist: [cim-fields.md](cim-fields.md). There is **no** field catalog in `catalogs/spl/` yet (docs only).
+
 Citations:
 
 - [CIM fields per associated data model](https://docs.splunk.com/Documentation/CIM/latest/User/CIMfields)

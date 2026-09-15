@@ -2,7 +2,7 @@
 
 use opentide_core::{CompletionItem, Diagnostic, LanguageId, Position};
 use opentide_highlight::{
-    HighlightResult, HighlightSpec, HighlightToken, SemanticTokens, encode_semantic_tokens,
+    HighlightResult, HighlightSpec, HighlightToken, SemanticTokens, encode_lsp_semantic_tokens,
 };
 use opentide_kql::Profile;
 use opentide_tide::{IndexedObject, TideAnalyzeResult};
@@ -109,7 +109,7 @@ pub fn highlight(language: LanguageId, text: &str) -> HighlightResult {
 pub fn semantic_tokens(language: LanguageId, text: &str) -> SemanticTokens {
     let result = highlight(language, text);
     SemanticTokens {
-        data: encode_semantic_tokens(&result.tokens),
+        data: encode_lsp_semantic_tokens(&result.tokens),
         legend: result.legend,
     }
 }

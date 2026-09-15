@@ -1,26 +1,6 @@
-//! Regression: keyword tokens must exist and survive HTML rendering as class=keyword.
 use opentide_analysis::highlight;
 use opentide_core::LanguageId;
-use opentide_highlight::HighlightToken;
-
-fn to_html(source: &str, tokens: &[HighlightToken]) -> String {
-    let mut html = String::new();
-    let mut last = 0usize;
-    let mut ordered = tokens.to_vec();
-    ordered.sort_by_key(|t| t.span.start);
-    for t in &ordered {
-        if t.span.start < last {
-            continue;
-        }
-        html.push_str(&source[last..t.span.start]);
-        html.push_str(&format!("<span class=\"{}\">", t.capture.replace('.', "-")));
-        html.push_str(&source[t.span.start..t.span.end]);
-        html.push_str("</span>");
-        last = t.span.end;
-    }
-    html.push_str(&source[last..]);
-    html
-}
+use opentide_highlight::tokens_to_html;
 
 #[test]
 fn kql_keyword_tokens_and_html_spans() {
@@ -40,7 +20,7 @@ fn kql_keyword_tokens_and_html_spans() {
         "{:?}",
         r.tokens
     );
-    let html = to_html(src, &r.tokens);
+    let html = tokens_to_html(src, &r.tokens);
     assert!(
         html.contains("<span class=\"keyword\">where</span>"),
         "{html}"
@@ -49,6 +29,8 @@ fn kql_keyword_tokens_and_html_spans() {
         html.contains("<span class=\"keyword\">take</span>"),
         "{html}"
     );
+    assert!(html.contains("#c586c0"), "{html}");
+    assert!(html.contains("#ff79c6"), "{html}");
 }
 
 #[test]
@@ -69,7 +51,7 @@ fn spl_keyword_tokens_and_html_spans() {
         "{:?}",
         r.tokens
     );
-    let html = to_html(src, &r.tokens);
+    let html = tokens_to_html(src, &r.tokens);
     assert!(
         html.contains("<span class=\"keyword\">stats</span>"),
         "{html}"

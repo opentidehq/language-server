@@ -124,7 +124,71 @@ pub struct SemanticTokens {
     pub legend: Vec<String>,
 }
 
+/// Standard LSP / VS Code semantic token types. Capture names such as
+/// `operator.pipe` are **not** styled by default themes, so encoding uses
+/// this legend instead of `HighlightSpec.legend`.
+pub const LSP_TOKEN_TYPES: &[&str] = &[
+    "namespace",
+    "type",
+    "class",
+    "enum",
+    "interface",
+    "struct",
+    "typeParameter",
+    "parameter",
+    "variable",
+    "property",
+    "enumMember",
+    "event",
+    "function",
+    "method",
+    "macro",
+    "keyword",
+    "modifier",
+    "comment",
+    "string",
+    "number",
+    "regexp",
+    "operator",
+    "decorator",
+];
+
+pub fn lsp_token_type_index(capture: &str) -> u32 {
+    let name = match capture {
+        "comment" => "comment",
+        "keyword" | "tide.keyword" => "keyword",
+        "operator"
+        | "operator.pipe"
+        | "punctuation"
+        | "punctuation.bracket"
+        | "punctuation.delimiter" => "operator",
+        "function" | "function.builtin" => "function",
+        "type" | "tide.schema" => "type",
+        "variable" => "variable",
+        "property" | "tide.property" => "property",
+        "string" => "string",
+        "number" | "tide.uuid" => "number",
+        "boolean" | "constant" => "enumMember",
+        "error" => "macro",
+        _ => "variable",
+    };
+    LSP_TOKEN_TYPES.iter().position(|n| *n == name).unwrap_or(8) as u32
+}
+
 pub fn encode_semantic_tokens(tokens: &[HighlightToken]) -> Vec<u32> {
+    encode_semantic_tokens_with(tokens, |t| t.token_type)
+}
+
+/// Encode using the standard LSP legend so VS Code / Monaco actually color
+/// pipes, builtins, Tide keys, and punctuation.
+pub fn encode_lsp_semantic_tokens(tokens: &[HighlightToken]) -> Vec<u32> {
+    encode_semantic_tokens_with(tokens, |t| lsp_token_type_index(&t.capture))
+}
+
+fn encode_semantic_tokens_with(
+    tokens: &[HighlightToken],
+    token_type: impl Fn(&HighlightToken) -> u32,
+) -> Vec<u32> {
     let mut data = Vec::with_capacity(tokens.len() * 5);
     let mut prev_line = 0u32;
     let mut prev_char = 0u32;
@@ -143,11 +207,65 @@ pub fn encode_semantic_tokens(tokens: &[HighlightToken]) -> Vec<u32> {
             .character
             .saturating_sub(token.range.start.character)
             .max(1);
-        data.extend_from_slice(&[delta_line, delta_char, length, token.token_type, 0]);
+        data.extend_from_slice(&[delta_line, delta_char, length, token_type(token), 0]);
         prev_line = line;
         prev_char = character;
     }
     data
+}
+
+/// High-contrast HTML for `opentide-lsp highlight --html` and tests.
+pub fn tokens_to_html(source: &str, tokens: &[HighlightToken]) -> String {
+    let mut html = String::from(
+        r#"<!doctype html><meta charset=utf-8>
+<title>OpenTide highlight</title>
+<style>
+body{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#1e1e1e;color:#d4d4d4;padding:24px;margin:0}
+pre{margin:0;white-space:pre-wrap}
+.keyword{color:#c586c0;font-weight:700}
+.function,.function-builtin{color:#dcdcaa;font-weight:600}
+.string{color:#ce9178}
+.number{color:#b5cea8}
+.comment{color:#6a9955;font-style:italic}
+.type{color:#4ec9b0;font-weight:700}
+.property{color:#9cdcfe}
+.operator{color:#d7ba7d;font-weight:600}
+.operator-pipe{color:#ff79c6;font-weight:800}
+.error{color:#f44747;text-decoration:underline}
+.boolean,.constant{color:#569cd6;font-weight:600}
+.punctuation,.punctuation-bracket,.punctuation-delimiter{color:#c8c8c8}
+.tide-keyword{color:#c586c0;font-weight:700}
+.tide-property{color:#9cdcfe}
+.tide-uuid{color:#b5cea8}
+.tide-schema{color:#4ec9b0}
+.variable{color:#9cdcfe}
+</style><pre>"#,
+    );
+    let mut last = 0usize;
+    let mut ordered = tokens.to_vec();
+    ordered.sort_by_key(|t| (t.span.start, t.span.end));
+    for t in &ordered {
+        if t.span.start < last {
+            continue;
+        }
+        let start = t.span.start.min(source.len());
+        let end = t.span.end.min(source.len());
+        html.push_str(&html_escape(&source[last..start]));
+        let class = t.capture.replace('.', "-");
+        html.push_str(&format!("<span class=\"{class}\">"));
+        html.push_str(&html_escape(&source[start..end]));
+        html.push_str("</span>");
+        last = end;
+    }
+    html.push_str(&html_escape(&source[last..]));
+    html.push_str("</pre>");
+    html
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 pub fn tokens_from_spans(
@@ -293,13 +411,25 @@ pub fn generated_artifacts_stale(
     monaco: &str,
     helix: &str,
 ) -> Result<(), String> {
-    let expected_tm = serde_json::to_string_pretty(&generate_tm_language(LanguageId::Kql, spec))
+    generated_artifacts_stale_for(spec, LanguageId::Kql, tm, monaco, helix)
+}
+
+pub fn generated_artifacts_stale_for(
+    spec: &HighlightSpec,
+    language: LanguageId,
+    tm: &str,
+    monaco: &str,
+    helix: &str,
+) -> Result<(), String> {
+    let expected_tm = serde_json::to_string_pretty(&generate_tm_language(language, spec))
         .map_err(|e| e.to_string())?;
     let expected_monaco =
         serde_json::to_string_pretty(&generate_monaco(spec)).map_err(|e| e.to_string())?;
     let expected_helix = generate_helix(spec);
     if tm.trim() != expected_tm.trim() {
-        return Err("generated tmLanguage is stale; run opentide-lsp generate-highlights".into());
+        return Err(format!(
+            "generated {language} tmLanguage is stale; run opentide-lsp generate-highlights"
+        ));
     }
     if monaco.trim() != expected_monaco.trim() {
         return Err("generated monaco map is stale; run opentide-lsp generate-highlights".into());
@@ -357,6 +487,47 @@ mod tests {
         assert_eq!(data.len(), 10);
         assert_eq!(data[0], 0);
         assert_eq!(data[5], 0); // same line
+    }
+
+    #[test]
+    fn lsp_legend_maps_dotted_captures_to_standard_types() {
+        assert_eq!(
+            LSP_TOKEN_TYPES[lsp_token_type_index("keyword") as usize],
+            "keyword"
+        );
+        assert_eq!(
+            LSP_TOKEN_TYPES[lsp_token_type_index("operator.pipe") as usize],
+            "operator"
+        );
+        assert_eq!(
+            LSP_TOKEN_TYPES[lsp_token_type_index("function.builtin") as usize],
+            "function"
+        );
+        assert_eq!(
+            LSP_TOKEN_TYPES[lsp_token_type_index("tide.keyword") as usize],
+            "keyword"
+        );
+    }
+
+    #[test]
+    fn html_stylesheet_colors_keywords_and_pipes() {
+        let spec = HighlightSpec::load().unwrap();
+        let src = "SecurityEvent | where x == 1";
+        let tokens = tokens_from_spans(
+            &spec,
+            src,
+            &[
+                (ByteSpan::new(0, 13), "type"),
+                (ByteSpan::new(14, 15), "operator.pipe"),
+                (ByteSpan::new(16, 21), "keyword"),
+            ],
+        )
+        .unwrap();
+        let html = tokens_to_html(src, &tokens);
+        assert!(html.contains("class=\"keyword\""));
+        assert!(html.contains("class=\"operator-pipe\""));
+        assert!(html.contains("#c586c0"));
+        assert!(html.contains("#ff79c6"));
     }
 }
 

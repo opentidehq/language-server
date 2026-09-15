@@ -13,6 +13,7 @@ const FUNCTIONS_TOML: &str = include_str!("../../../catalogs/kql/core/functions.
 const TYPES_TOML: &str = include_str!("../../../catalogs/kql/core/types.toml");
 const SCALAR_OPERATORS_TOML: &str =
     include_str!("../../../catalogs/kql/core/operators-scalar.toml");
+const PLUGINS_TOML: &str = include_str!("../../../catalogs/kql/core/evaluate-plugins.toml");
 const SENTINEL_TABLES: &str = include_str!("../../../catalogs/kql/sentinel/tables.toml");
 const DEFENDER_TABLES: &str = include_str!("../../../catalogs/kql/defender/tables.toml");
 
@@ -64,6 +65,19 @@ pub struct ScalarOperatorRow {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+struct PluginsFile {
+    plugins: Vec<PluginRow>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PluginRow {
+    pub name: String,
+    pub docs: Option<String>,
+    pub citation: Option<String>,
+    pub warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 struct TypesFile {
     types: Vec<TypeRow>,
 }
@@ -92,6 +106,7 @@ pub struct Catalog {
     pub operators: Vec<OperatorRow>,
     pub functions: Vec<FunctionRow>,
     pub scalar_operators: Vec<ScalarOperatorRow>,
+    pub plugins: Vec<PluginRow>,
     pub types: Vec<String>,
     pub tables: Vec<TableRow>,
 }
@@ -103,10 +118,12 @@ impl Catalog {
         let types: TypesFile = toml::from_str(TYPES_TOML).expect("types.toml");
         let scalar: ScalarOperatorsFile =
             toml::from_str(SCALAR_OPERATORS_TOML).expect("operators-scalar.toml");
+        let plugins: PluginsFile = toml::from_str(PLUGINS_TOML).expect("evaluate-plugins.toml");
         Self {
             operators: operators.operators,
             functions: functions.functions,
             scalar_operators: scalar.scalar_operators,
+            plugins: plugins.plugins,
             types: types.types.into_iter().map(|t| t.name).collect(),
             tables: Vec::new(),
         }
@@ -137,6 +154,12 @@ impl Catalog {
 
     pub fn table(&self, name: &str) -> Option<&TableRow> {
         self.tables.iter().find(|t| t.name == name)
+    }
+
+    pub fn plugin(&self, name: &str) -> Option<&PluginRow> {
+        self.plugins
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     pub fn suggest_table(&self, name: &str) -> Option<String> {
@@ -544,7 +567,9 @@ fn overlay_catalog_captures(source: &str, spans: &mut [(ByteSpan, String)], cata
             continue;
         }
         let text = &source[span.start..end];
-        if catalog.function(text).is_some() && (*capture == "variable" || *capture == "function") {
+        if (catalog.function(text).is_some() || catalog.plugin(text).is_some())
+            && (*capture == "variable" || *capture == "function")
+        {
             *capture = "function.builtin".into();
         } else if catalog.operator(text).is_some()
             && (*capture == "variable" || *capture == "error")
@@ -746,6 +771,20 @@ fn contains_ident(haystack: &str, ident: &str) -> bool {
 pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<CompletionItem> {
     let catalog = Catalog::core().with_profile(profile);
     let before = &source[..offset.min(source.len())];
+    let trimmed = before.trim_end();
+    if trimmed.to_ascii_lowercase().ends_with("evaluate") && before.ends_with(' ')
+        || trimmed.to_ascii_lowercase().ends_with("| evaluate")
+    {
+        return catalog
+            .plugins
+            .iter()
+            .map(|p| CompletionItem {
+                label: p.name.clone(),
+                detail: p.docs.clone(),
+                kind: "plugin".into(),
+            })
+            .collect();
+    }
     if before.trim_end().ends_with('|') || before.ends_with("| ") {
         return catalog
             .operators
@@ -775,6 +814,16 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
         label: o.name.clone(),
         detail: o.docs.clone(),
         kind: "operator".into(),
+    }));
+    items.extend(catalog.plugins.iter().map(|p| CompletionItem {
+        label: p.name.clone(),
+        detail: p.docs.clone(),
+        kind: "plugin".into(),
+    }));
+    items.extend(catalog.types.iter().map(|t| CompletionItem {
+        label: t.clone(),
+        detail: Some("KQL scalar type".into()),
+        kind: "type".into(),
     }));
     items
 }
@@ -828,6 +877,23 @@ pub fn hover(source: &str, position: opentide_core::Position, profile: Profile) 
             t.docs.clone().unwrap_or_default()
         ));
     }
+    if let Some(p) = catalog.plugin(&word) {
+        let mut md = format!(
+            "**{}** (evaluate plugin)\n\n{}",
+            p.name,
+            p.docs.clone().unwrap_or_default()
+        );
+        if let Some(c) = &p.citation {
+            md.push_str(&format!("\n\n[Microsoft Learn]({c})"));
+        }
+        if let Some(w) = &p.warning {
+            md.push_str(&format!("\n\nWarning: `{w}`"));
+        }
+        return Some(md);
+    }
+    if catalog.types.iter().any(|t| t.eq_ignore_ascii_case(&word)) {
+        return Some(format!("**{word}** (KQL scalar type)"));
+    }
     None
 }
 
@@ -857,13 +923,18 @@ fn word_at(source: &str, offset: usize) -> Option<String> {
     while i > 0 && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-') {
         i -= 1;
     }
-    if !(bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+    if bytes[i] == b'!' {
+        // keep `!has` / `!in` as a single operator token
+    } else if !(bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
         i += 1;
     }
     let start = i;
     let mut j = offset.min(bytes.len());
     while j < bytes.len()
-        && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-')
+        && (bytes[j].is_ascii_alphanumeric()
+            || bytes[j] == b'_'
+            || bytes[j] == b'-'
+            || bytes[j] == b'~')
     {
         j += 1;
     }
@@ -1008,6 +1079,8 @@ mod tests {
             "SecurityEvent | mv-expand AdditionalFields",
             "SecurityEvent | top 10 by EventID",
             "SecurityEvent | where EventID has 4688",
+            "SecurityEvent | where Computer hasprefix \"DC\"",
+            "SecurityEvent | evaluate bag_unpack(AdditionalFields)",
         ];
         for src in samples {
             let r = analyze(src, Profile::Core);
@@ -1047,11 +1120,16 @@ mod tests {
         assert!(c.operator("filter").is_some());
         assert!(c.tables.iter().any(|t| t.name == "SigninLogs"));
         assert!(
-            c.functions.len() > 200,
+            c.functions.len() > 400,
             "expected full scalar/agg catalog, got {}",
             c.functions.len()
         );
         assert!(c.operators.len() > 40, "{}", c.operators.len());
+        assert!(c.function("series_fft").is_some());
+        assert!(c.function("geo_point_in_polygon").is_some());
+        assert!(c.function("convert_length").is_some());
+        assert!(c.plugin("bag_unpack").is_some());
+        assert!(c.plugin("sql_request").is_some());
     }
 
     #[test]

@@ -10,12 +10,13 @@ This file compares the machine-readable catalogs under [`/workspace/catalogs/kql
 | --- | --- | --- |
 | [`core/operators.toml`](../../catalogs/kql/core/operators.toml) | **53** | Tabular ops + aliases (`filter`, `limit`, `order`, `mvexpand`) |
 | [`core/operators-scalar.toml`](../../catalogs/kql/core/operators-scalar.toml) | **54** | Includes `between`, `!between`, `-`, `*` |
-| [`core/functions.toml`](../../catalogs/kql/core/functions.toml) | **298** | 253 `scalar` + 45 `aggregate` |
+| [`core/functions.toml`](../../catalogs/kql/core/functions.toml) | **409** | 364 `scalar` + 45 `aggregate` (includes `series_*` / `geo_*` / `convert_*`) |
 | [`core/types.toml`](../../catalogs/kql/core/types.toml) | **10** | Full scalar type set |
+| [`core/evaluate-plugins.toml`](../../catalogs/kql/core/evaluate-plugins.toml) | **22** | `evaluate` plugin names + AM-no warnings |
 | [`sentinel/tables.toml`](../../catalogs/kql/sentinel/tables.toml) | **99** | Common first-party + selected connectors |
 | [`defender/tables.toml`](../../catalogs/kql/defender/tables.toml) | **65** | Advanced hunting schema tables |
 
-**Still no catalog files for:** evaluate plugins, control/management commands, syntax constructs.
+**Still no catalog file for:** control/management commands (parsed + diagnosed as unsupported), syntax constructs.
 
 ---
 
@@ -24,10 +25,10 @@ This file compares the machine-readable catalogs under [`/workspace/catalogs/kql
 | Area | Catalog now | Inventory / Learn | Remaining gap |
 | --- | --- | --- | --- |
 | Tabular operators | **53** | **~55** primary (+ aliases) | **~0** for hunting/detections |
-| Evaluate plugins | **0** (no file) | **22** in [`evaluate-plugins.md`](evaluate-plugins.md) | **22** — entire category |
+| Evaluate plugins | **22** | **22** | **0** names |
 | Control commands | **0** (diagnostics only) | **7** families in [`control-commands.md`](control-commands.md) | Catalog optional |
-| Scalar operators | **54** | **~54** documented | **~0** catalog; grammar still misses some tokens |
-| Scalar functions | **253** scalar rows | Learn index **~329** + AM helpers | **111** (`series_*` / `geo_*` / `convert_*` except `geo_info_from_ip_address`) |
+| Scalar operators | **54** | **~54** documented | **~0** |
+| Scalar functions | **364** scalar rows | Learn index **~329** + AM helpers | **~0** vs hunting inventory |
 | Aggregation functions | **45** | Learn **46** names | **`hll_merge` kind** (present as `scalar`, should be `aggregate`) |
 | Scalar types | **10** | **10** | **0** |
 | Sentinel tables | **99** | Inventory ~60 named; Learn connectors **600+** | Inventory covered; long-tail `_CL` out of scope |

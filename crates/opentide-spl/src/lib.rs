@@ -184,11 +184,10 @@ fn highlight_tree(
                     && (*capture == "variable" || *capture == "function")
                 {
                     *capture = "function.builtin".into();
-                } else if catalog.command(text).is_some()
-                    && (*capture == "variable" || *capture == "error")
+                } else if (catalog.command(text).is_some()
+                    && (*capture == "variable" || *capture == "error"))
+                    || (matches!(text, "by" | "AS" | "as" | "from") && *capture == "variable")
                 {
-                    *capture = "keyword".into();
-                } else if matches!(text, "by" | "AS" | "as" | "from") && *capture == "variable" {
                     *capture = "keyword".into();
                 }
             }
@@ -217,6 +216,7 @@ fn collect_highlights(node: Node, _source: &str, out: &mut Vec<(ByteSpan, &'stat
         "number" => Some("number"),
         "boolean" => Some("boolean"),
         "|" => Some("operator.pipe"),
+        "catalog_command_name" => Some("keyword"),
         "search" | "where" | "eval" | "stats" | "rex" | "table" | "rename" | "fields" | "dedup"
         | "sort" | "head" | "tail" | "join" | "lookup" | "makemv" | "mvexpand" | "tstats"
         | "AS" | "by" | "from" => Some("keyword"),
@@ -332,6 +332,15 @@ pub fn hover(source: &str, position: opentide_core::Position) -> Option<String> 
             c.docs.clone().unwrap_or_default()
         ));
     }
+    if let Some(f) = catalog.function(&word) {
+        let kind = f.kind.clone().unwrap_or_else(|| "function".into());
+        return Some(format!(
+            "**{}** ({})\n\n{}",
+            f.name,
+            kind,
+            f.docs.clone().unwrap_or_default()
+        ));
+    }
     None
 }
 
@@ -406,6 +415,26 @@ mod tests {
     }
 
     #[test]
+    fn hover_function_from_catalog() {
+        let h = hover(
+            "index=main | eval x=lower(user)",
+            opentide_core::Position::new(0, 22),
+        );
+        let text = h.expect("hover");
+        assert!(text.to_lowercase().contains("lower"), "{text}");
+    }
+
+    #[test]
+    fn catalog_includes_trig_and_stats_aliases() {
+        let c = Catalog::load();
+        assert!(c.function("sin").is_some());
+        assert!(c.function("acos").is_some());
+        assert!(c.function("c").is_some());
+        assert!(c.function("distinct_count").is_some());
+        assert!(c.functions.len() >= 140, "{}", c.functions.len());
+    }
+
+    #[test]
     fn catalog_covers_es_surface() {
         let c = Catalog::load();
         for name in [
@@ -419,8 +448,11 @@ mod tests {
         }
         assert!(c.function("if").is_some());
         assert!(c.function("count").is_some());
-        assert!(c.commands.len() > 80, "{}", c.commands.len());
+        assert!(c.commands.len() > 140, "{}", c.commands.len());
         assert!(c.functions.len() > 80, "{}", c.functions.len());
+        assert!(c.command("abstract").is_some());
+        assert!(c.command("predict").is_some());
+        assert!(c.command("timechart").is_some());
     }
 
     #[test]

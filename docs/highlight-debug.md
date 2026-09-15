@@ -2,7 +2,11 @@
 
 Investigation of “mostly white” highlighting (only table names looking cyan).
 
-**Verdict:** The `child_count() == 0` hypothesis is **false** for the current grammars. Keyword anonymous leaves (`where`, `take`, `stats`, `head`, …) have `child_count() == 0` and **are emitted** as `@keyword` by the CST walker. Runtime highlighting does **not** execute `highlights/queries/*/highlights.scm`; it walks the tree by hand. The washed-out demo look comes from **HTML/CSS contrast** (operators match body color; variables are pale; `type`/tables are vivid cyan) plus **inert TextMate stubs** / empty JS client tokens on editor-only paths. Prefer switching the engines to the tree-sitter **Query API** so the checked-in `.scm` files become the single source of truth.
+**Runtime path:** `opentide_syntax::query_captures` runs `highlights/queries/{kql,spl}/highlights.scm` via tree-sitter `QueryCursor::captures` (first pattern wins). Nested overlapping spans are dropped so LSP semantic tokens never overlap. Catalog overlay promotes known functions to `function.builtin` and operators/commands to `keyword`.
+
+**LSP encoding:** VS Code only colors the [standard semantic token types](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide). Capture names like `operator.pipe` / `function.builtin` / `tide.keyword` are **not** in that set, so `encode_lsp_semantic_tokens` maps them onto `keyword` / `operator` / `function` / `type` / … (`opentide_highlight::LSP_TOKEN_TYPES`). JSON `highlight()` still emits the frozen capture names.
+
+**HTML:** `tokens_to_html` uses high-contrast Dark+ colors (`keyword` magenta, pipes hot-pink, functions yellow, tables teal).
 
 ---
 

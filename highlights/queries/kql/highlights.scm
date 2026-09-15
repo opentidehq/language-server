@@ -123,6 +123,7 @@
 "in~" @operator
 "!in~" @operator
 "between" @operator
+"!between" @operator
 "matches" @operator
 "regex" @operator
 "(" @punctuation.bracket

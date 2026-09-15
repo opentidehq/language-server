@@ -8,7 +8,7 @@ use opentide_analysis::{
     completions, hover, index_workspace,
 };
 use opentide_core::{LanguageId, Position, Range};
-use opentide_highlight::encode_semantic_tokens;
+use opentide_highlight::encode_lsp_semantic_tokens;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{BufReader, Write};
@@ -128,7 +128,7 @@ fn dispatch(session: &mut Session, writer: &mut impl Write, msg: Incoming) -> Re
                             "diagnosticProvider": { "interFileDependencies": true, "workspaceDiagnostics": false },
                             "semanticTokensProvider": {
                                 "legend": {
-                                    "tokenTypes": opentide_highlight::HighlightSpec::load().unwrap().legend,
+                                    "tokenTypes": opentide_highlight::LSP_TOKEN_TYPES,
                                     "tokenModifiers": []
                                 },
                                 "full": true
@@ -498,7 +498,7 @@ fn handle_semantic_tokens(session: &Session, params: &Value) -> Value {
             text: text.clone(),
         },
     );
-    json!({ "data": encode_semantic_tokens(&response.tokens) })
+    json!({ "data": encode_lsp_semantic_tokens(&response.tokens) })
 }
 
 fn handle_pull_diagnostics(session: &Session, params: &Value) -> Value {

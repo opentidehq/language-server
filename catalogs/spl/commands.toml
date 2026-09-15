@@ -633,60 +633,79 @@ citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/
 [[commands]]
 name = "collect"
 kind = "streaming"
+docs = "Write results to a summary index (stash). Rare inside detection bodies."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Collect"
 
 [[commands]]
 name = "delete"
 kind = "streaming"
+docs = "Permanently delete matching events. Never use in a detection."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Delete"
 
 [[commands]]
 name = "sendemail"
 kind = "streaming"
+docs = "Email search results. Alert action, not query logic."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Sendemail"
 
 [[commands]]
 name = "script"
 kind = "streaming"
+docs = "Run an external script (alias: run). Not portable in OpenTide rules."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Script"
 
 [[commands]]
 name = "outputcsv"
 kind = "streaming"
+docs = "Write results to a CSV on the search head."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Outputcsv"
 
 [[commands]]
 name = "kmeans"
 kind = "streaming"
+docs = "K-means clustering on selected fields. Occasional anomaly detections."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/ListOfSearchCommands"
 
 [[commands]]
 name = "highlight"
 kind = "streaming"
+docs = "Highlight terms in the UI event display."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Highlight"
 
 [[commands]]
 name = "history"
-kind = "streaming"
+kind = "generating"
+docs = "Return a history of searches as events or a table."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/History"
 
 [[commands]]
 name = "mcollect"
 kind = "streaming"
+docs = "Convert results into metric data on the search head."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Mcollect"
 
 [[commands]]
 name = "geom"
 kind = "streaming"
+docs = "Add a geom field for choropleth map polygons."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Geom"
 
 [[commands]]
 name = "makecontinuous"
 kind = "streaming"
+docs = "Make an x-axis field continuous for chart/timechart."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Makecontinuous"
 
 [[commands]]
 name = "localize"
 kind = "streaming"
+docs = "Return time ranges where results were found."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Localize"
 
 [[commands]]
 name = "scrub"
 kind = "streaming"
+docs = "Anonymize results (PII scrubbing)."
 citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Scrub"
 
 [[functions]]
@@ -1318,3 +1337,285 @@ docs = "Values per minute."
 name = "per_second"
 kind = "aggregate"
 docs = "Values per second."
+
+[[functions]]
+name = "acos"
+kind = "eval"
+docs = "Arc cosine."
+
+[[functions]]
+name = "acosh"
+kind = "eval"
+docs = "Inverse hyperbolic cosine."
+
+[[functions]]
+name = "asin"
+kind = "eval"
+docs = "Arc sine."
+
+[[functions]]
+name = "asinh"
+kind = "eval"
+docs = "Inverse hyperbolic sine."
+
+[[functions]]
+name = "atan"
+kind = "eval"
+docs = "Arc tangent."
+
+[[functions]]
+name = "atan2"
+kind = "eval"
+docs = "Arc tangent of Y/X."
+
+[[functions]]
+name = "atanh"
+kind = "eval"
+docs = "Inverse hyperbolic tangent."
+
+[[functions]]
+name = "cos"
+kind = "eval"
+docs = "Cosine."
+
+[[functions]]
+name = "cosh"
+kind = "eval"
+docs = "Hyperbolic cosine."
+
+[[functions]]
+name = "hypot"
+kind = "eval"
+docs = "Hypotenuse (sqrt(x^2+y^2))."
+
+[[functions]]
+name = "sin"
+kind = "eval"
+docs = "Sine."
+
+[[functions]]
+name = "sinh"
+kind = "eval"
+docs = "Hyperbolic sine."
+
+[[functions]]
+name = "tan"
+kind = "eval"
+docs = "Tangent."
+
+[[functions]]
+name = "tanh"
+kind = "eval"
+docs = "Hyperbolic tangent."
+
+[[functions]]
+name = "c"
+kind = "aggregate"
+docs = "Alias of count."
+
+[[functions]]
+name = "distinct_count"
+kind = "aggregate"
+docs = "Alias of dc (distinct count)."
+
+[[functions]]
+name = "p"
+kind = "aggregate"
+docs = "Alias of perc (percentile)."
+
+[[functions]]
+name = "percentile"
+kind = "aggregate"
+docs = "Alias of perc (percentile)."
+
+[[commands]]
+name = "abstract"
+kind = "reporting"
+docs = "Produce a summary of the most common terms"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Abstract"
+
+[[commands]]
+name = "accum"
+kind = "streaming"
+docs = "Running total of a numeric field"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Accum"
+
+[[commands]]
+name = "addcoltotals"
+kind = "transforming"
+docs = "Add a row of column totals"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Addcoltotals"
+
+[[commands]]
+name = "analyzefields"
+kind = "reporting"
+docs = "Analyze how fields relate to a target"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Analyzefields"
+
+[[commands]]
+name = "anomalies"
+kind = "streaming"
+docs = "Detect anomalous events"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Anomalies"
+
+[[commands]]
+name = "anomalousvalue"
+kind = "streaming"
+docs = "Flag anomalous values in fields"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Anomalousvalue"
+
+[[commands]]
+name = "arules"
+kind = "reporting"
+docs = "Association rules"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Arules"
+
+[[commands]]
+name = "associate"
+kind = "reporting"
+docs = "See which fields co-occur"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Associate"
+
+[[commands]]
+name = "autoregress"
+kind = "streaming"
+docs = "Prepare data for autoregression"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Autoregress"
+
+[[commands]]
+name = "bucketdir"
+kind = "streaming"
+docs = "Replaces a field value with a more generic path"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Bucketdir"
+
+[[commands]]
+name = "cofilter"
+kind = "reporting"
+docs = "Find events that share field values"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Cofilter"
+
+[[commands]]
+name = "correlate"
+kind = "reporting"
+docs = "Calculate correlation between fields"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Correlate"
+
+[[commands]]
+name = "delta"
+kind = "streaming"
+docs = "Difference between adjacent values"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Delta"
+
+[[commands]]
+name = "diff"
+kind = "streaming"
+docs = "Compare two search results"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Diff"
+
+[[commands]]
+name = "findtypes"
+kind = "streaming"
+docs = "Generate suggested event types"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Findtypes"
+
+[[commands]]
+name = "folderize"
+kind = "streaming"
+docs = "Create a hierarchy from delimited fields"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Folderize"
+
+[[commands]]
+name = "gauge"
+kind = "transforming"
+docs = "Transform results into a gauge visualization"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Gauge"
+
+[[commands]]
+name = "geomfilter"
+kind = "streaming"
+docs = "Filter points that fall outside a bounding box"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Geomfilter"
+
+[[commands]]
+name = "iconify"
+kind = "streaming"
+docs = "Display a field as an icon"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Iconify"
+
+[[commands]]
+name = "meventcollect"
+kind = "generating"
+docs = "Converts events into metric data points"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Meventcollect"
+
+[[commands]]
+name = "msearch"
+kind = "generating"
+docs = "Search metric data"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Msearch"
+
+[[commands]]
+name = "outputtext"
+kind = "streaming"
+docs = "Output the raw text of events"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Outputtext"
+
+[[commands]]
+name = "overlap"
+kind = "streaming"
+docs = "Find overlapping events"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Overlap"
+
+[[commands]]
+name = "predict"
+kind = "reporting"
+docs = "Forecast future values"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Predict"
+
+[[commands]]
+name = "rtorder"
+kind = "streaming"
+docs = "Buffer real-time events into time order"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Rtorder"
+
+[[commands]]
+name = "sendalert"
+kind = "streaming"
+docs = "Invoke a custom alert action"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Sendalert"
+
+[[commands]]
+name = "trendline"
+kind = "transforming"
+docs = "Compute moving averages"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Trendline"
+
+[[commands]]
+name = "tscollect"
+kind = "streaming"
+docs = "Load events into a tsidx namespace"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Tscollect"
+
+[[commands]]
+name = "typeahead"
+kind = "generating"
+docs = "Suggest typeahead terms"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Typeahead"
+
+[[commands]]
+name = "typelearner"
+kind = "streaming"
+docs = "Generate suggested event types"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Typelearner"
+
+[[commands]]
+name = "typer"
+kind = "streaming"
+docs = "Apply event types"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Typer"
+
+[[commands]]
+name = "x11"
+kind = "transforming"
+docs = "Seasonal adjustment of a time series"
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/X11"

@@ -156,6 +156,8 @@ Citation: [search](https://docs.splunk.com/Documentation/Splunk/latest/SearchRef
 
 ## Subsearches `[ ]`
 
+See the dedicated inventory: [subsearches.md](subsearches.md).
+
 Square brackets run a **subsearch** first. The subsearch must start with a generating command (`search` is implied inside the brackets if the first token is not generating). Results are typically formatted into a parenthesized `OR` clause, or consumed by `join` / `append` / `return`.
 
 ```spl
@@ -180,6 +182,8 @@ Limits: `maxout` (default 10000 for `join`/`append` contexts; `return` defaults 
 Citation: [About subsearches](https://docs.splunk.com/Documentation/Splunk/latest/Search/Aboutsubsearches), [return](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Return), [format](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Format).
 
 ## Macros `` `macro` ``
+
+See the dedicated inventory: [macros.md](macros.md).
 
 Backticks expand a saved search macro. Arguments: `` `macro(arg1,arg2)` ``.
 
@@ -210,6 +214,8 @@ Do not hyphenate macro names (`macro_name`, not `macro-name`).
 Citation: [Use search macros in searches](https://docs.splunk.com/Documentation/Splunk/latest/Knowledge/Usesearchmacros).
 
 ## Comments
+
+See the dedicated inventory: [comments.md](comments.md).
 
 Inline comments use **three backticks** on each side:
 

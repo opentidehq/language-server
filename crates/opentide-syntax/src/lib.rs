@@ -55,26 +55,32 @@ pub fn query_captures(
         .parse(source, None)
         .ok_or_else(|| "parse failed".to_string())?;
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    // `captures` is the highlighting iterator: earliest start wins, then
+    // earliest pattern in the .scm file. Nested overlapping spans are
+    // resolved below so LSP semantic tokens never overlap.
+    let mut captures = cursor.captures(&query, tree.root_node(), source.as_bytes());
     let mut first_wins: Vec<(ByteSpan, String)> = Vec::new();
-    let mut occupied: Vec<(usize, usize)> = Vec::new();
-    while let Some(m) = matches.next() {
-        for cap in m.captures {
-            let name = query.capture_names()[cap.index as usize];
-            let start = cap.node.start_byte();
-            let end = cap.node.end_byte();
-            if start >= end {
-                continue;
-            }
-            if occupied.iter().any(|(s, e)| *s == start && *e == end) {
-                continue;
-            }
-            occupied.push((start, end));
-            first_wins.push((ByteSpan::new(start, end), name.to_string()));
+    while let Some((m, cap_index)) = captures.next() {
+        let cap = m.captures[*cap_index];
+        let name = query.capture_names()[cap.index as usize];
+        let start = cap.node.start_byte();
+        let end = cap.node.end_byte();
+        if start >= end {
+            continue;
         }
+        first_wins.push((ByteSpan::new(start, end), name.to_string()));
     }
-    first_wins.sort_by_key(|(span, _)| span.start);
-    Ok(first_wins)
+    first_wins.sort_by_key(|(span, _)| (span.start, span.end.saturating_sub(span.start)));
+    let mut resolved: Vec<(ByteSpan, String)> = Vec::new();
+    let mut last_end = 0usize;
+    for (span, name) in first_wins {
+        if span.start < last_end {
+            continue;
+        }
+        last_end = span.end;
+        resolved.push((span, name));
+    }
+    Ok(resolved)
 }
 
 #[cfg(test)]

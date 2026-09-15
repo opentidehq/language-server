@@ -9,7 +9,9 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use opentide_analysis::{AnalyzeRequest, MemoryWorkspace, highlight};
 use opentide_core::LanguageId;
-use opentide_highlight::{HighlightSpec, generate_helix, generate_monaco, generate_tm_language};
+use opentide_highlight::{
+    HighlightSpec, generate_helix, generate_monaco, generate_tm_language, tokens_to_html,
+};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -115,47 +117,6 @@ fn cmd_highlight(file: &Path, language: Option<&str>, html: bool) -> Result<()> 
     }
     println!("{}", serde_json::to_string_pretty(&result)?);
     Ok(())
-}
-
-fn tokens_to_html(source: &str, tokens: &[opentide_highlight::HighlightToken]) -> String {
-    let mut html = String::from(
-        r#"<!doctype html><meta charset=utf-8>
-<title>OpenTide highlight</title>
-<style>
-body{font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#1e1e1e;color:#d4d4d4;padding:24px}
-.keyword{color:#c586c0;font-weight:600}.function,.function-builtin{color:#dcdcaa}.string{color:#ce9178}.number{color:#b5cea8}
-.comment{color:#6a9955}.type{color:#4ec9b0}.property{color:#9cdcfe}.operator{color:#d7ba7d}
-.operator-pipe{color:#ff79c6;font-weight:700}.error{color:#f44747}.boolean{color:#569cd6}
-.constant{color:#4fc1ff}.punctuation,.punctuation-bracket,.punctuation-delimiter{color:#808080}
-.tide-keyword{color:#c586c0;font-weight:600}.tide-property{color:#9cdcfe}.tide-uuid{color:#b5cea8}
-.tide-schema{color:#4ec9b0}.variable{color:#9cdcfe}
-</style><pre>"#,
-    );
-    let mut last = 0usize;
-    let mut ordered = tokens.to_vec();
-    ordered.sort_by_key(|t| t.span.start);
-    for t in &ordered {
-        if t.span.start < last {
-            continue;
-        }
-        let start = t.span.start.min(source.len());
-        let end = t.span.end.min(source.len());
-        html.push_str(&escape(&source[last..start]));
-        let class = t.capture.replace('.', "-");
-        html.push_str(&format!("<span class=\"{class}\">"));
-        html.push_str(&escape(&source[start..end]));
-        html.push_str("</span>");
-        last = end;
-    }
-    html.push_str(&escape(&source[last..]));
-    html.push_str("</pre>");
-    html
-}
-
-fn escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
 }
 
 fn cmd_generate_highlights(check: bool) -> Result<()> {

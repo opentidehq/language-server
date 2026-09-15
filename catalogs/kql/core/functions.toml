@@ -2008,3 +2008,780 @@ signature = "variancepif(expr, predicate)"
 docs = "Conditional population variance"
 citation = "https://learn.microsoft.com/kusto/query/variancepif-aggregation-function"
 kind = "aggregate"
+
+[[functions]]
+name = "convert_angle"
+signature = "convert_angle(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-angle-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_energy"
+signature = "convert_energy(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-energy-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_force"
+signature = "convert_force(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-force-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_length"
+signature = "convert_length(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-length-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_mass"
+signature = "convert_mass(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-mass-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_speed"
+signature = "convert_speed(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-speed-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_temperature"
+signature = "convert_temperature(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-temperature-function"
+kind = "scalar"
+
+[[functions]]
+name = "convert_volume"
+signature = "convert_volume(...)"
+docs = "Unit conversion"
+citation = "https://learn.microsoft.com/kusto/query/convert-volume-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_abs"
+signature = "series_abs(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-abs-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_acos"
+signature = "series_acos(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-acos-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_add"
+signature = "series_add(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-add-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_asin"
+signature = "series_asin(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-asin-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_atan"
+signature = "series_atan(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-atan-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_ceiling"
+signature = "series_ceiling(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-ceiling-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_cos"
+signature = "series_cos(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-cos-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_cosine_similarity"
+signature = "series_cosine_similarity(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-cosine-similarity-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_decompose"
+signature = "series_decompose(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-decompose-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_decompose_anomalies"
+signature = "series_decompose_anomalies(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-decompose-anomalies-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_decompose_forecast"
+signature = "series_decompose_forecast(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-decompose-forecast-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_divide"
+signature = "series_divide(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-divide-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_dot_product"
+signature = "series_dot_product(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-dot-product-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_equals"
+signature = "series_equals(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-equals-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_exp"
+signature = "series_exp(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-exp-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fft"
+signature = "series_fft(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fft-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fill_backward"
+signature = "series_fill_backward(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fill-backward-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fill_const"
+signature = "series_fill_const(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fill-const-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fill_forward"
+signature = "series_fill_forward(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fill-forward-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fill_linear"
+signature = "series_fill_linear(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fill-linear-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fir"
+signature = "series_fir(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fir-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fit_2lines"
+signature = "series_fit_2lines(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fit-2lines-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fit_2lines_dynamic"
+signature = "series_fit_2lines_dynamic(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fit-2lines-dynamic-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fit_line"
+signature = "series_fit_line(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fit-line-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fit_line_dynamic"
+signature = "series_fit_line_dynamic(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fit-line-dynamic-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_fit_poly"
+signature = "series_fit_poly(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-fit-poly-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_floor"
+signature = "series_floor(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-floor-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_greater"
+signature = "series_greater(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-greater-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_greater_equals"
+signature = "series_greater_equals(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-greater-equals-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_ifft"
+signature = "series_ifft(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-ifft-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_iir"
+signature = "series_iir(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-iir-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_less"
+signature = "series_less(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-less-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_less_equals"
+signature = "series_less_equals(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-less-equals-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_log"
+signature = "series_log(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-log-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_magnitude"
+signature = "series_magnitude(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-magnitude-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_multiply"
+signature = "series_multiply(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-multiply-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_not_equals"
+signature = "series_not_equals(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-not-equals-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_outliers"
+signature = "series_outliers(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-outliers-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_pearson_correlation"
+signature = "series_pearson_correlation(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-pearson-correlation-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_periods_detect"
+signature = "series_periods_detect(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-periods-detect-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_periods_validate"
+signature = "series_periods_validate(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-periods-validate-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_pow"
+signature = "series_pow(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-pow-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_product"
+signature = "series_product(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-product-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_seasonal"
+signature = "series_seasonal(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-seasonal-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_sign"
+signature = "series_sign(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-sign-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_sin"
+signature = "series_sin(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-sin-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_stats"
+signature = "series_stats(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-stats-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_stats_dynamic"
+signature = "series_stats_dynamic(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-stats-dynamic-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_subtract"
+signature = "series_subtract(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-subtract-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_sum"
+signature = "series_sum(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-sum-function"
+kind = "scalar"
+
+[[functions]]
+name = "series_tan"
+signature = "series_tan(...)"
+docs = "Time-series / array processing"
+citation = "https://learn.microsoft.com/kusto/query/series-tan-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_angle"
+signature = "geo_angle(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-angle-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_azimuth"
+signature = "geo_azimuth(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-azimuth-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_closest_point_on_line"
+signature = "geo_closest_point_on_line(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-closest-point-on-line-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_closest_point_on_polygon"
+signature = "geo_closest_point_on_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-closest-point-on-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_distance_2points"
+signature = "geo_distance_2points(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-distance-2points-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_distance_point_to_line"
+signature = "geo_distance_point_to_line(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-distance-point-to-line-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_distance_point_to_polygon"
+signature = "geo_distance_point_to_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-distance-point-to-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_from_wkt"
+signature = "geo_from_wkt(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-from-wkt-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_geohash_neighbors"
+signature = "geo_geohash_neighbors(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-geohash-neighbors-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_geohash_to_central_point"
+signature = "geo_geohash_to_central_point(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-geohash-to-central-point-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_geohash_to_polygon"
+signature = "geo_geohash_to_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-geohash-to-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_children"
+signature = "geo_h3cell_children(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-children-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_level"
+signature = "geo_h3cell_level(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-level-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_neighbors"
+signature = "geo_h3cell_neighbors(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-neighbors-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_parent"
+signature = "geo_h3cell_parent(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-parent-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_rings"
+signature = "geo_h3cell_rings(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-rings-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_to_central_point"
+signature = "geo_h3cell_to_central_point(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-to-central-point-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_h3cell_to_polygon"
+signature = "geo_h3cell_to_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-h3cell-to-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersection_2lines"
+signature = "geo_intersection_2lines(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersection-2lines-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersection_2polygons"
+signature = "geo_intersection_2polygons(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersection-2polygons-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersection_line_with_polygon"
+signature = "geo_intersection_line_with_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersection-line-with-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersects_2lines"
+signature = "geo_intersects_2lines(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersects-2lines-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersects_2polygons"
+signature = "geo_intersects_2polygons(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersects-2polygons-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_intersects_line_with_polygon"
+signature = "geo_intersects_line_with_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-intersects-line-with-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_buffer"
+signature = "geo_line_buffer(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-buffer-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_centroid"
+signature = "geo_line_centroid(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-centroid-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_densify"
+signature = "geo_line_densify(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-densify-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_interpolate_point"
+signature = "geo_line_interpolate_point(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-interpolate-point-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_length"
+signature = "geo_line_length(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-length-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_locate_point"
+signature = "geo_line_locate_point(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-locate-point-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_simplify"
+signature = "geo_line_simplify(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-simplify-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_line_to_s2cells"
+signature = "geo_line_to_s2cells(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-line-to-s2cells-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_buffer"
+signature = "geo_point_buffer(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-buffer-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_in_circle"
+signature = "geo_point_in_circle(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-in-circle-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_in_polygon"
+signature = "geo_point_in_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-in-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_to_geohash"
+signature = "geo_point_to_geohash(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-to-geohash-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_to_h3cell"
+signature = "geo_point_to_h3cell(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-to-h3cell-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_point_to_s2cell"
+signature = "geo_point_to_s2cell(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-point-to-s2cell-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_area"
+signature = "geo_polygon_area(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-area-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_buffer"
+signature = "geo_polygon_buffer(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-buffer-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_centroid"
+signature = "geo_polygon_centroid(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-centroid-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_densify"
+signature = "geo_polygon_densify(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-densify-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_perimeter"
+signature = "geo_polygon_perimeter(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-perimeter-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_simplify"
+signature = "geo_polygon_simplify(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-simplify-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_to_h3cells"
+signature = "geo_polygon_to_h3cells(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-to-h3cells-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_polygon_to_s2cells"
+signature = "geo_polygon_to_s2cells(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-polygon-to-s2cells-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_s2cell_neighbors"
+signature = "geo_s2cell_neighbors(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-s2cell-neighbors-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_s2cell_to_central_point"
+signature = "geo_s2cell_to_central_point(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-s2cell-to-central-point-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_s2cell_to_polygon"
+signature = "geo_s2cell_to_polygon(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-s2cell-to-polygon-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_simplify_polygons_array"
+signature = "geo_simplify_polygons_array(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-simplify-polygons-array-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_union_lines_array"
+signature = "geo_union_lines_array(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-union-lines-array-function"
+kind = "scalar"
+
+[[functions]]
+name = "geo_union_polygons_array"
+signature = "geo_union_polygons_array(...)"
+docs = "Geospatial scalar"
+citation = "https://learn.microsoft.com/kusto/query/geo-union-polygons-array-function"
+kind = "scalar"

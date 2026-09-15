@@ -1024,6 +1024,18 @@
     "named": false
   },
   {
+    "type": "abstract",
+    "named": false
+  },
+  {
+    "type": "accum",
+    "named": false
+  },
+  {
+    "type": "addcoltotals",
+    "named": false
+  },
+  {
     "type": "addinfo",
     "named": false
   },
@@ -1032,7 +1044,19 @@
     "named": false
   },
   {
+    "type": "analyzefields",
+    "named": false
+  },
+  {
     "type": "and",
+    "named": false
+  },
+  {
+    "type": "anomalies",
+    "named": false
+  },
+  {
+    "type": "anomalousvalue",
     "named": false
   },
   {
@@ -1052,11 +1076,27 @@
     "named": false
   },
   {
+    "type": "arules",
+    "named": false
+  },
+  {
+    "type": "associate",
+    "named": false
+  },
+  {
+    "type": "autoregress",
+    "named": false
+  },
+  {
     "type": "bin",
     "named": false
   },
   {
     "type": "bucket",
+    "named": false
+  },
+  {
+    "type": "bucketdir",
     "named": false
   },
   {
@@ -1069,6 +1109,10 @@
   },
   {
     "type": "cluster",
+    "named": false
+  },
+  {
+    "type": "cofilter",
     "named": false
   },
   {
@@ -1093,6 +1137,10 @@
     "named": false
   },
   {
+    "type": "correlate",
+    "named": false
+  },
+  {
     "type": "datamodel",
     "named": false
   },
@@ -1110,6 +1158,14 @@
   },
   {
     "type": "delim",
+    "named": false
+  },
+  {
+    "type": "delta",
+    "named": false
+  },
+  {
+    "type": "diff",
     "named": false
   },
   {
@@ -1161,6 +1217,14 @@
     "named": false
   },
   {
+    "type": "findtypes",
+    "named": false
+  },
+  {
+    "type": "folderize",
+    "named": false
+  },
+  {
     "type": "foreach",
     "named": false
   },
@@ -1177,11 +1241,19 @@
     "named": false
   },
   {
+    "type": "gauge",
+    "named": false
+  },
+  {
     "type": "gentimes",
     "named": false
   },
   {
     "type": "geom",
+    "named": false
+  },
+  {
+    "type": "geomfilter",
     "named": false
   },
   {
@@ -1198,6 +1270,10 @@
   },
   {
     "type": "history",
+    "named": false
+  },
+  {
+    "type": "iconify",
     "named": false
   },
   {
@@ -1277,7 +1353,15 @@
     "named": false
   },
   {
+    "type": "meventcollect",
+    "named": false
+  },
+  {
     "type": "mpreview",
+    "named": false
+  },
+  {
+    "type": "msearch",
     "named": false
   },
   {
@@ -1333,7 +1417,19 @@
     "named": false
   },
   {
+    "type": "outputtext",
+    "named": false
+  },
+  {
+    "type": "overlap",
+    "named": false
+  },
+  {
     "type": "pivot",
+    "named": false
+  },
+  {
+    "type": "predict",
     "named": false
   },
   {
@@ -1385,6 +1481,10 @@
     "named": false
   },
   {
+    "type": "rtorder",
+    "named": false
+  },
+  {
     "type": "savedsearch",
     "named": false
   },
@@ -1406,6 +1506,10 @@
   },
   {
     "type": "selfjoin",
+    "named": false
+  },
+  {
+    "type": "sendalert",
     "named": false
   },
   {
@@ -1501,11 +1605,31 @@
     "named": false
   },
   {
+    "type": "trendline",
+    "named": false
+  },
+  {
     "type": "true",
     "named": false
   },
   {
+    "type": "tscollect",
+    "named": false
+  },
+  {
     "type": "tstats",
+    "named": false
+  },
+  {
+    "type": "typeahead",
+    "named": false
+  },
+  {
+    "type": "typelearner",
+    "named": false
+  },
+  {
+    "type": "typer",
     "named": false
   },
   {
@@ -1526,6 +1650,10 @@
   },
   {
     "type": "where",
+    "named": false
+  },
+  {
+    "type": "x11",
     "named": false
   },
   {

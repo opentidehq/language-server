@@ -1656,6 +1656,58 @@
                         "value": "between"
                       },
                       {
+                        "type": "STRING",
+                        "value": "!between"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "hasprefix"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!hasprefix"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "hasprefix_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!hasprefix_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "hassuffix"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!hassuffix"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "hassuffix_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!hassuffix_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_ipv4"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_ipv4_prefix"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_any_ipv4"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_any_ipv4_prefix"
+                      },
+                      {
                         "type": "SEQ",
                         "members": [
                           {

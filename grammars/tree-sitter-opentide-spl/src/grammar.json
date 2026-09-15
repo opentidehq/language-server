@@ -1464,6 +1464,134 @@
         {
           "type": "STRING",
           "value": "scrub"
+        },
+        {
+          "type": "STRING",
+          "value": "abstract"
+        },
+        {
+          "type": "STRING",
+          "value": "accum"
+        },
+        {
+          "type": "STRING",
+          "value": "addcoltotals"
+        },
+        {
+          "type": "STRING",
+          "value": "analyzefields"
+        },
+        {
+          "type": "STRING",
+          "value": "anomalies"
+        },
+        {
+          "type": "STRING",
+          "value": "anomalousvalue"
+        },
+        {
+          "type": "STRING",
+          "value": "arules"
+        },
+        {
+          "type": "STRING",
+          "value": "associate"
+        },
+        {
+          "type": "STRING",
+          "value": "autoregress"
+        },
+        {
+          "type": "STRING",
+          "value": "bucketdir"
+        },
+        {
+          "type": "STRING",
+          "value": "cofilter"
+        },
+        {
+          "type": "STRING",
+          "value": "correlate"
+        },
+        {
+          "type": "STRING",
+          "value": "delta"
+        },
+        {
+          "type": "STRING",
+          "value": "diff"
+        },
+        {
+          "type": "STRING",
+          "value": "findtypes"
+        },
+        {
+          "type": "STRING",
+          "value": "folderize"
+        },
+        {
+          "type": "STRING",
+          "value": "gauge"
+        },
+        {
+          "type": "STRING",
+          "value": "geomfilter"
+        },
+        {
+          "type": "STRING",
+          "value": "iconify"
+        },
+        {
+          "type": "STRING",
+          "value": "meventcollect"
+        },
+        {
+          "type": "STRING",
+          "value": "msearch"
+        },
+        {
+          "type": "STRING",
+          "value": "outputtext"
+        },
+        {
+          "type": "STRING",
+          "value": "overlap"
+        },
+        {
+          "type": "STRING",
+          "value": "predict"
+        },
+        {
+          "type": "STRING",
+          "value": "rtorder"
+        },
+        {
+          "type": "STRING",
+          "value": "sendalert"
+        },
+        {
+          "type": "STRING",
+          "value": "trendline"
+        },
+        {
+          "type": "STRING",
+          "value": "tscollect"
+        },
+        {
+          "type": "STRING",
+          "value": "typeahead"
+        },
+        {
+          "type": "STRING",
+          "value": "typelearner"
+        },
+        {
+          "type": "STRING",
+          "value": "typer"
+        },
+        {
+          "type": "STRING",
+          "value": "x11"
         }
       ]
     },
