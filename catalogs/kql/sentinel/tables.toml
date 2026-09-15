@@ -1,0 +1,82 @@
+# Microsoft Sentinel / Log Analytics common tables (catalog data).
+
+[[tables]]
+name = "SecurityEvent"
+profile = "sentinel"
+docs = "Windows security events."
+
+[[tables]]
+name = "SecurityAlert"
+profile = "sentinel"
+
+[[tables]]
+name = "SecurityIncident"
+profile = "sentinel"
+
+[[tables]]
+name = "Syslog"
+profile = "sentinel"
+
+[[tables]]
+name = "CommonSecurityLog"
+profile = "sentinel"
+
+[[tables]]
+name = "SigninLogs"
+profile = "sentinel"
+
+[[tables]]
+name = "AuditLogs"
+profile = "sentinel"
+
+[[tables]]
+name = "AzureActivity"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceProcessEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceFileEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceNetworkEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceRegistryEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceLogonEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceImageLoadEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "DeviceInfo"
+profile = "sentinel"
+
+[[tables]]
+name = "EmailEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "IdentityLogonEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "CloudAppEvents"
+profile = "sentinel"
+
+[[tables]]
+name = "AADSignInEventsBeta"
+profile = "sentinel"

@@ -1,0 +1,28 @@
+# KQL types
+
+[[types]]
+name = "string"
+
+[[types]]
+name = "int"
+
+[[types]]
+name = "long"
+
+[[types]]
+name = "real"
+
+[[types]]
+name = "datetime"
+
+[[types]]
+name = "timespan"
+
+[[types]]
+name = "bool"
+
+[[types]]
+name = "dynamic"
+
+[[types]]
+name = "guid"

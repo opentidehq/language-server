@@ -1,0 +1,85 @@
+# Microsoft Defender for Endpoint / XDR advanced hunting tables.
+
+[[tables]]
+name = "DeviceEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceFileCertificateInfo"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceFileEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceImageLoadEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceInfo"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceLogonEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceNetworkEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceNetworkInfo"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceProcessEvents"
+category = "endpoint"
+
+[[tables]]
+name = "DeviceRegistryEvents"
+category = "endpoint"
+
+[[tables]]
+name = "AlertEvidence"
+category = "alert"
+
+[[tables]]
+name = "AlertInfo"
+category = "alert"
+
+[[tables]]
+name = "EmailEvents"
+category = "xdr"
+
+[[tables]]
+name = "EmailAttachmentInfo"
+category = "xdr"
+
+[[tables]]
+name = "EmailUrlInfo"
+category = "xdr"
+
+[[tables]]
+name = "UrlClickEvents"
+category = "xdr"
+
+[[tables]]
+name = "IdentityLogonEvents"
+category = "xdr"
+
+[[tables]]
+name = "IdentityQueryEvents"
+category = "xdr"
+
+[[tables]]
+name = "IdentityDirectoryEvents"
+category = "xdr"
+
+[[tables]]
+name = "CloudAppEvents"
+category = "xdr"
+
+[[tables]]
+name = "AADSignInEventsBeta"
+category = "xdr"

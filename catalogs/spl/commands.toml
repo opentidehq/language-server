@@ -1,0 +1,171 @@
+# Splunk search commands. searchbnf-informed; we still own the grammar.
+# kind: generating | transforming | streaming | dataset | orchestrating
+
+[[commands]]
+name = "search"
+kind = "generating"
+docs = "Retrieve events from indexes. Implicit at the start of a pipeline."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Search"
+
+[[commands]]
+name = "where"
+kind = "streaming"
+docs = "Filter results using eval expressions."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Where"
+
+[[commands]]
+name = "eval"
+kind = "streaming"
+docs = "Calculate new fields."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Eval"
+
+[[commands]]
+name = "stats"
+kind = "transforming"
+docs = "Aggregate statistics."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Stats"
+
+[[commands]]
+name = "rex"
+kind = "streaming"
+docs = "Extract fields with regular expressions."
+citation = "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Rex"
+
+[[commands]]
+name = "table"
+kind = "transforming"
+docs = "Retain only the specified fields, in order."
+
+[[commands]]
+name = "rename"
+kind = "streaming"
+docs = "Rename fields."
+
+[[commands]]
+name = "fields"
+kind = "streaming"
+docs = "Keep or remove fields."
+
+[[commands]]
+name = "dedup"
+kind = "streaming"
+docs = "Remove duplicates."
+
+[[commands]]
+name = "sort"
+kind = "transforming"
+docs = "Sort results."
+
+[[commands]]
+name = "head"
+kind = "streaming"
+docs = "Return the first N results."
+
+[[commands]]
+name = "tail"
+kind = "streaming"
+docs = "Return the last N results."
+
+[[commands]]
+name = "join"
+kind = "dataset"
+docs = "Combine results of a subsearch."
+
+[[commands]]
+name = "lookup"
+kind = "streaming"
+docs = "Enrich events from a lookup table."
+
+[[commands]]
+name = "makemv"
+kind = "streaming"
+docs = "Convert a field into a multivalue field."
+
+[[commands]]
+name = "mvexpand"
+kind = "streaming"
+docs = "Expand a multivalue field into separate events."
+
+[[commands]]
+name = "tstats"
+kind = "generating"
+docs = "Statistical aggregation on indexed fields."
+
+[[functions]]
+name = "count"
+kind = "aggregate"
+docs = "Count events."
+
+[[functions]]
+name = "sum"
+kind = "aggregate"
+
+[[functions]]
+name = "avg"
+kind = "aggregate"
+
+[[functions]]
+name = "min"
+kind = "aggregate"
+
+[[functions]]
+name = "max"
+kind = "aggregate"
+
+[[functions]]
+name = "dc"
+kind = "aggregate"
+docs = "Distinct count."
+
+[[functions]]
+name = "len"
+kind = "eval"
+docs = "Length of a string."
+
+[[functions]]
+name = "lower"
+kind = "eval"
+
+[[functions]]
+name = "upper"
+kind = "eval"
+
+[[functions]]
+name = "replace"
+kind = "eval"
+
+[[functions]]
+name = "strftime"
+kind = "eval"
+
+[[functions]]
+name = "strptime"
+kind = "eval"
+
+[[functions]]
+name = "if"
+kind = "eval"
+
+[[functions]]
+name = "coalesce"
+kind = "eval"
+
+[[functions]]
+name = "tonumber"
+kind = "eval"
+
+[[functions]]
+name = "tostring"
+kind = "eval"
+
+[[functions]]
+name = "md5"
+kind = "eval"
+
+[[functions]]
+name = "sha1"
+kind = "eval"
+
+[[functions]]
+name = "sha256"
+kind = "eval"

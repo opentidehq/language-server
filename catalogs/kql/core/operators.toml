@@ -1,0 +1,83 @@
+# KQL tabular operators (core catalog)
+
+[[operators]]
+name = "where"
+kind = "tabular"
+docs = "Filter rows by a predicate."
+citation = "https://learn.microsoft.com/kusto/query/where-operator"
+
+[[operators]]
+name = "project"
+kind = "tabular"
+docs = "Select and optionally rename columns."
+
+[[operators]]
+name = "project-away"
+kind = "tabular"
+docs = "Remove columns from the output."
+
+[[operators]]
+name = "project-rename"
+kind = "tabular"
+docs = "Rename columns without changing others."
+
+[[operators]]
+name = "extend"
+kind = "tabular"
+docs = "Add calculated columns."
+
+[[operators]]
+name = "summarize"
+kind = "tabular"
+docs = "Aggregate rows, optionally grouped by columns."
+
+[[operators]]
+name = "join"
+kind = "tabular"
+docs = "Join two tabular expressions."
+
+[[operators]]
+name = "union"
+kind = "tabular"
+docs = "Union rows from multiple tabular expressions."
+
+[[operators]]
+name = "parse"
+kind = "tabular"
+docs = "Parse a string column into typed columns."
+
+[[operators]]
+name = "lookup"
+kind = "tabular"
+docs = "Lookup values from another table."
+
+[[operators]]
+name = "take"
+kind = "tabular"
+docs = "Return the first N rows."
+
+[[operators]]
+name = "limit"
+kind = "tabular"
+docs = "Alias of take."
+
+[[operators]]
+name = "sort"
+kind = "tabular"
+docs = "Sort rows."
+
+[[operators]]
+name = "order"
+kind = "tabular"
+docs = "Alias of sort."
+
+[[operators]]
+name = "distinct"
+kind = "tabular"
+docs = "Distinct values of the specified columns."
+
+[[operators]]
+name = "render"
+kind = "tabular"
+warning = "not_valid_in_detections"
+docs = "Visualization operator. Not valid in detection queries."

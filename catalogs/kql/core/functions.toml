@@ -1,0 +1,98 @@
+# KQL scalar functions (core catalog)
+
+[[functions]]
+name = "ago"
+signature = "ago(timespan)"
+docs = "Subtract a timespan from now()."
+returns = "datetime"
+
+[[functions]]
+name = "now"
+signature = "now()"
+docs = "Current UTC datetime."
+returns = "datetime"
+
+[[functions]]
+name = "tostring"
+signature = "tostring(value)"
+docs = "Convert a value to string."
+returns = "string"
+
+[[functions]]
+name = "toint"
+signature = "toint(value)"
+docs = "Convert a value to int."
+returns = "int"
+
+[[functions]]
+name = "tolong"
+signature = "tolong(value)"
+docs = "Convert a value to long."
+returns = "long"
+
+[[functions]]
+name = "todatetime"
+signature = "todatetime(value)"
+docs = "Convert a value to datetime."
+returns = "datetime"
+
+[[functions]]
+name = "strcat"
+signature = "strcat(s1, s2, ...)"
+docs = "Concatenate strings."
+returns = "string"
+
+[[functions]]
+name = "strlen"
+signature = "strlen(string)"
+docs = "Length of a string."
+returns = "long"
+
+[[functions]]
+name = "count"
+signature = "count()"
+docs = "Count rows."
+returns = "long"
+kind = "aggregate"
+
+[[functions]]
+name = "sum"
+signature = "sum(expr)"
+docs = "Sum of an expression."
+kind = "aggregate"
+
+[[functions]]
+name = "avg"
+signature = "avg(expr)"
+docs = "Average of an expression."
+kind = "aggregate"
+
+[[functions]]
+name = "min"
+signature = "min(expr)"
+docs = "Minimum of an expression."
+kind = "aggregate"
+
+[[functions]]
+name = "max"
+signature = "max(expr)"
+docs = "Maximum of an expression."
+kind = "aggregate"
+
+[[functions]]
+name = "dcount"
+signature = "dcount(expr)"
+docs = "Approximate distinct count."
+kind = "aggregate"
+
+[[functions]]
+name = "arg_max"
+signature = "arg_max(expr, * )"
+docs = "Pick the row with the maximum expr."
+kind = "aggregate"
+
+[[functions]]
+name = "arg_min"
+signature = "arg_max(expr, * )"
+docs = "Pick the row with the minimum expr."
+kind = "aggregate"

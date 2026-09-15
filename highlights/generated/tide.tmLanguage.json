@@ -1,0 +1,91 @@
+{
+  "name": "OpenTide opentide-yaml",
+  "opentideHighlightSpec": "0.1.0",
+  "patterns": [
+    {
+      "comment": "capture:boolean",
+      "name": "constant.language.boolean.opentide"
+    },
+    {
+      "comment": "capture:comment",
+      "name": "comment.line.opentide"
+    },
+    {
+      "comment": "capture:constant",
+      "name": "constant.language.opentide"
+    },
+    {
+      "comment": "capture:error",
+      "name": "invalid.illegal.opentide"
+    },
+    {
+      "comment": "capture:function",
+      "name": "entity.name.function.opentide"
+    },
+    {
+      "comment": "capture:function.builtin",
+      "name": "support.function.opentide"
+    },
+    {
+      "comment": "capture:keyword",
+      "name": "keyword.control.opentide"
+    },
+    {
+      "comment": "capture:number",
+      "name": "constant.numeric.opentide"
+    },
+    {
+      "comment": "capture:operator",
+      "name": "keyword.operator.opentide"
+    },
+    {
+      "comment": "capture:operator.pipe",
+      "name": "keyword.operator.pipe.opentide"
+    },
+    {
+      "comment": "capture:property",
+      "name": "variable.other.property.opentide"
+    },
+    {
+      "comment": "capture:punctuation",
+      "name": "punctuation.opentide"
+    },
+    {
+      "comment": "capture:punctuation.bracket",
+      "name": "punctuation.bracket.opentide"
+    },
+    {
+      "comment": "capture:punctuation.delimiter",
+      "name": "punctuation.delimiter.opentide"
+    },
+    {
+      "comment": "capture:string",
+      "name": "string.quoted.opentide"
+    },
+    {
+      "comment": "capture:tide.keyword",
+      "name": "keyword.control.tide"
+    },
+    {
+      "comment": "capture:tide.property",
+      "name": "variable.other.property.tide"
+    },
+    {
+      "comment": "capture:tide.schema",
+      "name": "entity.name.type.schema.tide"
+    },
+    {
+      "comment": "capture:tide.uuid",
+      "name": "constant.other.uuid.tide"
+    },
+    {
+      "comment": "capture:type",
+      "name": "entity.name.type.opentide"
+    },
+    {
+      "comment": "capture:variable",
+      "name": "variable.other.opentide"
+    }
+  ],
+  "scopeName": "source.opentide-yaml"
+}
