@@ -1,3 +1,6 @@
+; SPL highlights. Capture names must be subset of highlights/spec.toml.
+; Specific captures are listed before (identifier) @variable (first-wins).
+
 (search_command "search" @keyword)
 (where_command "where" @keyword)
 (eval_command "eval" @keyword)
@@ -15,6 +18,7 @@
 (makemv_command "makemv" @keyword)
 (mvexpand_command "mvexpand" @keyword)
 (tstats_command "tstats" @keyword)
+(catalog_command (catalog_command_name) @keyword)
 (unknown_command name: (identifier) @error)
 
 "|" @operator.pipe
@@ -43,3 +47,34 @@
 "]" @punctuation.bracket
 "," @punctuation.delimiter
 "=" @operator
+"==" @operator
+"!=" @operator
+"LIKE" @operator
+"IN" @operator
+
+"timechart" @keyword
+"chart" @keyword
+"eventstats" @keyword
+"streamstats" @keyword
+"transaction" @keyword
+"spath" @keyword
+"regex" @keyword
+"fillnull" @keyword
+"bin" @keyword
+"append" @keyword
+"inputlookup" @keyword
+"makeresults" @keyword
+"outputlookup" @keyword
+"foreach" @keyword
+"top" @keyword
+"rare" @keyword
+"extract" @keyword
+"convert" @keyword
+"strcat" @keyword
+"metadata" @keyword
+"rest" @keyword
+"from" @keyword
+"union" @keyword
+"map" @keyword
+"reverse" @keyword
+"table" @keyword

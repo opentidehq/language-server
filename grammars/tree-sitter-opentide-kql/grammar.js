@@ -57,24 +57,35 @@ module.exports = grammar({
     tabular_operator: ($) =>
       choice(
         $.where_operator,
+        $.filter_operator,
         $.project_operator,
         $.project_away_operator,
         $.project_rename_operator,
+        $.project_keep_operator,
+        $.project_reorder_operator,
         $.extend_operator,
         $.summarize_operator,
         $.join_operator,
         $.union_operator,
         $.parse_operator,
+        $.parse_where_operator,
+        $.parse_kv_operator,
         $.lookup_operator,
         $.take_operator,
         $.limit_operator,
+        $.top_operator,
+        $.count_operator,
+        $.mv_expand_operator,
         $.sort_operator,
         $.distinct_operator,
         $.render_operator,
+        $.keyword_operator,
         $.unknown_operator,
       ),
 
     where_operator: ($) => seq("where", field("predicate", $.expression)),
+
+    filter_operator: ($) => seq("filter", field("predicate", $.expression)),
 
     project_operator: ($) =>
       seq("project", field("columns", commaSep1($.project_item))),
@@ -109,6 +120,67 @@ module.exports = grammar({
 
     parse_operator: ($) =>
       seq("parse", field("column", $.identifier), "with", field("pattern", $.string)),
+
+    parse_where_operator: ($) =>
+      seq("parse-where", optional(field("args", $.expression))),
+
+    parse_kv_operator: ($) =>
+      seq("parse-kv", optional(field("args", $.expression))),
+
+    project_keep_operator: ($) =>
+      seq("project-keep", field("columns", commaSep1($.identifier))),
+
+    project_reorder_operator: ($) =>
+      seq("project-reorder", field("columns", commaSep1($.identifier))),
+
+    top_operator: ($) =>
+      seq(
+        "top",
+        field("count", $.number),
+        optional(seq("by", field("keys", commaSep1($.sort_item)))),
+      ),
+
+    count_operator: ($) => "count",
+
+    mv_expand_operator: ($) =>
+      seq(choice("mv-expand", "mvexpand"), optional(field("args", $.expression))),
+
+    keyword_operator: ($) =>
+      seq(
+        field(
+          "name",
+          choice(
+            "search",
+            "find",
+            "invoke",
+            "evaluate",
+            "serialize",
+            "scan",
+            "as",
+            "getschema",
+            "make-series",
+            "sample",
+            "sample-distinct",
+            "mv-apply",
+            "datatable",
+            "range",
+            "externaldata",
+            "partition",
+            "fork",
+            "facet",
+            "consume",
+            "reduce",
+            "make-graph",
+            "graph-match",
+            "graph-shortest-paths",
+            "graph-to-table",
+            "graph-mark-components",
+            "top-hitters",
+            "top-nested",
+          ),
+        ),
+        optional(field("args", $.expression)),
+      ),
 
     lookup_operator: ($) =>
       seq(
@@ -178,12 +250,29 @@ module.exports = grammar({
                 "=~",
                 "!~",
                 "has",
+                "!has",
+                "has_cs",
+                "!has_cs",
+                "has_any",
+                "has_all",
                 "contains",
+                "!contains",
+                "contains_cs",
+                "!contains_cs",
                 "startswith",
+                "!startswith",
+                "startswith_cs",
+                "!startswith_cs",
                 "endswith",
+                "!endswith",
+                "endswith_cs",
+                "!endswith_cs",
                 "in",
                 "!in",
+                "in~",
+                "!in~",
                 "between",
+                seq("matches", "regex"),
               ),
               $.additive_expression,
             ),

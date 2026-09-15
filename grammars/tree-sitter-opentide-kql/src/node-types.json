@@ -157,6 +157,22 @@
     }
   },
   {
+    "type": "filter_operator",
+    "named": true,
+    "fields": {
+      "predicate": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "function_call",
     "named": true,
     "fields": {
@@ -217,6 +233,136 @@
           {
             "type": "tabular_primary",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "keyword_operator",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "as",
+            "named": false
+          },
+          {
+            "type": "consume",
+            "named": false
+          },
+          {
+            "type": "datatable",
+            "named": false
+          },
+          {
+            "type": "evaluate",
+            "named": false
+          },
+          {
+            "type": "externaldata",
+            "named": false
+          },
+          {
+            "type": "facet",
+            "named": false
+          },
+          {
+            "type": "find",
+            "named": false
+          },
+          {
+            "type": "fork",
+            "named": false
+          },
+          {
+            "type": "getschema",
+            "named": false
+          },
+          {
+            "type": "graph-mark-components",
+            "named": false
+          },
+          {
+            "type": "graph-match",
+            "named": false
+          },
+          {
+            "type": "graph-shortest-paths",
+            "named": false
+          },
+          {
+            "type": "graph-to-table",
+            "named": false
+          },
+          {
+            "type": "invoke",
+            "named": false
+          },
+          {
+            "type": "make-graph",
+            "named": false
+          },
+          {
+            "type": "make-series",
+            "named": false
+          },
+          {
+            "type": "mv-apply",
+            "named": false
+          },
+          {
+            "type": "partition",
+            "named": false
+          },
+          {
+            "type": "range",
+            "named": false
+          },
+          {
+            "type": "reduce",
+            "named": false
+          },
+          {
+            "type": "sample",
+            "named": false
+          },
+          {
+            "type": "sample-distinct",
+            "named": false
+          },
+          {
+            "type": "scan",
+            "named": false
+          },
+          {
+            "type": "search",
+            "named": false
+          },
+          {
+            "type": "serialize",
+            "named": false
+          },
+          {
+            "type": "top-hitters",
+            "named": false
+          },
+          {
+            "type": "top-nested",
+            "named": false
           }
         ]
       }
@@ -306,6 +452,22 @@
     }
   },
   {
+    "type": "mv_expand_operator",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "not_expression",
     "named": true,
     "fields": {},
@@ -336,6 +498,22 @@
     }
   },
   {
+    "type": "parse_kv_operator",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "parse_operator",
     "named": true,
     "fields": {
@@ -355,6 +533,22 @@
         "types": [
           {
             "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "parse_where_operator",
+    "named": true,
+    "fields": {
+      "args": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
             "named": true
           }
         ]
@@ -459,6 +653,26 @@
     }
   },
   {
+    "type": "project_keep_operator",
+    "named": true,
+    "fields": {
+      "columns": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "project_operator",
     "named": true,
     "fields": {
@@ -492,6 +706,26 @@
           },
           {
             "type": "rename_item",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "project_reorder_operator",
+    "named": true,
+    "fields": {
+      "columns": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -684,6 +918,10 @@
       "required": true,
       "types": [
         {
+          "type": "count_operator",
+          "named": true
+        },
+        {
           "type": "distinct_operator",
           "named": true
         },
@@ -692,7 +930,15 @@
           "named": true
         },
         {
+          "type": "filter_operator",
+          "named": true
+        },
+        {
           "type": "join_operator",
+          "named": true
+        },
+        {
+          "type": "keyword_operator",
           "named": true
         },
         {
@@ -704,11 +950,27 @@
           "named": true
         },
         {
+          "type": "mv_expand_operator",
+          "named": true
+        },
+        {
+          "type": "parse_kv_operator",
+          "named": true
+        },
+        {
           "type": "parse_operator",
           "named": true
         },
         {
+          "type": "parse_where_operator",
+          "named": true
+        },
+        {
           "type": "project_away_operator",
+          "named": true
+        },
+        {
+          "type": "project_keep_operator",
           "named": true
         },
         {
@@ -717,6 +979,10 @@
         },
         {
           "type": "project_rename_operator",
+          "named": true
+        },
+        {
+          "type": "project_reorder_operator",
           "named": true
         },
         {
@@ -733,6 +999,10 @@
         },
         {
           "type": "take_operator",
+          "named": true
+        },
+        {
+          "type": "top_operator",
           "named": true
         },
         {
@@ -790,6 +1060,36 @@
         "types": [
           {
             "type": "number",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "top_operator",
+    "named": true,
+    "fields": {
+      "count": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "keys": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "sort_item",
             "named": true
           }
         ]
@@ -878,7 +1178,43 @@
     "named": false
   },
   {
+    "type": "!contains",
+    "named": false
+  },
+  {
+    "type": "!contains_cs",
+    "named": false
+  },
+  {
+    "type": "!endswith",
+    "named": false
+  },
+  {
+    "type": "!endswith_cs",
+    "named": false
+  },
+  {
+    "type": "!has",
+    "named": false
+  },
+  {
+    "type": "!has_cs",
+    "named": false
+  },
+  {
     "type": "!in",
+    "named": false
+  },
+  {
+    "type": "!in~",
+    "named": false
+  },
+  {
+    "type": "!startswith",
+    "named": false
+  },
+  {
+    "type": "!startswith_cs",
     "named": false
   },
   {
@@ -962,6 +1298,10 @@
     "named": false
   },
   {
+    "type": "as",
+    "named": false
+  },
+  {
     "type": "asc",
     "named": false
   },
@@ -979,7 +1319,23 @@
     "extra": true
   },
   {
+    "type": "consume",
+    "named": false
+  },
+  {
     "type": "contains",
+    "named": false
+  },
+  {
+    "type": "contains_cs",
+    "named": false
+  },
+  {
+    "type": "count_operator",
+    "named": true
+  },
+  {
+    "type": "datatable",
     "named": false
   },
   {
@@ -995,7 +1351,23 @@
     "named": false
   },
   {
+    "type": "endswith_cs",
+    "named": false
+  },
+  {
+    "type": "evaluate",
+    "named": false
+  },
+  {
     "type": "extend",
+    "named": false
+  },
+  {
+    "type": "externaldata",
+    "named": false
+  },
+  {
+    "type": "facet",
     "named": false
   },
   {
@@ -1003,7 +1375,51 @@
     "named": false
   },
   {
+    "type": "filter",
+    "named": false
+  },
+  {
+    "type": "find",
+    "named": false
+  },
+  {
+    "type": "fork",
+    "named": false
+  },
+  {
+    "type": "getschema",
+    "named": false
+  },
+  {
+    "type": "graph-mark-components",
+    "named": false
+  },
+  {
+    "type": "graph-match",
+    "named": false
+  },
+  {
+    "type": "graph-shortest-paths",
+    "named": false
+  },
+  {
+    "type": "graph-to-table",
+    "named": false
+  },
+  {
     "type": "has",
+    "named": false
+  },
+  {
+    "type": "has_all",
+    "named": false
+  },
+  {
+    "type": "has_any",
+    "named": false
+  },
+  {
+    "type": "has_cs",
     "named": false
   },
   {
@@ -1012,6 +1428,14 @@
   },
   {
     "type": "in",
+    "named": false
+  },
+  {
+    "type": "invoke",
+    "named": false
+  },
+  {
+    "type": "in~",
     "named": false
   },
   {
@@ -1032,6 +1456,30 @@
   },
   {
     "type": "lookup",
+    "named": false
+  },
+  {
+    "type": "make-graph",
+    "named": false
+  },
+  {
+    "type": "make-series",
+    "named": false
+  },
+  {
+    "type": "matches",
+    "named": false
+  },
+  {
+    "type": "mv-apply",
+    "named": false
+  },
+  {
+    "type": "mv-expand",
+    "named": false
+  },
+  {
+    "type": "mvexpand",
     "named": false
   },
   {
@@ -1063,6 +1511,18 @@
     "named": false
   },
   {
+    "type": "parse-kv",
+    "named": false
+  },
+  {
+    "type": "parse-where",
+    "named": false
+  },
+  {
+    "type": "partition",
+    "named": false
+  },
+  {
     "type": "print",
     "named": false
   },
@@ -1075,11 +1535,51 @@
     "named": false
   },
   {
+    "type": "project-keep",
+    "named": false
+  },
+  {
     "type": "project-rename",
     "named": false
   },
   {
+    "type": "project-reorder",
+    "named": false
+  },
+  {
+    "type": "range",
+    "named": false
+  },
+  {
+    "type": "reduce",
+    "named": false
+  },
+  {
+    "type": "regex",
+    "named": false
+  },
+  {
     "type": "render",
+    "named": false
+  },
+  {
+    "type": "sample",
+    "named": false
+  },
+  {
+    "type": "sample-distinct",
+    "named": false
+  },
+  {
+    "type": "scan",
+    "named": false
+  },
+  {
+    "type": "search",
+    "named": false
+  },
+  {
+    "type": "serialize",
     "named": false
   },
   {
@@ -1088,6 +1588,10 @@
   },
   {
     "type": "startswith",
+    "named": false
+  },
+  {
+    "type": "startswith_cs",
     "named": false
   },
   {
@@ -1105,6 +1609,18 @@
   {
     "type": "timespan",
     "named": true
+  },
+  {
+    "type": "top",
+    "named": false
+  },
+  {
+    "type": "top-hitters",
+    "named": false
+  },
+  {
+    "type": "top-nested",
+    "named": false
   },
   {
     "type": "true",

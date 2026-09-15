@@ -172,6 +172,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "catalog_command"
+        },
+        {
+          "type": "SYMBOL",
           "name": "unknown_command"
         }
       ]
@@ -1026,6 +1030,440 @@
               "type": "BLANK"
             }
           ]
+        }
+      ]
+    },
+    "catalog_command": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "catalog_command_name"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "argument_list"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "catalog_command_name": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "metadata"
+        },
+        {
+          "type": "STRING",
+          "value": "inputlookup"
+        },
+        {
+          "type": "STRING",
+          "value": "makeresults"
+        },
+        {
+          "type": "STRING",
+          "value": "from"
+        },
+        {
+          "type": "STRING",
+          "value": "rest"
+        },
+        {
+          "type": "STRING",
+          "value": "datamodel"
+        },
+        {
+          "type": "STRING",
+          "value": "inputcsv"
+        },
+        {
+          "type": "STRING",
+          "value": "loadjob"
+        },
+        {
+          "type": "STRING",
+          "value": "gentimes"
+        },
+        {
+          "type": "STRING",
+          "value": "metasearch"
+        },
+        {
+          "type": "STRING",
+          "value": "mstats"
+        },
+        {
+          "type": "STRING",
+          "value": "mpreview"
+        },
+        {
+          "type": "STRING",
+          "value": "pivot"
+        },
+        {
+          "type": "STRING",
+          "value": "savedsearch"
+        },
+        {
+          "type": "STRING",
+          "value": "multisearch"
+        },
+        {
+          "type": "STRING",
+          "value": "set"
+        },
+        {
+          "type": "STRING",
+          "value": "eventcount"
+        },
+        {
+          "type": "STRING",
+          "value": "dbinspect"
+        },
+        {
+          "type": "STRING",
+          "value": "walklex"
+        },
+        {
+          "type": "STRING",
+          "value": "searchtxn"
+        },
+        {
+          "type": "STRING",
+          "value": "timechart"
+        },
+        {
+          "type": "STRING",
+          "value": "chart"
+        },
+        {
+          "type": "STRING",
+          "value": "top"
+        },
+        {
+          "type": "STRING",
+          "value": "rare"
+        },
+        {
+          "type": "STRING",
+          "value": "transaction"
+        },
+        {
+          "type": "STRING",
+          "value": "eventstats"
+        },
+        {
+          "type": "STRING",
+          "value": "streamstats"
+        },
+        {
+          "type": "STRING",
+          "value": "xyseries"
+        },
+        {
+          "type": "STRING",
+          "value": "geostats"
+        },
+        {
+          "type": "STRING",
+          "value": "addtotals"
+        },
+        {
+          "type": "STRING",
+          "value": "contingency"
+        },
+        {
+          "type": "STRING",
+          "value": "anomalydetection"
+        },
+        {
+          "type": "STRING",
+          "value": "mvcombine"
+        },
+        {
+          "type": "STRING",
+          "value": "sistats"
+        },
+        {
+          "type": "STRING",
+          "value": "sichart"
+        },
+        {
+          "type": "STRING",
+          "value": "sitimechart"
+        },
+        {
+          "type": "STRING",
+          "value": "sitop"
+        },
+        {
+          "type": "STRING",
+          "value": "sirare"
+        },
+        {
+          "type": "STRING",
+          "value": "timewrap"
+        },
+        {
+          "type": "STRING",
+          "value": "regex"
+        },
+        {
+          "type": "STRING",
+          "value": "fillnull"
+        },
+        {
+          "type": "STRING",
+          "value": "filldown"
+        },
+        {
+          "type": "STRING",
+          "value": "convert"
+        },
+        {
+          "type": "STRING",
+          "value": "replace"
+        },
+        {
+          "type": "STRING",
+          "value": "setfields"
+        },
+        {
+          "type": "STRING",
+          "value": "fieldformat"
+        },
+        {
+          "type": "STRING",
+          "value": "reltime"
+        },
+        {
+          "type": "STRING",
+          "value": "addinfo"
+        },
+        {
+          "type": "STRING",
+          "value": "spath"
+        },
+        {
+          "type": "STRING",
+          "value": "xmlkv"
+        },
+        {
+          "type": "STRING",
+          "value": "extract"
+        },
+        {
+          "type": "STRING",
+          "value": "kv"
+        },
+        {
+          "type": "STRING",
+          "value": "erex"
+        },
+        {
+          "type": "STRING",
+          "value": "kvform"
+        },
+        {
+          "type": "STRING",
+          "value": "multikv"
+        },
+        {
+          "type": "STRING",
+          "value": "nomv"
+        },
+        {
+          "type": "STRING",
+          "value": "strcat"
+        },
+        {
+          "type": "STRING",
+          "value": "bin"
+        },
+        {
+          "type": "STRING",
+          "value": "bucket"
+        },
+        {
+          "type": "STRING",
+          "value": "rangemap"
+        },
+        {
+          "type": "STRING",
+          "value": "untable"
+        },
+        {
+          "type": "STRING",
+          "value": "iplocation"
+        },
+        {
+          "type": "STRING",
+          "value": "tags"
+        },
+        {
+          "type": "STRING",
+          "value": "xpath"
+        },
+        {
+          "type": "STRING",
+          "value": "xmlunescape"
+        },
+        {
+          "type": "STRING",
+          "value": "tojson"
+        },
+        {
+          "type": "STRING",
+          "value": "fromjson"
+        },
+        {
+          "type": "STRING",
+          "value": "outputlookup"
+        },
+        {
+          "type": "STRING",
+          "value": "append"
+        },
+        {
+          "type": "STRING",
+          "value": "appendcols"
+        },
+        {
+          "type": "STRING",
+          "value": "appendpipe"
+        },
+        {
+          "type": "STRING",
+          "value": "selfjoin"
+        },
+        {
+          "type": "STRING",
+          "value": "return"
+        },
+        {
+          "type": "STRING",
+          "value": "format"
+        },
+        {
+          "type": "STRING",
+          "value": "foreach"
+        },
+        {
+          "type": "STRING",
+          "value": "union"
+        },
+        {
+          "type": "STRING",
+          "value": "map"
+        },
+        {
+          "type": "STRING",
+          "value": "reverse"
+        },
+        {
+          "type": "STRING",
+          "value": "cluster"
+        },
+        {
+          "type": "STRING",
+          "value": "outlier"
+        },
+        {
+          "type": "STRING",
+          "value": "fieldsummary"
+        },
+        {
+          "type": "STRING",
+          "value": "transpose"
+        },
+        {
+          "type": "STRING",
+          "value": "uniq"
+        },
+        {
+          "type": "STRING",
+          "value": "concurrency"
+        },
+        {
+          "type": "STRING",
+          "value": "localop"
+        },
+        {
+          "type": "STRING",
+          "value": "noop"
+        },
+        {
+          "type": "STRING",
+          "value": "redistribute"
+        },
+        {
+          "type": "STRING",
+          "value": "require"
+        },
+        {
+          "type": "STRING",
+          "value": "collect"
+        },
+        {
+          "type": "STRING",
+          "value": "delete"
+        },
+        {
+          "type": "STRING",
+          "value": "sendemail"
+        },
+        {
+          "type": "STRING",
+          "value": "script"
+        },
+        {
+          "type": "STRING",
+          "value": "outputcsv"
+        },
+        {
+          "type": "STRING",
+          "value": "kmeans"
+        },
+        {
+          "type": "STRING",
+          "value": "highlight"
+        },
+        {
+          "type": "STRING",
+          "value": "history"
+        },
+        {
+          "type": "STRING",
+          "value": "mcollect"
+        },
+        {
+          "type": "STRING",
+          "value": "geom"
+        },
+        {
+          "type": "STRING",
+          "value": "makecontinuous"
+        },
+        {
+          "type": "STRING",
+          "value": "localize"
+        },
+        {
+          "type": "STRING",
+          "value": "scrub"
         }
       ]
     },
