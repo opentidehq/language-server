@@ -114,6 +114,37 @@
     "fields": {}
   },
   {
+    "type": "catalog_command",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "catalog_command_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "argument_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "catalog_command_name",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "command",
     "named": true,
     "fields": {},
@@ -121,6 +152,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "catalog_command",
+          "named": true
+        },
         {
           "type": "dedup_command",
           "named": true
@@ -989,11 +1024,99 @@
     "named": false
   },
   {
+    "type": "abstract",
+    "named": false
+  },
+  {
+    "type": "accum",
+    "named": false
+  },
+  {
+    "type": "addcoltotals",
+    "named": false
+  },
+  {
+    "type": "addinfo",
+    "named": false
+  },
+  {
+    "type": "addtotals",
+    "named": false
+  },
+  {
+    "type": "analyzefields",
+    "named": false
+  },
+  {
     "type": "and",
     "named": false
   },
   {
+    "type": "anomalies",
+    "named": false
+  },
+  {
+    "type": "anomalousvalue",
+    "named": false
+  },
+  {
+    "type": "anomalydetection",
+    "named": false
+  },
+  {
+    "type": "append",
+    "named": false
+  },
+  {
+    "type": "appendcols",
+    "named": false
+  },
+  {
+    "type": "appendpipe",
+    "named": false
+  },
+  {
+    "type": "arules",
+    "named": false
+  },
+  {
+    "type": "associate",
+    "named": false
+  },
+  {
+    "type": "autoregress",
+    "named": false
+  },
+  {
+    "type": "bin",
+    "named": false
+  },
+  {
+    "type": "bucket",
+    "named": false
+  },
+  {
+    "type": "bucketdir",
+    "named": false
+  },
+  {
     "type": "by",
+    "named": false
+  },
+  {
+    "type": "chart",
+    "named": false
+  },
+  {
+    "type": "cluster",
+    "named": false
+  },
+  {
+    "type": "cofilter",
+    "named": false
+  },
+  {
+    "type": "collect",
     "named": false
   },
   {
@@ -1002,7 +1125,35 @@
     "extra": true
   },
   {
+    "type": "concurrency",
+    "named": false
+  },
+  {
+    "type": "contingency",
+    "named": false
+  },
+  {
+    "type": "convert",
+    "named": false
+  },
+  {
+    "type": "correlate",
+    "named": false
+  },
+  {
+    "type": "datamodel",
+    "named": false
+  },
+  {
+    "type": "dbinspect",
+    "named": false
+  },
+  {
     "type": "dedup",
+    "named": false
+  },
+  {
+    "type": "delete",
     "named": false
   },
   {
@@ -1010,7 +1161,31 @@
     "named": false
   },
   {
+    "type": "delta",
+    "named": false
+  },
+  {
+    "type": "diff",
+    "named": false
+  },
+  {
+    "type": "erex",
+    "named": false
+  },
+  {
     "type": "eval",
+    "named": false
+  },
+  {
+    "type": "eventcount",
+    "named": false
+  },
+  {
+    "type": "eventstats",
+    "named": false
+  },
+  {
+    "type": "extract",
     "named": false
   },
   {
@@ -1022,7 +1197,39 @@
     "named": false
   },
   {
+    "type": "fieldformat",
+    "named": false
+  },
+  {
     "type": "fields",
+    "named": false
+  },
+  {
+    "type": "fieldsummary",
+    "named": false
+  },
+  {
+    "type": "filldown",
+    "named": false
+  },
+  {
+    "type": "fillnull",
+    "named": false
+  },
+  {
+    "type": "findtypes",
+    "named": false
+  },
+  {
+    "type": "folderize",
+    "named": false
+  },
+  {
+    "type": "foreach",
+    "named": false
+  },
+  {
+    "type": "format",
     "named": false
   },
   {
@@ -1030,7 +1237,43 @@
     "named": false
   },
   {
+    "type": "fromjson",
+    "named": false
+  },
+  {
+    "type": "gauge",
+    "named": false
+  },
+  {
+    "type": "gentimes",
+    "named": false
+  },
+  {
+    "type": "geom",
+    "named": false
+  },
+  {
+    "type": "geomfilter",
+    "named": false
+  },
+  {
+    "type": "geostats",
+    "named": false
+  },
+  {
     "type": "head",
+    "named": false
+  },
+  {
+    "type": "highlight",
+    "named": false
+  },
+  {
+    "type": "history",
+    "named": false
+  },
+  {
+    "type": "iconify",
     "named": false
   },
   {
@@ -1038,7 +1281,43 @@
     "named": true
   },
   {
+    "type": "inputcsv",
+    "named": false
+  },
+  {
+    "type": "inputlookup",
+    "named": false
+  },
+  {
+    "type": "iplocation",
+    "named": false
+  },
+  {
     "type": "join",
+    "named": false
+  },
+  {
+    "type": "kmeans",
+    "named": false
+  },
+  {
+    "type": "kv",
+    "named": false
+  },
+  {
+    "type": "kvform",
+    "named": false
+  },
+  {
+    "type": "loadjob",
+    "named": false
+  },
+  {
+    "type": "localize",
+    "named": false
+  },
+  {
+    "type": "localop",
     "named": false
   },
   {
@@ -1046,11 +1325,71 @@
     "named": false
   },
   {
+    "type": "makecontinuous",
+    "named": false
+  },
+  {
     "type": "makemv",
     "named": false
   },
   {
+    "type": "makeresults",
+    "named": false
+  },
+  {
+    "type": "map",
+    "named": false
+  },
+  {
+    "type": "mcollect",
+    "named": false
+  },
+  {
+    "type": "metadata",
+    "named": false
+  },
+  {
+    "type": "metasearch",
+    "named": false
+  },
+  {
+    "type": "meventcollect",
+    "named": false
+  },
+  {
+    "type": "mpreview",
+    "named": false
+  },
+  {
+    "type": "msearch",
+    "named": false
+  },
+  {
+    "type": "mstats",
+    "named": false
+  },
+  {
+    "type": "multikv",
+    "named": false
+  },
+  {
+    "type": "multisearch",
+    "named": false
+  },
+  {
+    "type": "mvcombine",
+    "named": false
+  },
+  {
     "type": "mvexpand",
+    "named": false
+  },
+  {
+    "type": "nomv",
+    "named": false
+  },
+  {
+    "type": "noop",
     "named": false
   },
   {
@@ -1066,7 +1405,75 @@
     "named": false
   },
   {
+    "type": "outlier",
+    "named": false
+  },
+  {
+    "type": "outputcsv",
+    "named": false
+  },
+  {
+    "type": "outputlookup",
+    "named": false
+  },
+  {
+    "type": "outputtext",
+    "named": false
+  },
+  {
+    "type": "overlap",
+    "named": false
+  },
+  {
+    "type": "pivot",
+    "named": false
+  },
+  {
+    "type": "predict",
+    "named": false
+  },
+  {
+    "type": "rangemap",
+    "named": false
+  },
+  {
+    "type": "rare",
+    "named": false
+  },
+  {
+    "type": "redistribute",
+    "named": false
+  },
+  {
+    "type": "regex",
+    "named": false
+  },
+  {
+    "type": "reltime",
+    "named": false
+  },
+  {
     "type": "rename",
+    "named": false
+  },
+  {
+    "type": "replace",
+    "named": false
+  },
+  {
+    "type": "require",
+    "named": false
+  },
+  {
+    "type": "rest",
+    "named": false
+  },
+  {
+    "type": "return",
+    "named": false
+  },
+  {
+    "type": "reverse",
     "named": false
   },
   {
@@ -1074,7 +1481,67 @@
     "named": false
   },
   {
+    "type": "rtorder",
+    "named": false
+  },
+  {
+    "type": "savedsearch",
+    "named": false
+  },
+  {
+    "type": "script",
+    "named": false
+  },
+  {
+    "type": "scrub",
+    "named": false
+  },
+  {
     "type": "search",
+    "named": false
+  },
+  {
+    "type": "searchtxn",
+    "named": false
+  },
+  {
+    "type": "selfjoin",
+    "named": false
+  },
+  {
+    "type": "sendalert",
+    "named": false
+  },
+  {
+    "type": "sendemail",
+    "named": false
+  },
+  {
+    "type": "set",
+    "named": false
+  },
+  {
+    "type": "setfields",
+    "named": false
+  },
+  {
+    "type": "sichart",
+    "named": false
+  },
+  {
+    "type": "sirare",
+    "named": false
+  },
+  {
+    "type": "sistats",
+    "named": false
+  },
+  {
+    "type": "sitimechart",
+    "named": false
+  },
+  {
+    "type": "sitop",
     "named": false
   },
   {
@@ -1082,7 +1549,19 @@
     "named": false
   },
   {
+    "type": "spath",
+    "named": false
+  },
+  {
     "type": "stats",
+    "named": false
+  },
+  {
+    "type": "strcat",
+    "named": false
+  },
+  {
+    "type": "streamstats",
     "named": false
   },
   {
@@ -1094,7 +1573,39 @@
     "named": false
   },
   {
+    "type": "tags",
+    "named": false
+  },
+  {
     "type": "tail",
+    "named": false
+  },
+  {
+    "type": "timechart",
+    "named": false
+  },
+  {
+    "type": "timewrap",
+    "named": false
+  },
+  {
+    "type": "tojson",
+    "named": false
+  },
+  {
+    "type": "top",
+    "named": false
+  },
+  {
+    "type": "transaction",
+    "named": false
+  },
+  {
+    "type": "transpose",
+    "named": false
+  },
+  {
+    "type": "trendline",
     "named": false
   },
   {
@@ -1102,11 +1613,63 @@
     "named": false
   },
   {
+    "type": "tscollect",
+    "named": false
+  },
+  {
     "type": "tstats",
     "named": false
   },
   {
+    "type": "typeahead",
+    "named": false
+  },
+  {
+    "type": "typelearner",
+    "named": false
+  },
+  {
+    "type": "typer",
+    "named": false
+  },
+  {
+    "type": "union",
+    "named": false
+  },
+  {
+    "type": "uniq",
+    "named": false
+  },
+  {
+    "type": "untable",
+    "named": false
+  },
+  {
+    "type": "walklex",
+    "named": false
+  },
+  {
     "type": "where",
+    "named": false
+  },
+  {
+    "type": "x11",
+    "named": false
+  },
+  {
+    "type": "xmlkv",
+    "named": false
+  },
+  {
+    "type": "xmlunescape",
+    "named": false
+  },
+  {
+    "type": "xpath",
+    "named": false
+  },
+  {
+    "type": "xyseries",
     "named": false
   },
   {

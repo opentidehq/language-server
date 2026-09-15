@@ -11,6 +11,9 @@ use tree_sitter::Node;
 const OPERATORS_TOML: &str = include_str!("../../../catalogs/kql/core/operators.toml");
 const FUNCTIONS_TOML: &str = include_str!("../../../catalogs/kql/core/functions.toml");
 const TYPES_TOML: &str = include_str!("../../../catalogs/kql/core/types.toml");
+const SCALAR_OPERATORS_TOML: &str =
+    include_str!("../../../catalogs/kql/core/operators-scalar.toml");
+const PLUGINS_TOML: &str = include_str!("../../../catalogs/kql/core/evaluate-plugins.toml");
 const SENTINEL_TABLES: &str = include_str!("../../../catalogs/kql/sentinel/tables.toml");
 const DEFENDER_TABLES: &str = include_str!("../../../catalogs/kql/defender/tables.toml");
 
@@ -32,6 +35,7 @@ pub struct OperatorRow {
     pub kind: String,
     pub docs: Option<String>,
     pub warning: Option<String>,
+    pub citation: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -45,6 +49,32 @@ pub struct FunctionRow {
     pub signature: Option<String>,
     pub docs: Option<String>,
     pub kind: Option<String>,
+    pub citation: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct ScalarOperatorsFile {
+    scalar_operators: Vec<ScalarOperatorRow>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ScalarOperatorRow {
+    pub name: String,
+    pub docs: Option<String>,
+    pub citation: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PluginsFile {
+    plugins: Vec<PluginRow>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PluginRow {
+    pub name: String,
+    pub docs: Option<String>,
+    pub citation: Option<String>,
+    pub warning: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -68,12 +98,15 @@ pub struct TableRow {
     pub profile: Option<String>,
     pub category: Option<String>,
     pub docs: Option<String>,
+    pub citation: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Catalog {
     pub operators: Vec<OperatorRow>,
     pub functions: Vec<FunctionRow>,
+    pub scalar_operators: Vec<ScalarOperatorRow>,
+    pub plugins: Vec<PluginRow>,
     pub types: Vec<String>,
     pub tables: Vec<TableRow>,
 }
@@ -83,9 +116,14 @@ impl Catalog {
         let operators: OperatorsFile = toml::from_str(OPERATORS_TOML).expect("operators.toml");
         let functions: FunctionsFile = toml::from_str(FUNCTIONS_TOML).expect("functions.toml");
         let types: TypesFile = toml::from_str(TYPES_TOML).expect("types.toml");
+        let scalar: ScalarOperatorsFile =
+            toml::from_str(SCALAR_OPERATORS_TOML).expect("operators-scalar.toml");
+        let plugins: PluginsFile = toml::from_str(PLUGINS_TOML).expect("evaluate-plugins.toml");
         Self {
             operators: operators.operators,
             functions: functions.functions,
+            scalar_operators: scalar.scalar_operators,
+            plugins: plugins.plugins,
             types: types.types.into_iter().map(|t| t.name).collect(),
             tables: Vec::new(),
         }
@@ -116,6 +154,12 @@ impl Catalog {
 
     pub fn table(&self, name: &str) -> Option<&TableRow> {
         self.tables.iter().find(|t| t.name == name)
+    }
+
+    pub fn plugin(&self, name: &str) -> Option<&PluginRow> {
+        self.plugins
+            .iter()
+            .find(|p| p.name.eq_ignore_ascii_case(name))
     }
 
     pub fn suggest_table(&self, name: &str) -> Option<String> {
@@ -227,7 +271,11 @@ pub fn lower(source: &str) -> Hir {
                 .to_string();
         }
         if node.kind().ends_with("_operator") && node.kind() != "tabular_operator" {
-            let name = node.kind().trim_end_matches("_operator").replace('_', "-");
+            let name = if node.kind() == "keyword_operator" {
+                child_text(node, "name", source).unwrap_or_else(|| "unknown".into())
+            } else {
+                node.kind().trim_end_matches("_operator").replace('_', "-")
+            };
             let args = node.utf8_text(source.as_bytes()).unwrap_or("").to_string();
             operators.push(HirOp { name, args });
         }
@@ -487,9 +535,55 @@ fn highlight_tree(
     source: &str,
     root: Node,
 ) -> Result<Vec<HighlightToken>, opentide_highlight::HighlightError> {
-    let mut spans = Vec::new();
-    collect_highlights(root, source, &mut spans);
-    tokens_from_spans(spec, source, &spans)
+    let catalog = Catalog::core();
+    match opentide_syntax::query_captures(
+        LanguageId::Kql,
+        source,
+        opentide_highlight::KQL_HIGHLIGHTS_SCM,
+    ) {
+        Ok(mut owned) => {
+            overlay_catalog_captures(source, &mut owned, &catalog);
+            let refs: Vec<(ByteSpan, &str)> = owned
+                .iter()
+                .map(|(span, cap)| (*span, cap.as_str()))
+                .collect();
+            tokens_from_spans(spec, source, &refs)
+        }
+        Err(err) => {
+            if cfg!(debug_assertions) {
+                panic!("KQL highlights.scm query failed: {err}");
+            }
+            let mut spans = Vec::new();
+            collect_highlights(root, source, &mut spans);
+            tokens_from_spans(spec, source, &spans)
+        }
+    }
+}
+
+fn overlay_catalog_captures(source: &str, spans: &mut [(ByteSpan, String)], catalog: &Catalog) {
+    for (span, capture) in spans.iter_mut() {
+        let end = span.end.min(source.len());
+        if span.start >= end {
+            continue;
+        }
+        let text = &source[span.start..end];
+        if (catalog.function(text).is_some() || catalog.plugin(text).is_some())
+            && (*capture == "variable" || *capture == "function")
+        {
+            *capture = "function.builtin".into();
+        } else if catalog.operator(text).is_some()
+            && (*capture == "variable" || *capture == "error")
+        {
+            *capture = "keyword".into();
+        } else if catalog
+            .scalar_operators
+            .iter()
+            .any(|o| o.name.eq_ignore_ascii_case(text))
+            && *capture == "variable"
+        {
+            *capture = "operator".into();
+        }
+    }
 }
 
 fn collect_highlights(node: Node, _source: &str, out: &mut Vec<(ByteSpan, &'static str)>) {
@@ -501,10 +595,12 @@ fn collect_highlights(node: Node, _source: &str, out: &mut Vec<(ByteSpan, &'stat
         "boolean" => Some("boolean"),
         "null" => Some("constant"),
         "|" => Some("operator.pipe"),
-        "let" | "where" | "project" | "project-away" | "project-rename" | "extend"
-        | "summarize" | "join" | "union" | "parse" | "lookup" | "take" | "limit" | "sort"
-        | "order" | "distinct" | "render" | "print" | "by" | "on" | "with" | "and" | "or"
-        | "not" => Some("keyword"),
+        "let" | "where" | "filter" | "project" | "project-away" | "project-rename"
+        | "project-keep" | "project-reorder" | "extend" | "summarize" | "join" | "union"
+        | "parse" | "parse-where" | "parse-kv" | "lookup" | "take" | "limit" | "sort" | "order"
+        | "distinct" | "render" | "print" | "by" | "on" | "with" | "and" | "or" | "not" | "top"
+        | "count" | "mv-expand" | "mvexpand" | "search" | "find" | "invoke" | "evaluate"
+        | "serialize" | "as" => Some("keyword"),
         "identifier" => {
             if node.parent().map(|p| p.kind()) == Some("function_call")
                 && node
@@ -675,6 +771,20 @@ fn contains_ident(haystack: &str, ident: &str) -> bool {
 pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<CompletionItem> {
     let catalog = Catalog::core().with_profile(profile);
     let before = &source[..offset.min(source.len())];
+    let trimmed = before.trim_end();
+    if trimmed.to_ascii_lowercase().ends_with("evaluate") && before.ends_with(' ')
+        || trimmed.to_ascii_lowercase().ends_with("| evaluate")
+    {
+        return catalog
+            .plugins
+            .iter()
+            .map(|p| CompletionItem {
+                label: p.name.clone(),
+                detail: p.docs.clone(),
+                kind: "plugin".into(),
+            })
+            .collect();
+    }
     if before.trim_end().ends_with('|') || before.ends_with("| ") {
         return catalog
             .operators
@@ -700,6 +810,21 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
         detail: t.docs.clone(),
         kind: "table".into(),
     }));
+    items.extend(catalog.scalar_operators.iter().map(|o| CompletionItem {
+        label: o.name.clone(),
+        detail: o.docs.clone(),
+        kind: "operator".into(),
+    }));
+    items.extend(catalog.plugins.iter().map(|p| CompletionItem {
+        label: p.name.clone(),
+        detail: p.docs.clone(),
+        kind: "plugin".into(),
+    }));
+    items.extend(catalog.types.iter().map(|t| CompletionItem {
+        label: t.clone(),
+        detail: Some("KQL scalar type".into()),
+        kind: "type".into(),
+    }));
     items
 }
 
@@ -708,19 +833,42 @@ pub fn hover(source: &str, position: opentide_core::Position, profile: Profile) 
     let offset = position_to_offset(source, position);
     let word = word_at(source, offset)?;
     if let Some(op) = catalog.operator(&word) {
-        return Some(format!(
+        let mut md = format!(
             "**{}** (tabular operator)\n\n{}",
             op.name,
             op.docs.clone().unwrap_or_default()
-        ));
+        );
+        if let Some(c) = &op.citation {
+            md.push_str(&format!("\n\n[Microsoft Learn]({c})"));
+        }
+        return Some(md);
+    }
+    if let Some(op) = catalog
+        .scalar_operators
+        .iter()
+        .find(|o| o.name.eq_ignore_ascii_case(&word))
+    {
+        let mut md = format!(
+            "**{}** (scalar operator)\n\n{}",
+            op.name,
+            op.docs.clone().unwrap_or_default()
+        );
+        if let Some(c) = &op.citation {
+            md.push_str(&format!("\n\n[Microsoft Learn]({c})"));
+        }
+        return Some(md);
     }
     if let Some(f) = catalog.function(&word) {
-        return Some(format!(
+        let mut md = format!(
             "**{}** {}\n\n{}",
             f.name,
             f.signature.clone().unwrap_or_default(),
             f.docs.clone().unwrap_or_default()
-        ));
+        );
+        if let Some(c) = &f.citation {
+            md.push_str(&format!("\n\n[Microsoft Learn]({c})"));
+        }
+        return Some(md);
     }
     if let Some(t) = catalog.table(&word) {
         return Some(format!(
@@ -728,6 +876,23 @@ pub fn hover(source: &str, position: opentide_core::Position, profile: Profile) 
             t.name,
             t.docs.clone().unwrap_or_default()
         ));
+    }
+    if let Some(p) = catalog.plugin(&word) {
+        let mut md = format!(
+            "**{}** (evaluate plugin)\n\n{}",
+            p.name,
+            p.docs.clone().unwrap_or_default()
+        );
+        if let Some(c) = &p.citation {
+            md.push_str(&format!("\n\n[Microsoft Learn]({c})"));
+        }
+        if let Some(w) = &p.warning {
+            md.push_str(&format!("\n\nWarning: `{w}`"));
+        }
+        return Some(md);
+    }
+    if catalog.types.iter().any(|t| t.eq_ignore_ascii_case(&word)) {
+        return Some(format!("**{word}** (KQL scalar type)"));
     }
     None
 }
@@ -758,13 +923,18 @@ fn word_at(source: &str, offset: usize) -> Option<String> {
     while i > 0 && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'-') {
         i -= 1;
     }
-    if !(bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+    if bytes[i] == b'!' {
+        // keep `!has` / `!in` as a single operator token
+    } else if !(bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
         i += 1;
     }
     let start = i;
     let mut j = offset.min(bytes.len());
     while j < bytes.len()
-        && (bytes[j].is_ascii_alphanumeric() || bytes[j] == b'_' || bytes[j] == b'-')
+        && (bytes[j].is_ascii_alphanumeric()
+            || bytes[j] == b'_'
+            || bytes[j] == b'-'
+            || bytes[j] == b'~')
     {
         j += 1;
     }
@@ -881,6 +1051,8 @@ mod tests {
     fn completions_after_pipe() {
         let items = completions("SecurityEvent | ", 16, Profile::Core);
         assert!(items.iter().any(|i| i.label == "where"));
+        assert!(items.iter().any(|i| i.label == "mv-expand"));
+        assert!(items.iter().any(|i| i.label == "top"));
     }
 
     #[test]
@@ -904,6 +1076,11 @@ mod tests {
             "SecurityEvent | limit 1",
             "SecurityEvent | sort by EventID desc",
             "SecurityEvent | distinct Computer",
+            "SecurityEvent | mv-expand AdditionalFields",
+            "SecurityEvent | top 10 by EventID",
+            "SecurityEvent | where EventID has 4688",
+            "SecurityEvent | where Computer hasprefix \"DC\"",
+            "SecurityEvent | evaluate bag_unpack(AdditionalFields)",
         ];
         for src in samples {
             let r = analyze(src, Profile::Core);
@@ -930,5 +1107,58 @@ mod tests {
     #[test]
     fn engine_has_no_sql() {
         assert!(LanguageId::parse("sql").is_none());
+    }
+
+    #[test]
+    fn catalog_covers_hunting_surface() {
+        let c = Catalog::core().with_profile(Profile::Sentinel);
+        assert!(c.function("ago").is_some());
+        assert!(c.function("parse_json").is_some() || c.function("todynamic").is_some());
+        assert!(c.function("iff").is_some() || c.function("iif").is_some());
+        assert!(c.operator("mv-expand").is_some());
+        assert!(c.operator("top").is_some());
+        assert!(c.operator("filter").is_some());
+        assert!(c.tables.iter().any(|t| t.name == "SigninLogs"));
+        assert!(
+            c.functions.len() > 400,
+            "expected full scalar/agg catalog, got {}",
+            c.functions.len()
+        );
+        assert!(c.operators.len() > 40, "{}", c.operators.len());
+        assert!(c.function("series_fft").is_some());
+        assert!(c.function("geo_point_in_polygon").is_some());
+        assert!(c.function("convert_length").is_some());
+        assert!(c.plugin("bag_unpack").is_some());
+        assert!(c.plugin("sql_request").is_some());
+    }
+
+    #[test]
+    fn highlight_scm_query_emits_visible_tokens() {
+        let src = "SecurityEvent | where TimeGenerated > ago(1d) | take 1";
+        let r = analyze(src, Profile::Core);
+        let slice =
+            |t: &opentide_highlight::HighlightToken| src[t.span.start..t.span.end].to_string();
+        assert!(
+            r.tokens
+                .iter()
+                .any(|t| t.capture == "keyword" && slice(t) == "where"),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| (t.capture.as_str(), slice(t)))
+                .collect::<Vec<_>>()
+        );
+        assert!(r.tokens.iter().any(|t| t.capture == "operator.pipe"));
+        assert!(
+            r.tokens.iter().any(|t| {
+                let s = slice(t);
+                s == "ago" && (t.capture == "function" || t.capture == "function.builtin")
+            }),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| (t.capture.as_str(), slice(t)))
+                .collect::<Vec<_>>()
+        );
     }
 }

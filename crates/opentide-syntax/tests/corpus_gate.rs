@@ -131,6 +131,15 @@ fn kql_named_rules_in_grammar_json_are_known() {
         "control_command",
         "function_call",
         "render_operator",
+        "count_operator",
+        "filter_operator",
+        "keyword_operator",
+        "mv_expand_operator",
+        "parse_kv_operator",
+        "parse_where_operator",
+        "project_keep_operator",
+        "project_reorder_operator",
+        "top_operator",
     ]
     .into_iter()
     .collect();
