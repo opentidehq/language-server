@@ -54,6 +54,28 @@ export function createOpentideClient(options: OpentideClientOptions): OpentideCl
         const fn = (globalThis as { highlight: (id: string, bytes: Uint8Array) => unknown }).highlight;
         return fn(languageId, new TextEncoder().encode(text)) as HighlightResult;
       }
+      if (options.transport === "stdio" && options.command) {
+        const { spawnSync } = await import("node:child_process");
+        const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+        const dir = mkdtempSync(join(tmpdir(), "opentide-hl-"));
+        const ext = languageId.includes("yaml") || languageId === "tide" ? "yaml" : languageId === "spl" ? "spl" : "kql";
+        const file = join(dir, `query.${ext}`);
+        writeFileSync(file, text);
+        try {
+          const result = spawnSync(
+            options.command,
+            options.args ?? ["highlight", file, "--language", languageId],
+            { encoding: "utf8" },
+          );
+          if (result.status === 0 && result.stdout) {
+            return JSON.parse(result.stdout) as HighlightResult;
+          }
+        } finally {
+          rmSync(dir, { recursive: true, force: true });
+        }
+      }
       return {
         language_id: languageId,
         tokens: [],

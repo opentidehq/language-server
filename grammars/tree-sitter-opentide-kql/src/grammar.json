@@ -227,6 +227,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "filter_operator"
+        },
+        {
+          "type": "SYMBOL",
           "name": "project_operator"
         },
         {
@@ -236,6 +240,14 @@
         {
           "type": "SYMBOL",
           "name": "project_rename_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "project_keep_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "project_reorder_operator"
         },
         {
           "type": "SYMBOL",
@@ -259,6 +271,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "parse_where_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "parse_kv_operator"
+        },
+        {
+          "type": "SYMBOL",
           "name": "lookup_operator"
         },
         {
@@ -268,6 +288,18 @@
         {
           "type": "SYMBOL",
           "name": "limit_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "top_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "count_operator"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "mv_expand_operator"
         },
         {
           "type": "SYMBOL",
@@ -283,6 +315,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "keyword_operator"
+        },
+        {
+          "type": "SYMBOL",
           "name": "unknown_operator"
         }
       ]
@@ -293,6 +329,23 @@
         {
           "type": "STRING",
           "value": "where"
+        },
+        {
+          "type": "FIELD",
+          "name": "predicate",
+          "content": {
+            "type": "SYMBOL",
+            "name": "expression"
+          }
+        }
+      ]
+    },
+    "filter_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "filter"
         },
         {
           "type": "FIELD",
@@ -662,6 +715,371 @@
             "type": "SYMBOL",
             "name": "string"
           }
+        }
+      ]
+    },
+    "parse_where_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "parse-where"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "args",
+              "content": {
+                "type": "SYMBOL",
+                "name": "expression"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "parse_kv_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "parse-kv"
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "args",
+              "content": {
+                "type": "SYMBOL",
+                "name": "expression"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "project_keep_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "project-keep"
+        },
+        {
+          "type": "FIELD",
+          "name": "columns",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "REPEAT",
+                "content": {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": ","
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "identifier"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "project_reorder_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "project-reorder"
+        },
+        {
+          "type": "FIELD",
+          "name": "columns",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "identifier"
+              },
+              {
+                "type": "REPEAT",
+                "content": {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "STRING",
+                      "value": ","
+                    },
+                    {
+                      "type": "SYMBOL",
+                      "name": "identifier"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "top_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "top"
+        },
+        {
+          "type": "FIELD",
+          "name": "count",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "by"
+                },
+                {
+                  "type": "FIELD",
+                  "name": "keys",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "SYMBOL",
+                        "name": "sort_item"
+                      },
+                      {
+                        "type": "REPEAT",
+                        "content": {
+                          "type": "SEQ",
+                          "members": [
+                            {
+                              "type": "STRING",
+                              "value": ","
+                            },
+                            {
+                              "type": "SYMBOL",
+                              "name": "sort_item"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "count_operator": {
+      "type": "STRING",
+      "value": "count"
+    },
+    "mv_expand_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "STRING",
+              "value": "mv-expand"
+            },
+            {
+              "type": "STRING",
+              "value": "mvexpand"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "args",
+              "content": {
+                "type": "SYMBOL",
+                "name": "expression"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "keyword_operator": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "search"
+              },
+              {
+                "type": "STRING",
+                "value": "find"
+              },
+              {
+                "type": "STRING",
+                "value": "invoke"
+              },
+              {
+                "type": "STRING",
+                "value": "evaluate"
+              },
+              {
+                "type": "STRING",
+                "value": "serialize"
+              },
+              {
+                "type": "STRING",
+                "value": "scan"
+              },
+              {
+                "type": "STRING",
+                "value": "as"
+              },
+              {
+                "type": "STRING",
+                "value": "getschema"
+              },
+              {
+                "type": "STRING",
+                "value": "make-series"
+              },
+              {
+                "type": "STRING",
+                "value": "sample"
+              },
+              {
+                "type": "STRING",
+                "value": "sample-distinct"
+              },
+              {
+                "type": "STRING",
+                "value": "mv-apply"
+              },
+              {
+                "type": "STRING",
+                "value": "datatable"
+              },
+              {
+                "type": "STRING",
+                "value": "range"
+              },
+              {
+                "type": "STRING",
+                "value": "externaldata"
+              },
+              {
+                "type": "STRING",
+                "value": "partition"
+              },
+              {
+                "type": "STRING",
+                "value": "fork"
+              },
+              {
+                "type": "STRING",
+                "value": "facet"
+              },
+              {
+                "type": "STRING",
+                "value": "consume"
+              },
+              {
+                "type": "STRING",
+                "value": "reduce"
+              },
+              {
+                "type": "STRING",
+                "value": "make-graph"
+              },
+              {
+                "type": "STRING",
+                "value": "graph-match"
+              },
+              {
+                "type": "STRING",
+                "value": "graph-shortest-paths"
+              },
+              {
+                "type": "STRING",
+                "value": "graph-to-table"
+              },
+              {
+                "type": "STRING",
+                "value": "graph-mark-components"
+              },
+              {
+                "type": "STRING",
+                "value": "top-hitters"
+              },
+              {
+                "type": "STRING",
+                "value": "top-nested"
+              }
+            ]
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "args",
+              "content": {
+                "type": "SYMBOL",
+                "name": "expression"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
     },
@@ -1151,7 +1569,39 @@
                       },
                       {
                         "type": "STRING",
+                        "value": "!has"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!has_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_any"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "has_all"
+                      },
+                      {
+                        "type": "STRING",
                         "value": "contains"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!contains"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "contains_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!contains_cs"
                       },
                       {
                         "type": "STRING",
@@ -1159,7 +1609,31 @@
                       },
                       {
                         "type": "STRING",
+                        "value": "!startswith"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "startswith_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!startswith_cs"
+                      },
+                      {
+                        "type": "STRING",
                         "value": "endswith"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!endswith"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "endswith_cs"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!endswith_cs"
                       },
                       {
                         "type": "STRING",
@@ -1171,7 +1645,28 @@
                       },
                       {
                         "type": "STRING",
+                        "value": "in~"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "!in~"
+                      },
+                      {
+                        "type": "STRING",
                         "value": "between"
+                      },
+                      {
+                        "type": "SEQ",
+                        "members": [
+                          {
+                            "type": "STRING",
+                            "value": "matches"
+                          },
+                          {
+                            "type": "STRING",
+                            "value": "regex"
+                          }
+                        ]
                       }
                     ]
                   },

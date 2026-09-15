@@ -1,7 +1,19 @@
-# KQL types
+# KQL scalar types. Generated from docs/kql/types.md
 
 [[types]]
-name = "string"
+name = "bool"
+
+[[types]]
+name = "datetime"
+
+[[types]]
+name = "decimal"
+
+[[types]]
+name = "dynamic"
+
+[[types]]
+name = "guid"
 
 [[types]]
 name = "int"
@@ -13,16 +25,7 @@ name = "long"
 name = "real"
 
 [[types]]
-name = "datetime"
+name = "string"
 
 [[types]]
 name = "timespan"
-
-[[types]]
-name = "bool"
-
-[[types]]
-name = "dynamic"
-
-[[types]]
-name = "guid"

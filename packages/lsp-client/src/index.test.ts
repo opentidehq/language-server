@@ -9,6 +9,7 @@ test("createOpentideClient stdio", async () => {
   assert.ok(legend.includes("tide.keyword"));
   const hl = await client.highlight("kql", "SecurityEvent | take 1");
   assert.equal(hl.language_id, "kql");
+  assert.ok(Array.isArray(hl.tokens));
 });
 
 test("createOtideClient is rejected", () => {

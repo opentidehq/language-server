@@ -335,5 +335,5 @@ fn highlight_html_contains_spans() {
         String::from_utf8_lossy(&out.stderr)
     );
     let html = String::from_utf8_lossy(&out.stdout);
-    assert!(html.contains("<span class=\"keyword\">") || html.contains("operator-pipe"));
+    assert!(html.contains("<span class=\"keyword\">") && html.contains("operator-pipe"));
 }

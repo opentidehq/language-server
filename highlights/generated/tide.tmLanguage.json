@@ -3,88 +3,29 @@
   "opentideHighlightSpec": "0.1.0",
   "patterns": [
     {
-      "comment": "capture:boolean",
-      "name": "constant.language.boolean.opentide"
-    },
-    {
       "comment": "capture:comment",
+      "match": "//.*$|```[^`]*```",
       "name": "comment.line.opentide"
     },
     {
-      "comment": "capture:constant",
-      "name": "constant.language.opentide"
-    },
-    {
-      "comment": "capture:error",
-      "name": "invalid.illegal.opentide"
-    },
-    {
-      "comment": "capture:function",
-      "name": "entity.name.function.opentide"
-    },
-    {
-      "comment": "capture:function.builtin",
-      "name": "support.function.opentide"
-    },
-    {
-      "comment": "capture:keyword",
-      "name": "keyword.control.opentide"
-    },
-    {
-      "comment": "capture:number",
-      "name": "constant.numeric.opentide"
-    },
-    {
-      "comment": "capture:operator",
-      "name": "keyword.operator.opentide"
-    },
-    {
-      "comment": "capture:operator.pipe",
-      "name": "keyword.operator.pipe.opentide"
-    },
-    {
-      "comment": "capture:property",
-      "name": "variable.other.property.opentide"
-    },
-    {
-      "comment": "capture:punctuation",
-      "name": "punctuation.opentide"
-    },
-    {
-      "comment": "capture:punctuation.bracket",
-      "name": "punctuation.bracket.opentide"
-    },
-    {
-      "comment": "capture:punctuation.delimiter",
-      "name": "punctuation.delimiter.opentide"
-    },
-    {
       "comment": "capture:string",
+      "match": "\"(\\\\.|[^\"\\\\])*\"|'(\\\\.|[^'\\\\])*'",
       "name": "string.quoted.opentide"
     },
     {
+      "comment": "capture:number",
+      "match": "\\\\b[0-9]+(\\\\.[0-9]+)?\\\\b",
+      "name": "constant.numeric.opentide"
+    },
+    {
       "comment": "capture:tide.keyword",
+      "match": "(?m)^\\\\s*(name|metadata|description|status|severity|techniques|detection_model|response|configurations|objective|threat|composition|criticality)\\\\s*:",
       "name": "keyword.control.tide"
     },
     {
       "comment": "capture:tide.property",
+      "match": "(?m)^\\\\s*(uuid|schema|version|created|modified|tlp|author|organisation|query|search|enabled)\\\\s*:",
       "name": "variable.other.property.tide"
-    },
-    {
-      "comment": "capture:tide.schema",
-      "name": "entity.name.type.schema.tide"
-    },
-    {
-      "comment": "capture:tide.uuid",
-      "name": "constant.other.uuid.tide"
-    },
-    {
-      "comment": "capture:type",
-      "name": "entity.name.type.opentide"
-    },
-    {
-      "comment": "capture:variable",
-      "name": "variable.other.opentide"
     }
   ],
   "scopeName": "source.opentide-yaml"

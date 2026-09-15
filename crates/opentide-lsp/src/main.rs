@@ -123,11 +123,11 @@ fn tokens_to_html(source: &str, tokens: &[opentide_highlight::HighlightToken]) -
 <title>OpenTide highlight</title>
 <style>
 body{font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;background:#1e1e1e;color:#d4d4d4;padding:24px}
-.keyword{color:#569cd6}.function{color:#dcdcaa}.string{color:#ce9178}.number{color:#b5cea8}
-.comment{color:#6a9955}.type{color:#4ec9b0}.property{color:#9cdcfe}.operator{color:#d4d4d4}
-.operator-pipe{color:#c586c0;font-weight:600}.error{color:#f44747}.boolean{color:#569cd6}
+.keyword{color:#c586c0;font-weight:600}.function,.function-builtin{color:#dcdcaa}.string{color:#ce9178}.number{color:#b5cea8}
+.comment{color:#6a9955}.type{color:#4ec9b0}.property{color:#9cdcfe}.operator{color:#d7ba7d}
+.operator-pipe{color:#ff79c6;font-weight:700}.error{color:#f44747}.boolean{color:#569cd6}
 .constant{color:#4fc1ff}.punctuation,.punctuation-bracket,.punctuation-delimiter{color:#808080}
-.tide-keyword{color:#c586c0}.tide-property{color:#9cdcfe}.tide-uuid{color:#b5cea8}
+.tide-keyword{color:#c586c0;font-weight:600}.tide-property{color:#9cdcfe}.tide-uuid{color:#b5cea8}
 .tide-schema{color:#4ec9b0}.variable{color:#9cdcfe}
 </style><pre>"#,
     );

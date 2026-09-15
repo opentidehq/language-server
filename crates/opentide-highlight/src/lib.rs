@@ -171,16 +171,97 @@ pub fn tokens_from_spans(
 
 /// Generate TextMate / Monaco / Helix maps from the frozen spec.
 pub fn generate_tm_language(language: LanguageId, spec: &HighlightSpec) -> serde_json::Value {
-    let patterns: Vec<serde_json::Value> = spec
+    let scm = match language {
+        LanguageId::Kql => KQL_HIGHLIGHTS_SCM,
+        LanguageId::Spl => SPL_HIGHLIGHTS_SCM,
+        LanguageId::TideYaml => TIDE_HIGHLIGHTS_SCM,
+    };
+    let mut patterns: Vec<serde_json::Value> = Vec::new();
+    let comment_tm = spec
         .captures
-        .iter()
-        .map(|(name, maps)| {
-            serde_json::json!({
+        .get("comment")
+        .map(|m| m.tm.as_str())
+        .unwrap_or("comment");
+    let string_tm = spec
+        .captures
+        .get("string")
+        .map(|m| m.tm.as_str())
+        .unwrap_or("string");
+    let number_tm = spec
+        .captures
+        .get("number")
+        .map(|m| m.tm.as_str())
+        .unwrap_or("constant.numeric");
+    patterns.push(serde_json::json!({
+        "name": comment_tm,
+        "match": "//.*$|```[^`]*```",
+        "comment": "capture:comment",
+    }));
+    patterns.push(serde_json::json!({
+        "name": string_tm,
+        "match": "\"(\\\\.|[^\"\\\\])*\"|'(\\\\.|[^'\\\\])*'",
+        "comment": "capture:string",
+    }));
+    patterns.push(serde_json::json!({
+        "name": number_tm,
+        "match": "\\\\b[0-9]+(\\\\.[0-9]+)?\\\\b",
+        "comment": "capture:number",
+    }));
+    if language == LanguageId::TideYaml {
+        if let Some(maps) = spec.captures.get("tide.keyword") {
+            patterns.push(serde_json::json!({
                 "name": maps.tm,
-                "comment": format!("capture:{name}"),
-            })
-        })
-        .collect();
+                "match": "(?m)^\\\\s*(name|metadata|description|status|severity|techniques|detection_model|response|configurations|objective|threat|composition|criticality)\\\\s*:",
+                "comment": "capture:tide.keyword",
+            }));
+        }
+        if let Some(maps) = spec.captures.get("tide.property") {
+            patterns.push(serde_json::json!({
+                "name": maps.tm,
+                "match": "(?m)^\\\\s*(uuid|schema|version|created|modified|tlp|author|organisation|query|search|enabled)\\\\s*:",
+                "comment": "capture:tide.property",
+            }));
+        }
+    }
+    let mut by_capture: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let re = Regex::new(r#""([^"\\]+)"\s+@([A-Za-z0-9_.]+)"#).expect("regex");
+    for cap in re.captures_iter(scm) {
+        by_capture
+            .entry(cap[2].to_string())
+            .or_default()
+            .insert(cap[1].to_string());
+    }
+    for (capture, tokens) in &by_capture {
+        let Some(maps) = spec.captures.get(capture) else {
+            continue;
+        };
+        let mut words = Vec::new();
+        let mut punct = Vec::new();
+        for token in tokens {
+            if token
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                words.push(regex::escape(token));
+            } else {
+                punct.push(regex::escape(token));
+            }
+        }
+        if !words.is_empty() {
+            patterns.push(serde_json::json!({
+                "name": maps.tm,
+                "match": format!("(?i)(?<![A-Za-z0-9_])(?:{})(?![A-Za-z0-9_])", words.join("|")),
+                "comment": format!("capture:{capture}"),
+            }));
+        }
+        for p in punct {
+            patterns.push(serde_json::json!({
+                "name": maps.tm,
+                "match": p,
+                "comment": format!("capture:{capture}"),
+            }));
+        }
+    }
     serde_json::json!({
         "scopeName": format!("source.{}", language.as_str()),
         "name": format!("OpenTide {}", language),
@@ -276,5 +357,22 @@ mod tests {
         assert_eq!(data.len(), 10);
         assert_eq!(data[0], 0);
         assert_eq!(data[5], 0); // same line
+    }
+}
+
+#[cfg(test)]
+mod tm_language_stub_bug {
+    #[test]
+    fn generated_kql_tm_language_has_executable_match_rules() {
+        let tm = include_str!("../../../highlights/generated/kql.tmLanguage.json");
+        let v: serde_json::Value = serde_json::from_str(tm).expect("json");
+        let patterns = v["patterns"].as_array().expect("patterns");
+        let has_match = patterns
+            .iter()
+            .any(|p| p.get("match").is_some() || p.get("begin").is_some());
+        assert!(
+            has_match,
+            "kql.tmLanguage.json patterns are name-only stubs with no match/begin — TextMate-only editors render uncolored source"
+        );
     }
 }

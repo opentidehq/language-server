@@ -167,9 +167,46 @@ fn highlight_tree(
     source: &str,
     root: Node,
 ) -> Result<Vec<HighlightToken>, opentide_highlight::HighlightError> {
-    let mut spans = Vec::new();
-    collect_highlights(root, source, &mut spans);
-    tokens_from_spans(spec, source, &spans)
+    let catalog = Catalog::load();
+    match opentide_syntax::query_captures(
+        LanguageId::Spl,
+        source,
+        opentide_highlight::SPL_HIGHLIGHTS_SCM,
+    ) {
+        Ok(mut owned) => {
+            for (span, capture) in owned.iter_mut() {
+                let end = span.end.min(source.len());
+                if span.start >= end {
+                    continue;
+                }
+                let text = &source[span.start..end];
+                if catalog.function(text).is_some()
+                    && (*capture == "variable" || *capture == "function")
+                {
+                    *capture = "function.builtin".into();
+                } else if catalog.command(text).is_some()
+                    && (*capture == "variable" || *capture == "error")
+                {
+                    *capture = "keyword".into();
+                } else if matches!(text, "by" | "AS" | "as" | "from") && *capture == "variable" {
+                    *capture = "keyword".into();
+                }
+            }
+            let refs: Vec<(ByteSpan, &str)> = owned
+                .iter()
+                .map(|(span, cap)| (*span, cap.as_str()))
+                .collect();
+            tokens_from_spans(spec, source, &refs)
+        }
+        Err(err) => {
+            if cfg!(debug_assertions) {
+                panic!("SPL highlights.scm query failed: {err}");
+            }
+            let mut spans = Vec::new();
+            collect_highlights(root, source, &mut spans);
+            tokens_from_spans(spec, source, &spans)
+        }
+    }
 }
 
 fn collect_highlights(node: Node, _source: &str, out: &mut Vec<(ByteSpan, &'static str)>) {
@@ -355,6 +392,7 @@ mod tests {
     fn completions_after_pipe_include_catalog_commands() {
         let items = completions("index=main | ", 14);
         assert!(items.iter().any(|i| i.label == "stats"));
+        assert!(items.iter().any(|i| i.label == "timechart"));
         assert!(items.iter().any(|i| i.kind == "command"));
     }
 
@@ -365,5 +403,57 @@ mod tests {
             opentide_core::Position::new(0, 14),
         );
         assert!(h.unwrap().to_lowercase().contains("stats"));
+    }
+
+    #[test]
+    fn catalog_covers_es_surface() {
+        let c = Catalog::load();
+        for name in [
+            "timechart",
+            "eventstats",
+            "inputlookup",
+            "makeresults",
+            "spath",
+        ] {
+            assert!(c.command(name).is_some(), "{name}");
+        }
+        assert!(c.function("if").is_some());
+        assert!(c.function("count").is_some());
+        assert!(c.commands.len() > 80, "{}", c.commands.len());
+        assert!(c.functions.len() > 80, "{}", c.functions.len());
+    }
+
+    #[test]
+    fn highlight_scm_query_emits_spl_keywords() {
+        let src = "index=main | stats count by host | head 1";
+        let r = analyze(src);
+        let slice =
+            |t: &opentide_highlight::HighlightToken| src[t.span.start..t.span.end].to_string();
+        assert!(
+            r.tokens
+                .iter()
+                .any(|t| t.capture == "keyword" && slice(t) == "stats"),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| (t.capture.as_str(), slice(t)))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            r.tokens
+                .iter()
+                .any(|t| t.capture == "keyword" && slice(t) == "head")
+        );
+        assert!(r.tokens.iter().any(|t| t.capture == "operator.pipe"));
+        assert!(
+            r.tokens.iter().any(|t| {
+                slice(t) == "count" && (t.capture == "function" || t.capture == "function.builtin")
+            }),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| (t.capture.as_str(), slice(t)))
+                .collect::<Vec<_>>()
+        );
     }
 }
