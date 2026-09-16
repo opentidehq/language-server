@@ -1,7 +1,7 @@
 //! Conformance: tide_corpus objects produce `{code, field_path, severity}` diagnostics
 //! matching CLI issue shape. Engine may add extra query diagnostics inside `query: |`.
 
-use opentide_analysis::{AnalyzeRequest, MemoryWorkspace, analyze, index_workspace};
+use opentide_analysis::{analyze, index_workspace, AnalyzeRequest, MemoryWorkspace};
 use opentide_core::LanguageId;
 use std::fs;
 use std::path::PathBuf;
@@ -87,11 +87,10 @@ fn splunk_rule_injects_spl_and_tokenizes_authored_text() {
             text: text.clone(),
         },
     );
-    assert!(
-        r.tokens
-            .iter()
-            .any(|t| t.capture == "operator.pipe" || t.capture == "property")
-    );
+    assert!(r
+        .tokens
+        .iter()
+        .any(|t| t.capture == "operator.pipe" || t.capture == "property"));
     assert!(
         !text.contains("| search index"),
         "authored SPL must not be rewritten with implicit search"
@@ -162,8 +161,17 @@ fn library_rule_is_analyzable() {
         AnalyzeRequest {
             uri,
             language: LanguageId::TideYaml,
-            text,
+            text: text.clone(),
         },
     );
     assert!(r.tokens.iter().any(|t| t.capture == "tide.keyword"));
+    assert!(
+        r.tokens.iter().any(|t| t.capture == "type"
+            && text.get(t.span.start..t.span.end) == Some("DeviceNetworkEvents")),
+        "hunt searches[].query must inject when system: is a same-indent sibling; got {:?}",
+        r.tokens
+            .iter()
+            .map(|t| (t.capture.as_str(), text.get(t.span.start..t.span.end)))
+            .collect::<Vec<_>>(),
+    );
 }

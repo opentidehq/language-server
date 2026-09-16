@@ -3,8 +3,8 @@
 //! Pydantic remains CLI authority. The LSP emits the same `{code, field_path, severity}`
 //! with real source ranges. OpenTide LSP owns Tide diagnostics — disable yamlls on `objects/**`.
 
-use opentide_core::{ByteSpan, Diagnostic, LanguageId, Range, codes, span_to_range};
-use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
+use opentide_core::{codes, span_to_range, ByteSpan, Diagnostic, LanguageId, Range};
+use opentide_highlight::{tokens_from_spans, HighlightSpec, HighlightToken};
 use opentide_kql::Profile;
 use regex::Regex;
 use serde::Deserialize;
@@ -203,11 +203,19 @@ pub fn extract_injections(source: &str) -> Vec<InjectedQuery> {
         let line = lines[i];
         let indent = line.chars().take_while(|c| *c == ' ').count();
         let trimmed = line.trim();
+        let content = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+        // Keep platform across a same-indent sibling `query:` / `search:` of `system:`.
+        // Real hunts look like:
+        //   - purpose: ...
+        //     system: defender_for_endpoint
+        //     query: |-
         if indent == 0
             || (platform.is_some()
                 && indent <= platform_indent
                 && !trimmed.is_empty()
-                && !trimmed.starts_with('#'))
+                && !trimmed.starts_with('#')
+                && !content.starts_with("query:")
+                && !content.starts_with("search:"))
         {
             platform = None;
         }
@@ -217,7 +225,6 @@ pub fn extract_injections(source: &str) -> Vec<InjectedQuery> {
                 platform_indent = indent;
             }
         }
-        let content = trimmed.strip_prefix("- ").unwrap_or(trimmed);
         if let Some(rest) = content.strip_prefix("system:") {
             if let Some(plat) = intern_platform(rest.trim()) {
                 platform = Some(plat);
@@ -840,7 +847,9 @@ fn key_capture(key: &str) -> &'static str {
         | "detection_model" | "response" | "configurations" | "objective" | "threat"
         | "composition" | "criticality" | "references" | "procedure" => "tide.keyword",
         "uuid" | "schema" | "version" | "created" | "modified" | "tlp" | "author"
-        | "organisation" | "query" | "search" | "enabled" => "tide.property",
+        | "organisation" | "query" | "search" | "enabled" | "system" | "purpose" => {
+            "tide.property"
+        }
         _ => "property",
     }
 }
@@ -993,7 +1002,27 @@ fn highlight_tide(spec: &HighlightSpec, source: &str, skip: &[ByteSpan]) -> Vec<
         if let Some((item, indent)) = line_list_item(line) {
             let dash = byte + indent;
             push_span(&mut spans, skip, dash, dash + 1, "punctuation");
-            highlight_scalar(&mut spans, skip, byte + indent + 2, item, &vocab);
+            if let Some((key, rest)) = item.split_once(':') {
+                if !key.is_empty()
+                    && key
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                {
+                    let key_start = byte + indent + 2;
+                    push_span(
+                        &mut spans,
+                        skip,
+                        key_start,
+                        key_start + key.len(),
+                        key_capture(key),
+                    );
+                    highlight_scalar(&mut spans, skip, key_start + key.len() + 1, rest, &vocab);
+                } else {
+                    highlight_scalar(&mut spans, skip, byte + indent + 2, item, &vocab);
+                }
+            } else {
+                highlight_scalar(&mut spans, skip, byte + indent + 2, item, &vocab);
+            }
         }
 
         byte += line.len();
@@ -1262,16 +1291,11 @@ configurations:
         });
         let uuid_vals = token_text(RULE, &r.tokens, "tide.uuid");
         assert!(
-            uuid_vals
-                .iter()
-                .any(|v| *v == "00000000-0000-4000-8003-000000000001"),
+            uuid_vals.contains(&"00000000-0000-4000-8003-000000000001"),
             "{uuid_vals:?}"
         );
         let schema_vals = token_text(RULE, &r.tokens, "tide.schema");
-        assert!(
-            schema_vals.iter().any(|v| *v == "rule::1.0"),
-            "{schema_vals:?}"
-        );
+        assert!(schema_vals.contains(&"rule::1.0"), "{schema_vals:?}");
         assert!(token_text(RULE, &r.tokens, "constant").contains(&"STAGING"));
         assert!(token_text(RULE, &r.tokens, "constant").contains(&"clear"));
         assert!(token_text(RULE, &r.tokens, "constant").contains(&"Substantial incident"));
@@ -1285,6 +1309,8 @@ configurations:
 
     #[test]
     fn hunts_query_injects_from_system_field() {
+        // Real objects put `system:` and `query:` as same-indent mapping siblings
+        // under `- purpose:`, not as a nested child of `- system:`.
         let src = r#"
 name: Hunt
 metadata:
@@ -1293,10 +1319,11 @@ metadata:
 response:
   procedure:
     searches:
-      - system: defender_for_endpoint
-        query: |-
-          DeviceNetworkEvents
-          | take 1
+    - purpose: Check for Shai-Hulud network IOC egress from the device
+      system: defender_for_endpoint
+      query: |-
+        DeviceNetworkEvents
+        | take 1
 configurations:
   crowdstrike:
     query: index=main
@@ -1317,11 +1344,12 @@ configurations:
                 .map(|t| (t.capture.as_str(), &src[t.span.start..t.span.end]))
                 .collect::<Vec<_>>()
         );
-        assert!(
-            r.diagnostics
-                .iter()
-                .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED)
-        );
+        let purpose_keys = token_text(src, &r.tokens, "tide.property");
+        assert!(purpose_keys.contains(&"purpose"), "{purpose_keys:?}");
+        assert!(r
+            .diagnostics
+            .iter()
+            .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED));
     }
 
     #[test]
@@ -1380,11 +1408,10 @@ threat:
             source: src,
             workspace: &[],
         });
-        assert!(
-            r.diagnostics
-                .iter()
-                .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED)
-        );
+        assert!(r
+            .diagnostics
+            .iter()
+            .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED));
     }
 
     #[test]
