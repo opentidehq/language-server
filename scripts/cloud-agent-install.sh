@@ -9,14 +9,15 @@ cd "$(dirname "$0")/.."
 # scripts/check-grammars.sh and the CI "grammars" job regenerate the vendored
 # parsers with this exact version. Install it into the nvm-managed Node prefix:
 # that bin directory is already on PATH and lives under $HOME, so it persists in
-# environment snapshots. The prefix is recorded in ~/.npmrc (npm config, not a
-# shell-profile mutation).
+# environment snapshots. Use an inline `--prefix` rather than `npm config set`
+# so nothing is written to ~/.npmrc (a persisted prefix there makes nvm print a
+# warning on every shell start). The base image's default global prefix is not
+# writable, which is why the prefix must be given explicitly.
 # ---------------------------------------------------------------------------
 TS_VERSION="0.25.10"
 if [ "$(tree-sitter --version 2>/dev/null | awk '{print $2}')" != "$TS_VERSION" ]; then
   node_prefix="$(dirname "$(dirname "$(command -v npm)")")"
-  npm config set prefix "$node_prefix"
-  npm install -g "tree-sitter-cli@${TS_VERSION}"
+  npm install -g --prefix "$node_prefix" "tree-sitter-cli@${TS_VERSION}"
 fi
 tree-sitter --version
 
