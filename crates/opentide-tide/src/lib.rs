@@ -3,8 +3,8 @@
 //! Pydantic remains CLI authority. The LSP emits the same `{code, field_path, severity}`
 //! with real source ranges. OpenTide LSP owns Tide diagnostics — disable yamlls on `objects/**`.
 
-use opentide_core::{codes, span_to_range, ByteSpan, Diagnostic, LanguageId, Range};
-use opentide_highlight::{tokens_from_spans, HighlightSpec, HighlightToken};
+use opentide_core::{ByteSpan, Diagnostic, LanguageId, Range, codes, span_to_range};
+use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_kql::Profile;
 use regex::Regex;
 use serde::Deserialize;
@@ -847,9 +847,7 @@ fn key_capture(key: &str) -> &'static str {
         | "detection_model" | "response" | "configurations" | "objective" | "threat"
         | "composition" | "criticality" | "references" | "procedure" => "tide.keyword",
         "uuid" | "schema" | "version" | "created" | "modified" | "tlp" | "author"
-        | "organisation" | "query" | "search" | "enabled" | "system" | "purpose" => {
-            "tide.property"
-        }
+        | "organisation" | "query" | "search" | "enabled" | "system" | "purpose" => "tide.property",
         _ => "property",
     }
 }
@@ -1003,11 +1001,7 @@ fn highlight_tide(spec: &HighlightSpec, source: &str, skip: &[ByteSpan]) -> Vec<
             let dash = byte + indent;
             push_span(&mut spans, skip, dash, dash + 1, "punctuation");
             if let Some((key, rest)) = item.split_once(':') {
-                if !key.is_empty()
-                    && key
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-                {
+                if !key.is_empty() && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
                     let key_start = byte + indent + 2;
                     push_span(
                         &mut spans,
@@ -1346,10 +1340,11 @@ configurations:
         );
         let purpose_keys = token_text(src, &r.tokens, "tide.property");
         assert!(purpose_keys.contains(&"purpose"), "{purpose_keys:?}");
-        assert!(r
-            .diagnostics
-            .iter()
-            .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED));
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED)
+        );
     }
 
     #[test]
@@ -1408,10 +1403,11 @@ threat:
             source: src,
             workspace: &[],
         });
-        assert!(r
-            .diagnostics
-            .iter()
-            .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED));
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED)
+        );
     }
 
     #[test]
