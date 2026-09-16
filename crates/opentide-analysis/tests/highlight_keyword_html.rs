@@ -61,3 +61,42 @@ fn spl_keyword_tokens_and_html_spans() {
         "{html}"
     );
 }
+
+#[test]
+fn tide_html_colors_object_values() {
+    let src = r#"
+name: Sentinel KQL Rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000001
+  schema: rule::1.0
+status: STAGING
+configurations:
+  sentinel:
+    enabled: true
+    query: |
+      SecurityEvent
+      | take 1
+"#;
+    let r = highlight(LanguageId::TideYaml, src);
+    let html = tokens_to_html(src, &r.tokens);
+    assert!(
+        html.contains("<span class=\"tide-uuid\">00000000-0000-4000-8003-000000000001</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"tide-schema\">rule::1.0</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"boolean\">true</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"constant\">STAGING</span>"),
+        "{html}"
+    );
+    assert!(
+        html.contains("<span class=\"keyword\">take</span>"),
+        "{html}"
+    );
+}

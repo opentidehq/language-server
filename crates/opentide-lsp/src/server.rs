@@ -522,9 +522,15 @@ fn handle_pull_diagnostics(session: &Session, params: &Value) -> Value {
         "kind": "full",
         "items": response.diagnostics.iter().map(|d| json!({
             "range": range_json(d.range),
-            "severity": 1,
+            "severity": match d.severity {
+                opentide_core::Severity::Error => 1,
+                opentide_core::Severity::Warning => 2,
+                opentide_core::Severity::Information => 3,
+                opentide_core::Severity::Hint => 4,
+            },
             "code": d.code,
-            "message": d.message
+            "source": "opentide",
+            "message": d.message,
         })).collect::<Vec<_>>()
     })
 }

@@ -114,6 +114,35 @@ pub fn semantic_tokens(language: LanguageId, text: &str) -> SemanticTokens {
     }
 }
 
+fn offset_at_position(text: &str, position: Position) -> usize {
+    let mut line = 0u32;
+    let mut col = 0u32;
+    for (idx, ch) in text.char_indices() {
+        if line == position.line && col >= position.character {
+            return idx;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    text.len()
+}
+
+fn position_at_offset(text: &str, offset: usize) -> Position {
+    opentide_core::span_to_range(text, opentide_core::ByteSpan::new(offset, offset.max(1))).start
+}
+
+fn defender_profile(field_path: &[String]) -> Profile {
+    if field_path.iter().any(|p| p == "defender_for_endpoint") {
+        Profile::Defender
+    } else {
+        Profile::Sentinel
+    }
+}
+
 pub fn hover(
     host: &dyn WorkspaceHost,
     language: LanguageId,
@@ -124,26 +153,20 @@ pub fn hover(
         LanguageId::Kql => opentide_kql::hover(text, position, Profile::Sentinel),
         LanguageId::Spl => opentide_spl::hover(text, position),
         LanguageId::TideYaml => {
+            let offset = offset_at_position(text, position);
+            if let Some((inj, inner)) = opentide_tide::injection_at_offset(text, offset) {
+                let inner_pos = position_at_offset(&inj.inner, inner);
+                return match inj.language {
+                    LanguageId::Kql => opentide_kql::hover(
+                        &inj.inner,
+                        inner_pos,
+                        defender_profile(&inj.field_path),
+                    ),
+                    LanguageId::Spl => opentide_spl::hover(&inj.inner, inner_pos),
+                    LanguageId::TideYaml => None,
+                };
+            }
             let workspace = index_workspace(host);
-            // UUID hover
-            let offset = {
-                let mut line = 0u32;
-                let mut col = 0u32;
-                let mut at = text.len();
-                for (idx, ch) in text.char_indices() {
-                    if line == position.line && col >= position.character {
-                        at = idx;
-                        break;
-                    }
-                    if ch == '\n' {
-                        line += 1;
-                        col = 0;
-                    } else {
-                        col += 1;
-                    }
-                }
-                at
-            };
             let window = text
                 .get(offset.saturating_sub(40)..(offset + 40).min(text.len()))
                 .unwrap_or("");
@@ -151,9 +174,25 @@ pub fn hover(
                 r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
             )
             .ok()?;
-            let uuid = re.find(window)?.as_str();
-            opentide_tide::definition(&workspace, uuid)
-                .map(|o| format!("**{}** ({})\n\n`{}`", o.name, o.object_type, o.uuid))
+            if let Some(uuid) = re.find(window).map(|m| m.as_str()) {
+                if let Some(o) = opentide_tide::definition(&workspace, uuid) {
+                    return Some(format!(
+                        "**{}** ({})\n\n`{}`",
+                        o.name, o.object_type, o.uuid
+                    ));
+                }
+            }
+            for vocab in opentide_tide::bundled_vocabs().values() {
+                for key in &vocab.keys {
+                    for (idx, _) in text.match_indices(&key.name) {
+                        let end = idx + key.name.len();
+                        if offset >= idx && offset < end {
+                            return vocab.hover(&key.name);
+                        }
+                    }
+                }
+            }
+            None
         }
     }
 }
@@ -168,6 +207,17 @@ pub fn completions(
         LanguageId::Kql => opentide_kql::completions(text, offset, Profile::Sentinel),
         LanguageId::Spl => opentide_spl::completions(text, offset),
         LanguageId::TideYaml => {
+            if let Some((inj, inner)) = opentide_tide::injection_at_offset(text, offset) {
+                return match inj.language {
+                    LanguageId::Kql => opentide_kql::completions(
+                        &inj.inner,
+                        inner,
+                        defender_profile(&inj.field_path),
+                    ),
+                    LanguageId::Spl => opentide_spl::completions(&inj.inner, inner),
+                    LanguageId::TideYaml => Vec::new(),
+                };
+            }
             let workspace = index_workspace(host);
             let mut items = Vec::new();
             for (name, uuid) in opentide_tide::completions_for(&workspace, "objective") {
@@ -243,5 +293,40 @@ mod tests {
             Position::new(0, 16),
         );
         assert!(h.unwrap().contains("where"));
+    }
+
+    #[test]
+    fn hover_and_completions_inside_tide_injected_kql() {
+        let src = r#"name: Sentinel KQL Rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000001
+  schema: rule::1.0
+configurations:
+  sentinel:
+    query: |
+      SecurityEvent
+      | where EventID == 4688
+"#;
+        let host = MemoryWorkspace {
+            files: vec![("objects/rules/rule.yaml".into(), src.to_string())],
+        };
+        let where_off = src.find("where").expect("where");
+        let line = src[..where_off].bytes().filter(|b| *b == b'\n').count() as u32;
+        let col = src[..where_off]
+            .rsplit_once('\n')
+            .map(|(_, rest)| rest.len())
+            .unwrap_or(where_off) as u32;
+        let h = hover(&host, LanguageId::TideYaml, src, Position::new(line, col));
+        assert!(
+            h.as_deref().unwrap_or("").contains("where"),
+            "hover at injected where, got {h:?}"
+        );
+        let pipe = src.find("| where").expect("pipe") + 2;
+        let items = completions(&host, LanguageId::TideYaml, src, pipe);
+        assert!(
+            items.iter().any(|i| i.label == "where"),
+            "{:?}",
+            items.iter().map(|i| &i.label).collect::<Vec<_>>()
+        );
     }
 }

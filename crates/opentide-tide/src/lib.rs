@@ -159,17 +159,36 @@ pub struct InjectedQuery {
     pub host_span: ByteSpan,
 }
 
-fn is_platform_key(name: &str) -> bool {
-    matches!(
-        name,
-        "sentinel"
-            | "defender_for_endpoint"
-            | "splunk"
-            | "crowdstrike"
-            | "sentinel_one"
-            | "harfanglab"
-            | "carbon_black_cloud"
-    )
+fn intern_platform(name: &str) -> Option<&'static str> {
+    match name {
+        "sentinel" => Some("sentinel"),
+        "defender_for_endpoint" => Some("defender_for_endpoint"),
+        "splunk" => Some("splunk"),
+        "crowdstrike" => Some("crowdstrike"),
+        "sentinel_one" => Some("sentinel_one"),
+        "harfanglab" => Some("harfanglab"),
+        "carbon_black_cloud" => Some("carbon_black_cloud"),
+        _ => None,
+    }
+}
+
+/// Locate the injected query (if any) covering a host byte offset.
+pub fn injection_at_offset(source: &str, offset: usize) -> Option<(InjectedQuery, usize)> {
+    for inj in extract_injections(source) {
+        if let Some(inner) = inj.host_map.iter().position(|&h| h == offset) {
+            return Some((inj, inner));
+        }
+        if offset >= inj.host_span.start && offset < inj.host_span.end {
+            let inner = inj.host_map.iter().position(|&h| h >= offset).unwrap_or(
+                inj.inner
+                    .len()
+                    .saturating_sub(1)
+                    .min(inj.host_map.len().saturating_sub(1)),
+            );
+            return Some((inj, inner));
+        }
+    }
+    None
 }
 
 /// Strip block-scalar indent and remap tokens onto YAML coordinates.
@@ -193,8 +212,15 @@ pub fn extract_injections(source: &str) -> Vec<InjectedQuery> {
             platform = None;
         }
         if let Some(name) = trimmed.strip_suffix(':').map(str::trim) {
-            if is_platform_key(name) {
-                platform = Some(name);
+            if let Some(plat) = intern_platform(name) {
+                platform = Some(plat);
+                platform_indent = indent;
+            }
+        }
+        let content = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+        if let Some(rest) = content.strip_prefix("system:") {
+            if let Some(plat) = intern_platform(rest.trim()) {
+                platform = Some(plat);
                 platform_indent = indent;
             }
         }
@@ -424,7 +450,7 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
             ));
             return TideAnalyzeResult {
                 diagnostics,
-                tokens: highlight_tide(&spec, input.source),
+                tokens: highlight_tide(&spec, input.source, &[]),
                 symbols: Vec::new(),
             };
         }
@@ -703,7 +729,8 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
 
     // Injected query analysis
     let injections = extract_injections(input.source);
-    let mut tokens = highlight_tide(&spec, input.source);
+    let skip: Vec<ByteSpan> = injections.iter().map(|inj| inj.host_span).collect();
+    let mut tokens = highlight_tide(&spec, input.source, &skip);
     for inj in &injections {
         match inj.language {
             LanguageId::Kql => {
@@ -737,6 +764,7 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
         }
     }
 
+    tokens.sort_by_key(|t| (t.span.start, t.span.end));
     let symbols = document_symbols(input.source, &object, &object_type);
     TideAnalyzeResult {
         diagnostics,
@@ -781,24 +809,194 @@ fn remap_token(
     })
 }
 
-fn highlight_tide(spec: &HighlightSpec, source: &str) -> Vec<HighlightToken> {
-    let mut spans = Vec::new();
-    let key_re = Regex::new(r"(?m)^(\s*)([A-Za-z0-9_]+):").unwrap();
-    for cap in key_re.captures_iter(source) {
-        let whole = cap.get(0).unwrap();
-        let key = cap.get(2).unwrap();
-        let capture = match key.as_str() {
-            "name" | "metadata" | "description" | "status" | "severity" | "techniques"
-            | "detection_model" | "response" | "configurations" | "objective" | "threat"
-            | "composition" | "criticality" => "tide.keyword",
-            "uuid" => "tide.uuid",
-            "schema" => "tide.schema",
-            "version" | "created" | "modified" | "tlp" | "author" | "organisation" | "query"
-            | "search" | "enabled" => "tide.property",
-            _ => "property",
+const STATUS_VALUES: &[&str] = &["STAGING", "DEVELOPMENT", "PRODUCTION", "DEPRECATED"];
+
+fn overlaps(skip: &[ByteSpan], start: usize, end: usize) -> bool {
+    skip.iter().any(|s| start < s.end && end > s.start)
+}
+
+fn push_span(
+    spans: &mut Vec<(ByteSpan, &'static str)>,
+    skip: &[ByteSpan],
+    start: usize,
+    end: usize,
+    capture: &'static str,
+) {
+    if start >= end || overlaps(skip, start, end) {
+        return;
+    }
+    if spans
+        .iter()
+        .any(|(existing, _)| start < existing.end && end > existing.start)
+    {
+        return;
+    }
+    spans.push((ByteSpan::new(start, end), capture));
+}
+
+fn key_capture(key: &str) -> &'static str {
+    match key {
+        "name" | "metadata" | "description" | "status" | "severity" | "techniques"
+        | "detection_model" | "response" | "configurations" | "objective" | "threat"
+        | "composition" | "criticality" | "references" | "procedure" => "tide.keyword",
+        "uuid" | "schema" | "version" | "created" | "modified" | "tlp" | "author"
+        | "organisation" | "query" | "search" | "enabled" => "tide.property",
+        _ => "property",
+    }
+}
+
+fn highlight_scalar(
+    spans: &mut Vec<(ByteSpan, &'static str)>,
+    skip: &[ByteSpan],
+    start: usize,
+    value: &str,
+    vocab: &[String],
+) {
+    let trimmed = value.trim_end_matches(['\n', '\r', ' ']);
+    let leading = value.len() - value.trim_start().len();
+    let start = start + leading;
+    let value = trimmed.trim_start();
+    if value.is_empty()
+        || value == "|"
+        || value.starts_with("|-")
+        || value.starts_with("|+")
+        || value.starts_with('>')
+    {
+        return;
+    }
+    let end = start + value.len();
+    let capture =
+        if Regex::new(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+            .unwrap()
+            .is_match(value)
+        {
+            "tide.uuid"
+        } else if Regex::new(r"^[A-Za-z][A-Za-z0-9_]*::[0-9.]+$")
+            .unwrap()
+            .is_match(value)
+        {
+            "tide.schema"
+        } else if value == "true" || value == "false" {
+            "boolean"
+        } else if (value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\''))
+        {
+            "string"
+        } else if vocab.iter().any(|v| v == value)
+            || STATUS_VALUES.contains(&value)
+            || Regex::new(r"^T[0-9]{4}(\.[0-9]{3})?$")
+                .unwrap()
+                .is_match(value)
+        {
+            "constant"
+        } else if Regex::new(r"^-?[0-9]+(\.[0-9]+)?$")
+            .unwrap()
+            .is_match(value)
+        {
+            "number"
+        } else {
+            "string"
         };
-        spans.push((ByteSpan::new(key.start(), key.end()), capture));
-        let _ = whole;
+    push_span(spans, skip, start, end, capture);
+}
+
+fn line_key(line: &str) -> Option<(&str, &str, usize, usize)> {
+    let body = line.trim_end_matches(['\n', '\r']);
+    let indent = body.bytes().take_while(|b| *b == b' ').count();
+    let rest = body.get(indent..)?;
+    let colon = rest.find(':')?;
+    let key = &rest[..colon];
+    if key.is_empty() || !key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some((key, &rest[colon + 1..], indent, indent + key.len()))
+}
+
+fn line_list_item(line: &str) -> Option<(&str, usize)> {
+    let body = line.trim_end_matches(['\n', '\r']);
+    let indent = body.bytes().take_while(|b| *b == b' ').count();
+    let rest = body.get(indent..)?;
+    let item = rest.strip_prefix("- ")?;
+    Some((item, indent))
+}
+
+fn highlight_tide(spec: &HighlightSpec, source: &str, skip: &[ByteSpan]) -> Vec<HighlightToken> {
+    let mut spans = Vec::new();
+    let mut vocab: Vec<String> = bundled_vocabs()
+        .values()
+        .flat_map(|v| v.keys.iter().map(|k| k.name.clone()))
+        .collect();
+    vocab.sort_by_key(|s| std::cmp::Reverse(s.len()));
+
+    let mut in_block = false;
+    let mut block_indent = 0usize;
+    let mut block_is_injected = false;
+    let mut byte = 0usize;
+    for line in source.split_inclusive('\n') {
+        let indent = line.bytes().take_while(|b| *b == b' ').count();
+        let trimmed = line.trim();
+        if in_block && !trimmed.is_empty() && indent <= block_indent {
+            in_block = false;
+            block_is_injected = false;
+        }
+
+        if !in_block && trimmed.starts_with('#') {
+            if let Some(hash) = line.find('#') {
+                let end = byte + line.trim_end_matches(['\n', '\r']).len();
+                push_span(&mut spans, skip, byte + hash, end, "comment");
+            }
+            byte += line.len();
+            continue;
+        }
+
+        if let Some((key, rest_text, key_start, key_end)) = line_key(line) {
+            push_span(
+                &mut spans,
+                skip,
+                byte + key_start,
+                byte + key_end,
+                key_capture(key),
+            );
+            let rest_off = key_end + 1;
+            let is_block = {
+                let t = rest_text.trim();
+                t == "|"
+                    || t == "|-"
+                    || t == "|+"
+                    || t == ">"
+                    || t == ">-"
+                    || t == ">+"
+                    || t.starts_with('|')
+                    || t.starts_with('>')
+            };
+            if is_block {
+                in_block = true;
+                block_indent = indent;
+                block_is_injected = matches!(key, "query" | "search");
+            } else {
+                highlight_scalar(&mut spans, skip, byte + rest_off, rest_text, &vocab);
+            }
+            byte += line.len();
+            continue;
+        }
+
+        if in_block {
+            if !block_is_injected && !trimmed.is_empty() {
+                let content_start = byte + indent.min(line.len());
+                let content_end = byte + line.trim_end_matches(['\n', '\r']).len();
+                push_span(&mut spans, skip, content_start, content_end, "string");
+            }
+            byte += line.len();
+            continue;
+        }
+
+        if let Some((item, indent)) = line_list_item(line) {
+            let dash = byte + indent;
+            push_span(&mut spans, skip, dash, dash + 1, "punctuation");
+            highlight_scalar(&mut spans, skip, byte + indent + 2, item, &vocab);
+        }
+
+        byte += line.len();
     }
     tokens_from_spans(spec, source, &spans).unwrap_or_default()
 }
@@ -1026,13 +1224,103 @@ configurations:
             source: RULE,
             workspace: &[],
         });
-        assert!(r.tokens.iter().any(|t| t.capture == "tide.keyword"));
+        assert!(
+            r.tokens.iter().any(|t| t.capture == "tide.keyword"),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| t.capture.as_str())
+                .collect::<Vec<_>>()
+        );
         assert!(
             r.tokens
                 .iter()
                 .any(|t| t.capture == "keyword" || t.capture == "function" || t.capture == "type"),
             "expected inner KQL tokens, got {:?}",
             r.tokens.iter().map(|t| &t.capture).collect::<Vec<_>>()
+        );
+    }
+
+    fn token_text<'a>(
+        source: &'a str,
+        tokens: &'a [HighlightToken],
+        capture: &str,
+    ) -> Vec<&'a str> {
+        tokens
+            .iter()
+            .filter(|t| t.capture == capture)
+            .map(|t| &source[t.span.start..t.span.end])
+            .collect()
+    }
+
+    #[test]
+    fn tide_values_use_legend_captures() {
+        let r = analyze(AnalyzeInput {
+            path: "objects/rules/sentinel-kql-rule.yaml",
+            source: RULE,
+            workspace: &[],
+        });
+        let uuid_vals = token_text(RULE, &r.tokens, "tide.uuid");
+        assert!(
+            uuid_vals
+                .iter()
+                .any(|v| *v == "00000000-0000-4000-8003-000000000001"),
+            "{uuid_vals:?}"
+        );
+        let schema_vals = token_text(RULE, &r.tokens, "tide.schema");
+        assert!(
+            schema_vals.iter().any(|v| *v == "rule::1.0"),
+            "{schema_vals:?}"
+        );
+        assert!(token_text(RULE, &r.tokens, "constant").contains(&"STAGING"));
+        assert!(token_text(RULE, &r.tokens, "constant").contains(&"clear"));
+        assert!(token_text(RULE, &r.tokens, "constant").contains(&"Substantial incident"));
+        let uuid_keys = token_text(RULE, &r.tokens, "tide.property");
+        assert!(uuid_keys.contains(&"uuid"), "{uuid_keys:?}");
+        let starts: Vec<usize> = r.tokens.iter().map(|t| t.span.start).collect();
+        let mut sorted = starts.clone();
+        sorted.sort();
+        assert_eq!(starts, sorted, "semantic tokens must be in document order");
+    }
+
+    #[test]
+    fn hunts_query_injects_from_system_field() {
+        let src = r#"
+name: Hunt
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000099
+  schema: rule::1.0
+response:
+  procedure:
+    searches:
+      - system: defender_for_endpoint
+        query: |-
+          DeviceNetworkEvents
+          | take 1
+configurations:
+  crowdstrike:
+    query: index=main
+"#;
+        let r = analyze(AnalyzeInput {
+            path: "objects/rules/hunt.yaml",
+            source: src,
+            workspace: &[],
+        });
+        assert!(
+            r.tokens
+                .iter()
+                .any(|t| t.capture == "type"
+                    && &src[t.span.start..t.span.end] == "DeviceNetworkEvents"),
+            "{:?}",
+            r.tokens
+                .iter()
+                .map(|t| (t.capture.as_str(), &src[t.span.start..t.span.end]))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::CROWDSTRIKE_UNSUPPORTED)
         );
     }
 
