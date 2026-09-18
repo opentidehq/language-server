@@ -5,7 +5,7 @@
 
 mod markdown;
 
-use opentide_core::{span_to_range, ByteSpan, LanguageId, Range};
+use opentide_core::{ByteSpan, LanguageId, Range, span_to_range};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -108,6 +108,14 @@ pub struct TideField {
     pub vocab: Option<String>,
     #[serde(default)]
     pub required: bool,
+    /// Immediate parent mapping keys. Empty string = document root.
+    #[serde(default)]
+    pub parents: Vec<String>,
+    /// Object kinds (`rule`, `objective`, `threat`). Empty = all.
+    #[serde(default)]
+    pub schemas: Vec<String>,
+    #[serde(default, rename = "ref")]
+    pub ref_kind: Option<String>,
 }
 
 fn default_tide_capture() -> String {

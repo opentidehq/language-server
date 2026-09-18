@@ -1,6 +1,6 @@
 //! Protocol tests over stdio. The CLI never speaks JSON-RPC; `--stdio` does.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -216,11 +216,13 @@ fn initialize_and_analyze_kql() {
         "opentide/highlight",
         json!({ "language": "kql", "text": kql }),
     );
-    assert!(highlight["result"]["tokens"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|t| t["capture"] == "operator.pipe"));
+    assert!(
+        highlight["result"]["tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["capture"] == "operator.pipe")
+    );
 
     lsp.request("shutdown", json!(null));
     lsp.notify("exit", json!({}));
@@ -297,6 +299,94 @@ fn tide_yaml_pull_diagnostics_and_symbols() {
             .any(|s| s["name"] == "Sentinel KQL Rule"),
         "{symbols}"
     );
+
+    fn pos(text: &str, needle: &str) -> (u32, u32) {
+        let off = text.find(needle).expect(needle);
+        let line = text[..off].bytes().filter(|b| *b == b'\n').count() as u32;
+        let col = text[..off]
+            .rsplit_once('\n')
+            .map(|(_, rest)| rest.len())
+            .unwrap_or(off) as u32;
+        (line, col)
+    }
+
+    let (dline, dcol) = pos(&text, "description:");
+    let hover = lsp.request(
+        "textDocument/hover",
+        json!({
+            "textDocument": { "uri": uri },
+            "position": { "line": dline, "character": dcol }
+        }),
+    );
+    let hover_md = hover["result"]["contents"]["value"].as_str().unwrap_or("");
+    assert!(
+        hover_md.contains("Description") && hover_md.contains("required"),
+        "field hover, got {hover}"
+    );
+
+    let (mline, mcol) = pos(&text, "  tlp:");
+    let completion = lsp.request(
+        "textDocument/completion",
+        json!({
+            "textDocument": { "uri": uri },
+            "position": { "line": mline, "character": mcol }
+        }),
+    );
+    let labels: Vec<&str> = completion["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|i| i["label"].as_str())
+        .collect();
+    assert!(labels.contains(&"author"), "{labels:?}");
+    assert!(
+        completion["result"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["documentation"]["value"]
+                .as_str()
+                .is_some_and(|d| d.contains("Author"))),
+        "{completion}"
+    );
+    assert!(
+        !labels.contains(&"High"),
+        "no global vocab dump: {labels:?}"
+    );
+
+    let resolve = lsp.request(
+        "completionItem/resolve",
+        json!({ "label": "description", "kind": 5 }),
+    );
+    assert!(
+        resolve["result"]["documentation"]["value"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Description"),
+        "{resolve}"
+    );
+
+    let inlays = lsp.request(
+        "textDocument/inlayHint",
+        json!({
+            "textDocument": { "uri": uri },
+            "range": {
+                "start": { "line": 0, "character": 0 },
+                "end": { "line": 80, "character": 0 }
+            }
+        }),
+    );
+    assert!(
+        inlays["result"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|h| h["label"]
+                .as_str()
+                .is_some_and(|l| l.to_lowercase().contains("objective"))),
+        "{inlays}"
+    );
+
     let compiled_spl = lsp.request(
         "opentide/compiledSpl",
         json!({ "query": "index=main | head 1" }),
