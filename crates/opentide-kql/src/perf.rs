@@ -539,10 +539,18 @@ mod tests {
     #[test]
     fn join_or_summarize_before_visible_project() {
         assert!(has(
-            "SecurityEvent | join kind=inner SecurityAlert on EventID",
+            "SecurityEvent | join kind=inner SecurityAlert on EventID | project Computer",
             codes::KQL_JOIN_SUMMARIZE_BEFORE_PROJECT
         ));
         assert!(has(
+            "SecurityEvent | where EventID == 4688 | summarize count() by Computer | project Computer",
+            codes::KQL_JOIN_SUMMARIZE_BEFORE_PROJECT
+        ));
+        assert!(!has(
+            "SecurityEvent | join kind=inner SecurityAlert on EventID",
+            codes::KQL_JOIN_SUMMARIZE_BEFORE_PROJECT
+        ));
+        assert!(!has(
             "SecurityEvent | where EventID == 4688 | summarize count() by Computer",
             codes::KQL_JOIN_SUMMARIZE_BEFORE_PROJECT
         ));
