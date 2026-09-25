@@ -988,6 +988,25 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
             .collect();
     }
     if let Some((call, index)) = innermost_call(before) {
+        let named = before.trim_end().to_ascii_lowercase();
+        if let Some(opt) = catalog.options.iter().find(|opt| {
+            opt.operator.eq_ignore_ascii_case(&call)
+                && !opt.values.is_empty()
+                && named.ends_with(&format!("{}=", opt.name.to_ascii_lowercase()))
+        }) {
+            return opt
+                .values
+                .iter()
+                .map(|value| {
+                    complete_item(
+                        value.clone(),
+                        "keyword",
+                        Some(format!("{call} {}", opt.name)),
+                        opt.docs.clone(),
+                    )
+                })
+                .collect();
+        }
         let argument_options: Vec<&OperatorOption> = catalog
             .options
             .iter()
@@ -1030,13 +1049,6 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
                         )
                     })
                     .collect();
-            }
-            let alongside = opts.iter().any(|o| o.place.as_deref() == Some("alongside"));
-            if after.trim().is_empty() && !alongside {
-                let items = prefix_option_items(&op, &opts);
-                if !items.is_empty() {
-                    return items;
-                }
             }
         }
     }
@@ -1082,6 +1094,10 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
                 }
             }
             if !items.is_empty() {
+                let opts = catalog.options_for(&op);
+                if !opts.is_empty() && text_after_operator(before, &op).trim().is_empty() {
+                    items.extend(prefix_option_items(&op, &opts));
+                }
                 return items;
             }
         }
@@ -1124,7 +1140,7 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
     );
     if let Some(op) = last_operator(before) {
         let opts = catalog.options_for(&op);
-        if opts.iter().any(|o| o.place.as_deref() == Some("alongside")) {
+        if !opts.is_empty() && text_after_operator(before, &op).trim().is_empty() {
             items.extend(prefix_option_items(&op, &opts));
         }
     }
@@ -1926,6 +1942,29 @@ mod tests {
         let items = completions(kind, kind.len(), Profile::Sentinel);
         assert!(items.iter().any(|i| i.label == "bag"), "{items:?}");
         assert!(items.iter().any(|i| i.label == "array"), "{items:?}");
+
+        let join_prefix = "StormEvents | join ";
+        let items = completions(join_prefix, join_prefix.len(), Profile::Sentinel);
+        assert!(
+            items.iter().any(|i| i.label == "kind="),
+            "join options stay available: {items:?}"
+        );
+        assert!(
+            items.iter().any(|i| i.kind == "table"),
+            "join must still offer tables, got {:?}",
+            items
+                .iter()
+                .map(|i| (&i.label, &i.kind))
+                .take(12)
+                .collect::<Vec<_>>()
+        );
+
+        let named = "StormEvents | evaluate bag_unpack(Parsed, columnsConflict=";
+        let items = completions(named, named.len(), Profile::Sentinel);
+        assert!(
+            items.iter().any(|i| i.label == "replace_source"),
+            "named columnsConflict= should complete: {items:?}"
+        );
 
         let join = "StormEvents | join kind=";
         let items = completions(join, join.len(), Profile::Sentinel);

@@ -154,7 +154,7 @@ required = false
 [[operators]]
 name = "top-nested"
 kind = "tabular"
-signature = "top-nested([N] of Expr [with others = ConstExpr] by Aggregation [asc | desc] [, )"
+signature = "top-nested([N] of Expr [with others = ConstExpr] by Aggregation [asc | desc] [, ...])"
 docs = "The top-nested operator performs hierarchical aggregation and value selection."
 citation = "https://learn.microsoft.com/kusto/query/top-nested-operator"
 
@@ -210,7 +210,7 @@ required = true
 [[operators]]
 name = "project"
 kind = "tabular"
-signature = "project([ColumnName | (ColumnName[,]) =] Expression [, ...] or)"
+signature = "project(ColumnName [= Expression] [, ...])"
 docs = "Select the columns to include, rename or drop, and insert new computed columns."
 citation = "https://learn.microsoft.com/kusto/query/project-operator"
 
@@ -701,7 +701,7 @@ required = false
 [[operators]]
 name = "mv-apply"
 kind = "tabular"
-signature = "mv-apply([ItemIndex] ColumnsToExpand [RowLimit] on(SubQuery) Where ItemIndex has the syntax: with_itemindex = IndexColumnName ColumnsToExpand is a comma-separated list of one or more elements of the form: [Name =] ArrayExpression [to typeof(Typename)] RowLimit is simply: limit RowLimit SubQuery has the same syntax of any query statement.)"
+signature = "mv-apply([ItemIndex] ColumnsToExpand [to typeof(Typename)] [limit RowLimit] on (SubQuery))"
 docs = "Applies a subquery to each record, and returns the union of the results of all subqueries."
 citation = "https://learn.microsoft.com/kusto/query/mv-apply-operator"
 

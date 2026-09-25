@@ -508,16 +508,6 @@ docs = "A property bag of name value pairs to be passed to the Python script as 
 required = false
 
 [[plugins.parameters]]
-name = "hint.distribution"
-docs = "A hint for the plugin's execution to be distributed across multiple cluster nodes."
-required = false
-
-[[plugins.parameters]]
-name = "hint.remote"
-docs = "This hint is only relevant for cross cluster queries."
-required = false
-
-[[plugins.parameters]]
 name = "external_artifacts"
 docs = "A property bag of name and URL pairs for artifacts that are accessible from cloud storage."
 required = false
