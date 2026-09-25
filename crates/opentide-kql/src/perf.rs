@@ -86,9 +86,18 @@ fn warn_pipeline(expr: Node, source: &str, out: &mut Vec<Diagnostic>) {
         }
     }
 
-    // Warn only when a later `project` makes the bad order visible. A pipeline
-    // with no `project` is not this diagnostic.
+    // Warn only when columns are still wide and a later `project` shows the
+    // reversed order. A project already before the operator, or no project
+    // at all, is not this diagnostic.
+    let mut narrowed = false;
     for (index, op) in ops.iter().enumerate() {
+        if is_narrowing_project(op.kind()) {
+            narrowed = true;
+            continue;
+        }
+        if narrowed {
+            continue;
+        }
         let name = match op.kind() {
             "join_operator" => "join",
             "summarize_operator" => "summarize",

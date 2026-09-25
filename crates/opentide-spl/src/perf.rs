@@ -16,6 +16,8 @@ const NOT_CITE: &str =
     "https://docs.splunk.com/Documentation/Splunk/latest/Search/Booleanexpressions";
 const SUBSEARCH_CITE: &str =
     "https://docs.splunk.com/Documentation/Splunk/latest/Search/Aboutsubsearches";
+const TRANSACTION_CITE: &str =
+    "https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Transaction";
 
 pub(crate) fn collect(source: &str, catalog: &Catalog, out: &mut Vec<Diagnostic>) {
     if source.is_empty() {
@@ -36,15 +38,13 @@ fn walk_pipeline(
             continue;
         }
         let (word, word_span) = command_word(source, seg_start, seg_end);
-        if is_truncating(&word) {
-            if let Some((cmd_start, cmd_end)) = word_span {
+        if let Some((cmd_start, cmd_end)) = word_span {
+            if let Some(message) = truncation_message(&word) {
                 push(
                     out,
                     source,
                     codes::SPL_SUBSEARCH_TRUNCATION,
-                    format!(
-                        "`{word}` silently truncates at 50,000 events or 60 seconds without an error ({SUBSEARCH_CITE})"
-                    ),
+                    message,
                     cmd_start,
                     cmd_end,
                 );
@@ -59,11 +59,22 @@ fn walk_pipeline(
     }
 }
 
+fn truncation_message(word: &str) -> Option<String> {
+    match word.to_ascii_lowercase().as_str() {
+        "join" | "append" => Some(format!(
+            "`{word}` silently truncates at 50,000 events or 60 seconds without an error ({SUBSEARCH_CITE})"
+        )),
+        // `transaction` is not a subsearch. Its limit is open transactions, not
+        // the 50,000-event / 60-second subsearch cap.
+        "transaction" => Some(format!(
+            "`transaction` holds events in memory until the group closes and drops events past maxopentxn ({TRANSACTION_CITE})"
+        )),
+        _ => None,
+    }
+}
+
 fn is_truncating(word: &str) -> bool {
-    matches!(
-        word.to_ascii_lowercase().as_str(),
-        "join" | "append" | "transaction"
-    )
+    truncation_message(word).is_some()
 }
 
 fn is_search_context(word: &str, catalog: &Catalog) -> bool {
@@ -545,7 +556,6 @@ mod tests {
         for src in [
             "index=main | join host [ search index=other ]",
             "index=main | append [ search index=other ]",
-            "index=main | transaction user",
         ] {
             let found = warnings(src)
                 .into_iter()
@@ -560,6 +570,13 @@ mod tests {
                 "{src} must not rewrite the query"
             );
         }
+        let txn = warnings("index=main | transaction user")
+            .into_iter()
+            .find(|d| d.code == codes::SPL_SUBSEARCH_TRUNCATION)
+            .expect("transaction warning");
+        assert!(txn.message.contains("maxopentxn"), "{}", txn.message);
+        assert!(txn.message.contains(TRANSACTION_CITE));
+        assert!(!txn.message.contains("50,000"));
         assert!(!has(
             "index=main | appendcols [ search index=other ]",
             codes::SPL_SUBSEARCH_TRUNCATION

@@ -139,6 +139,14 @@ fn project_after_summarize_is_a_warning_and_summarize_alone_is_not() {
             .any(|c| c == "kql_join_summarize_before_project"),
         "{codes:?}"
     );
+    let already = "SecurityEvent\n| where EventID == 4688\n| project Computer, EventID\n| summarize count() by Computer\n| project Computer, count_\n";
+    let codes = codes_for(LanguageId::Kql, already);
+    assert!(
+        !codes
+            .iter()
+            .any(|c| c == "kql_join_summarize_before_project"),
+        "{codes:?}"
+    );
 }
 
 #[test]
