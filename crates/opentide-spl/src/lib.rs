@@ -486,7 +486,7 @@ const AGGREGATE_COMMANDS: &[&str] = &[
 ];
 
 fn aggregate_command(cmd: &str) -> bool {
-    AGGREGATE_COMMANDS.iter().any(|name| *name == cmd)
+    AGGREGATE_COMMANDS.contains(&cmd)
 }
 
 /// `bucket` is the Search Reference alias of `bin` and takes the same arguments.
