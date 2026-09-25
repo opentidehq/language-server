@@ -703,9 +703,11 @@ pub fn completions(source: &str, offset: usize) -> Vec<CompletionItem> {
             }
         }
     }
+    let mut seen = std::collections::BTreeSet::new();
     catalog
         .functions
         .iter()
+        .filter(|f| seen.insert(f.name.to_ascii_lowercase()))
         .map(|f| {
             complete_item(
                 f.name.clone(),
@@ -1037,7 +1039,10 @@ fn innermost_call(before: &str) -> Option<(String, u32)> {
 }
 
 fn parameters_from_signature(sig: &str) -> Vec<ParameterInformation> {
-    let start = sig.find('(').map(|i| i + 1).unwrap_or(0);
+    let Some(open) = sig.find('(') else {
+        return Vec::new();
+    };
+    let start = open + 1;
     let end = sig.rfind(')').unwrap_or(sig.len());
     if start >= end {
         return Vec::new();
@@ -1407,6 +1412,15 @@ mod tests {
         )
         .expect("macro hover");
         assert!(h.contains("security_content_ctime(field)"), "{h}");
+
+        let notable = "| `notable(";
+        let help = signature_help(notable, notable.len()).expect("notable");
+        assert_eq!(help.signatures[0].label, "notable");
+        assert!(
+            help.signatures[0].parameters.is_empty(),
+            "a macro signature without parentheses has no parameters: {:?}",
+            help.signatures[0].parameters
+        );
     }
 
     #[test]
