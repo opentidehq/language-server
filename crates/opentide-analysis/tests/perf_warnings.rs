@@ -122,6 +122,26 @@ fn spl_leading_wildcard_fixture_raw_and_tide() {
 }
 
 #[test]
+fn project_after_summarize_is_a_warning_and_summarize_alone_is_not() {
+    let reversed = "SecurityEvent\n| where EventID == 4688\n| summarize count() by Computer\n| project Computer, count_\n";
+    let codes = codes_for(LanguageId::Kql, reversed);
+    assert!(
+        codes
+            .iter()
+            .any(|c| c == "kql_join_summarize_before_project"),
+        "{codes:?}"
+    );
+    let no_project = "SecurityEvent\n| where EventID == 4688\n| summarize count() by Computer\n";
+    let codes = codes_for(LanguageId::Kql, no_project);
+    assert!(
+        !codes
+            .iter()
+            .any(|c| c == "kql_join_summarize_before_project"),
+        "{codes:?}"
+    );
+}
+
+#[test]
 fn clean_hunt_and_trailing_wildcard_stay_clean() {
     let kql = codes_for(LanguageId::Kql, &read("sentinel-hunt.kql"));
     assert!(

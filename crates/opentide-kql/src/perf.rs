@@ -86,26 +86,27 @@ fn warn_pipeline(expr: Node, source: &str, out: &mut Vec<Diagnostic>) {
         }
     }
 
-    let mut narrowed = false;
-    for op in &ops {
-        if is_narrowing_project(op.kind()) {
-            narrowed = true;
-            continue;
-        }
-        if narrowed {
-            continue;
-        }
+    // Warn only when a later `project` makes the bad order visible. A pipeline
+    // with no `project` is not this diagnostic.
+    for (index, op) in ops.iter().enumerate() {
         let name = match op.kind() {
             "join_operator" => "join",
             "summarize_operator" => "summarize",
             _ => continue,
         };
+        let project_later = ops
+            .iter()
+            .skip(index + 1)
+            .any(|later| is_narrowing_project(later.kind()));
+        if !project_later {
+            continue;
+        }
         push(
             out,
             source,
             codes::KQL_JOIN_SUMMARIZE_BEFORE_PROJECT,
             format!(
-                "`{name}` runs before `project` has narrowed columns; project the needed columns first when that order is visible in the query ({CITE})"
+                "`{name}` runs before `project` narrows columns; project the needed columns first ({CITE})"
             ),
             op.start_byte(),
             op.end_byte(),
