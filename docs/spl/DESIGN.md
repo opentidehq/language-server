@@ -105,6 +105,24 @@ Inside `search` / `bare_search` (not only `eval` comparisons):
 | `(` on an eval or stats function | Search Reference `signature`. `stats` / `tstats` / `chart` / `timechart` (and the other aggregate commands) resolve `sum` / `avg` / `min` / `max` as aggregates |
 | `` `macro( `` | macro `signature` string |
 
+## Slow and truncated shapes
+
+`crates/opentide-spl/src/perf.rs` emits **warnings** and does not rewrite
+the query. The same codes fire on a raw `.spl` file and inside
+`configurations.splunk.query` / legacy `configurations.splunk.search`.
+
+| Code | Fires when |
+| --- | --- |
+| `spl_subsearch_truncation` | Command word is `join` or `append`. Message: silent truncation at 50,000 events or 60 seconds ([About subsearches](https://docs.splunk.com/Documentation/Splunk/latest/Search/Aboutsubsearches)). |
+| `spl_subsearch_truncation` | Command word is `transaction`. Different limit: events stay in memory until the group closes, and events past `maxopentxn` are dropped ([transaction](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Transaction)). This is not the 50,000-event subsearch cap. |
+| `spl_leading_not` | In a search clause, `NOT` is the first filter (optional wrapping `(` and an optional leading `search`). [Boolean expressions](https://docs.splunk.com/Documentation/Splunk/latest/Search/Booleanexpressions). |
+| `spl_wildcard` | In a search clause: a bare `*`, a leading wildcard (`*fail`, `process=*fail`), or a mid-token wildcard (`f*ail`). A trailing `fail*` is clean. [Search](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Search). |
+
+Search-clause scanning runs for an empty command word, for `search`, and for
+a word that is not a catalogued command. `join`, `append`, and `transaction`
+get the truncation warning and are not also scanned as search clauses.
+Bracketed subsearches are walked with the same rules.
+
 ## Highlight overlay
 
 After tree-sitter:
