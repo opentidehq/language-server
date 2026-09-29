@@ -30,7 +30,7 @@ Read `references/wire-format.md` before adding a method.
 
 The analysis crate sees a `MemoryWorkspace` built from open documents plus YAML files under the workspace `objects/` directory. The engine still does not call `std::fs`. The host does.
 
-`initialize` reads `rootUri` and installs the Tide deprecation overlay from `.opentide/lsp/catalogs/generated/deprecations.json` when that file exists. Capabilities are the JSON object in the `initialize` arm. When you add a provider, advertise it there and handle the method. A capability without a handler makes editors hang waiting for a response.
+`initialize` reads `rootUri` and installs the Tide deprecation overlay from `.opentide/lsp/catalogs/generated/deprecations.json` when that file exists. Capabilities are the JSON object in the `initialize` arm. When you add a provider, advertise it there and handle the method in the same change. An unhandled request that still has an `id` hits the `_` arm and returns `-32601`, so the client unblocks with a failure instead of waiting.
 
 Current providers: incremental sync (`textDocumentSync: 2`), hover, completion (resolve, trigger characters), signature help, definition, references, document symbol, workspace symbol, document highlight, code action, folding, selection range, inlay hints, pull diagnostics, semantic tokens (full).
 

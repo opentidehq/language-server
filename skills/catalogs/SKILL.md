@@ -61,7 +61,7 @@ Block-scalar indent is stripped for analysis. Tokens are remapped onto the origi
 
 ## Conformance
 
-`testdata/conformance/external/<id>/` holds real public rules and a twin with one injected fault (`frobnicate` for KQL, `notacommand` for SPL). `crates/opentide-analysis/tests/external_corpus.rs` requires a diagnostic on every broken file and no parse error on the longest prefix of the valid file the grammar accepts. Sources and licenses are `testdata/conformance/external/SOURCES.md`. Do not add a rule whose license is unclear.
+`testdata/conformance/external/<id>/` holds real public rules and a `.broken.` twin (`frobnicate` or `.show` for KQL, `notacommand` for SPL). `crates/opentide-analysis/tests/external_corpus.rs` does not require the full valid file to parse. v1 grammars still miss forms such as `summarize min =`, `between`, leading SPL macros, and `stats ... BY`. The test keeps the full rule, finds the longest prefix that parses (at most 16 lines, and the prefix must contain `|`), injects the fault on that prefix, and requires `kql_unknown_operator` or `spl_unknown_command`. The broken full file must produce at least one diagnostic. A corpus that catches the fault on fewer than 5 KQL prefixes or 2 SPL prefixes fails. Sources and licenses are `testdata/conformance/external/SOURCES.md`. Do not add a rule whose license is unclear, and do not trim a public rule down to the prefix the grammar already accepts.
 
 `testdata/conformance/pydantic/` and `crates/opentide-analysis/tests/tide_corpus.rs` check object issues. `testdata/oracles/exceptions.toml` lists Kusto.Language disagreements. The Kusto.Language oracle is CI-only (`scripts/ci-oracle.sh`, `continue-on-error`). Do not vendor Microsoft Kusto.Language in the binary.
 

@@ -19,7 +19,7 @@ CrowdStrike stays unsupported until its language is specified. SQL stays unsuppo
 - The grammar coverage gate names the productions, and `parser.c` matches `tree-sitter-cli` 0.25.10.
 - Catalogs load once per process through `OnceLock` and `include_str!`. No `std::fs` in the new engine's `src/`.
 - `generate-highlights --check` passes, and capture names are an append-only change to HighlightSpec.
-- `testdata/conformance/external/<id>/` contains real public rules and the same rules with one injected fault. Valid files do not parse-error. Broken files each produce a diagnostic.
+- `testdata/conformance/external/<id>/` contains real public rules and a `.broken.` twin with one injected fault. The full valid file may still parse-error where the grammar does not cover the rule yet. The harness keeps that file, takes the longest prefix that parses, and requires the injected fault on that prefix to diagnose. The broken full file must produce at least one diagnostic. Copy `crates/opentide-analysis/tests/external_corpus.rs`.
 - Unsupported platforms still produce no fake validation.
 - `cargo clippy --workspace --all-targets -- -D warnings` is clean.
 
@@ -34,7 +34,7 @@ CrowdStrike stays unsupported until its language is specified. SQL stays unsuppo
 7. Add `highlights/queries/<id>/highlights.scm`. Specific patterns come before `(identifier) @variable`. New captures are appended to `highlights/spec.toml` `legend`. Run `generate-highlights`.
 8. Register the engine in `opentide-analysis` on `LanguageId`. Hover, completion, and signature help dispatch here. Do not copy a second implementation into `opentide-tide` except the injection remap.
 9. If Tide YAML embeds the language, add a row to the injection table in `docs/ARCHITECTURE.md` and to `language_for_field_path`. Remap tokens onto YAML coordinates after stripping block-scalar indent.
-10. Add `testdata/conformance/external/<id>/`: unmodified public rules, and the same rules with one injected fault. Record the source and license in `SOURCES.md`.
+10. Add `testdata/conformance/external/<id>/`: unmodified public rules, plus `<name>.broken.<ext>` with one injected fault. Record the source and license in `SOURCES.md`. Follow `external_corpus.rs`: do not delete a public rule because the full text parse-errors; assert the fault on the longest prefix the grammar accepts, and assert the broken full file emits some diagnostic.
 11. Extend `crates/opentide-lsp` only for host behaviour (language id from the URI suffix, e2e frame). The CLI `analyze` / `highlight` path must keep printing plain JSON.
 12. WASM: `highlight(language_id, bytes)` already goes through `LanguageId::parse` and `opentide_analysis::highlight`. Do not add a wasm-bindgen export per language, and do not link `opentide-wasm` into a WASI build.
 

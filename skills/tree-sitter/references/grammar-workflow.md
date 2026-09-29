@@ -17,10 +17,11 @@ Do not `npm install tree-sitter-cli` at the repo root. There is no root `package
 
 ## Generate
 
-From the grammar directory (`grammars/tree-sitter-opentide-kql` or `...-spl`):
+From the repository root. The subshell is what puts `tree-sitter` next to `grammar.js`; the check script resolves the repo from its own path and must be invoked as `scripts/check-grammars.sh`.
 
 ```bash
-tree-sitter generate
+(cd grammars/tree-sitter-opentide-kql && tree-sitter generate)   # or -spl
+bash scripts/check-grammars.sh
 ```
 
 0.25 reads `grammar.js` and writes `src/parser.c`, `src/grammar.json`, `src/node-types.json`, and `src/tree_sitter/parser.h`. Commit every file git shows as changed. Do not format `parser.c` with rustfmt or clang-format; the diff against a fresh generate must be empty.
@@ -32,10 +33,11 @@ tree-sitter generate
 Tree-sitter is GLR. Conflicts are allowed when they are real (a token that starts two operators) and named in a comment. Do not paper over a conflict with `prec` that makes a valid query fail to parse. Check with:
 
 ```bash
-tree-sitter parse testdata/corpus/kql/take_operator__valid.kql
+# grammar directory, so the CLI finds grammar.js; the corpus lives two levels up
+tree-sitter parse ../../testdata/corpus/kql/take_operator__valid.kql
 ```
 
-Run that from the grammar directory so the CLI finds `grammar.js`. A successful parse prints an S-expression. `ERROR` or `MISSING` nodes are failures even if the process exits 0. The Rust tests use `has_error`.
+Run that from `grammars/tree-sitter-opentide-kql` (use `...-spl` and `../../testdata/corpus/spl/...` for SPL). A successful parse prints an S-expression. `ERROR` or `MISSING` nodes are failures even if the process exits 0. The Rust tests use `has_error`.
 
 Keywords that are also identifiers (`and`, `or`, `by`) belong in the expression rules as literals, not as a reserved-word list that rejects them as column names. Look at the existing `grammar.js` before adding a word to a reserved set.
 

@@ -45,4 +45,15 @@ cargo test --workspace
 cargo run -p opentide-lsp -- generate-highlights --check
 ```
 
-Grammar edits also need `bash scripts/check-grammars.sh` (CLI 0.25.10). CI sets `RUSTFLAGS=-Dwarnings`.
+Grammar edits also need `bash scripts/check-grammars.sh` from the repository root (CLI 0.25.10). CI sets `RUSTFLAGS=-Dwarnings`.
+
+## Upstream docs, not downloaded skills
+
+The Rust project, tree-sitter, wasm-bindgen, and the LSP spec publish documentation, not Agent Skills. Use those docs when a skill points at them:
+
+- Edition 2024: <https://doc.rust-lang.org/stable/edition-guide/rust-2024/>
+- tree-sitter 0.25.10: <https://docs.rs/tree-sitter/0.25.10/tree_sitter/>
+- wasm-bindgen targets: <https://wasm-bindgen.github.io/wasm-bindgen/reference/rust-targets.html>
+- LSP framing: <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#headerPart>
+
+Do not `npx skills add` a generic Rust, tree-sitter, or WASM skill into this repo. The packs on skills.sh describe async services, snapshot tests, `wasm-pack`, or a multi-hundred-language parser cache. None of them match this engine. Apollo's `rust-best-practices` handbook is the closest maintained Rust skill and still disagrees with this repo on snapshots and async.

@@ -23,11 +23,10 @@ Generated files:
 - `src/node-types.json`
 - the headers under `src/tree_sitter/`
 
-Edit `grammar.js` only, then:
+Edit `grammar.js` only, then run this from the repository root. `tree-sitter generate` has to see `grammar.js`, and `scripts/check-grammars.sh` is not on the path from inside the grammar directory:
 
 ```bash
-cd grammars/tree-sitter-opentide-kql   # or -spl
-tree-sitter generate
+(cd grammars/tree-sitter-opentide-kql && tree-sitter generate)   # or -spl
 bash scripts/check-grammars.sh
 ```
 
