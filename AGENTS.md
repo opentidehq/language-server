@@ -27,7 +27,7 @@ Engines are I/O-free. Hosts (`opentide-lsp`, the WASM crate, the TypeScript pack
 - Control commands (`.show`, `.create`) parse so the engine can emit `kql_control_command_unsupported`. They are not valid detections.
 - Highlight tokenizes **authored** SPL. An implicit leading `| search` is not a source rewrite.
 - OpenTide LSP owns Tide diagnostics. Editor samples keep yamlls off `objects/**`.
-- Do not add `opentide-sql`, a `.sql` language id, or a stub SQL highlighter.
+- There is no `opentide-sql` crate, no `.sql` language id, and no stub SQL highlighter.
 - Do not hand-edit `grammars/**/src/parser.c`, `grammar.json`, or `node-types.json`. Regenerate with `tree-sitter-cli` **0.25.10**.
 - Do not commit a rewritten `Cargo.lock`. Resolution prunes entries the lock keeps on purpose. Restore the committed lock if Cargo rewrites it.
 - Configuration TOML (`#64`) is post-v1. No tree-sitter TOML grammar, no HighlightSpec captures, no hand-written JSON Schema. It waits on `opentide#374`.
