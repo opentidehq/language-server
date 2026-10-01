@@ -2063,4 +2063,30 @@ mod tests {
                 .collect::<Vec<_>>()
         );
     }
+
+    /// Completion caret conversion counts Unicode scalars. `é` is one column;
+    /// an emoji is one column and two UTF-16 units, so this does not match
+    /// `offset_to_position`.
+    #[test]
+    fn position_to_offset_counts_scalars_not_utf16() {
+        let src = "aéX";
+        assert_eq!(
+            position_to_offset(src, opentide_core::Position::new(0, 1)),
+            1
+        );
+        assert_eq!(
+            position_to_offset(src, opentide_core::Position::new(0, 2)),
+            1 + "é".len()
+        );
+
+        let src = "a😀b";
+        assert_eq!(
+            position_to_offset(src, opentide_core::Position::new(0, 2)),
+            1 + "😀".len()
+        );
+        assert_eq!(
+            position_to_offset(src, opentide_core::Position::new(1, 0)),
+            src.len()
+        );
+    }
 }
