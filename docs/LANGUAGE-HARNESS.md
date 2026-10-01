@@ -6,7 +6,7 @@ KQL, SPL, and Tide YAML are the 1.0 engines. A later language (S1QL, Lucene, Sig
 
 Raw `.kql` and `.spl` files are first-class documents. They are analyzed on their own, with an empty Tide workspace, by the same KQL and SPL engines that Tide `query:` and `search:` injections use (`configurations.sentinel.query`, `configurations.defender_for_endpoint.query`, `configurations.splunk.query`, and legacy `configurations.splunk.search`). `Session::language_for` selects the engine from a reported language id, then from the URI suffix (`.kql` → KQL, `.spl` → SPL, otherwise Tide YAML). A reported id the parser does not know is ignored and the suffix is used.
 
-`crates/opentide-analysis/tests/raw_query_composability.rs` checks that `analyze` on a standalone file and the same text inside a Tide query block return the same operator diagnostic (`kql_unknown_operator` for an injected `frobnicate`, `spl_unknown_command` for an injected unknown command).
+`crates/opentide-analysis/tests/raw_query_composability.rs` checks that `analyze` on a standalone file and the same text inside a Tide query block return the same operator diagnostic (`kql_unknown_operator` for an injected `frobnicate`, `spl_unknown_command` for an injected unknown command). Slow-query warnings follow the same split: `crates/opentide-analysis/tests/perf_warnings.rs` requires `kql_where_not_first` and `spl_wildcard` on both the raw file and the Tide block, with the Tide diagnostic's `field_path` set to the injected key. Warning rules: [kql/DESIGN.md](kql/DESIGN.md), [spl/DESIGN.md](spl/DESIGN.md).
 
 ## SQL
 

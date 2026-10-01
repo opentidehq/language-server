@@ -36,6 +36,14 @@ editors / @opentide/lsp-client / WASM worker
 
 Tide object intelligence is generated from the installed OpenTide package (`opentide==0.5.0`) by [`scripts/sync_opentide_schemas.py`](../scripts/sync_opentide_schemas.py). The LSP loads [`catalogs/tide/generated/fields.json`](../catalogs/tide/generated/fields.json), keyed by schema family and YAML path. JSON Schema supplies titles, types, required, enums, and consts. Pydantic `tide.template.multiline` / `hide` supply markdown and hidden flags the schema emitter drops. Capture rename in HighlightSpec is a **major**; adding `markdown.*` / `macro` is a minor (`0.2.0`).
 
+Every schema key uses one capture, `tide.property`, including a key on a
+list item (`- purpose:`). [`scripts/sync_opentide_schemas.py`](../scripts/sync_opentide_schemas.py)
+`capture_for` ignores the path so nesting does not recolor the key.
+`tide.keyword` stays in HighlightSpec and is not assigned. Values keep their
+own captures (markdown, enums as `constant`, UUIDs as `tide.uuid`, injected
+KQL/SPL). A key with no field row is `property`. LSP semantic tokens map
+`tide.property` → `property`. JSON `highlight()` still emits `tide.property`.
+
 ## Diagnostics
 
 Pydantic remains CLI authority. The LSP emits the same `{code, field_path, severity}` with real ranges. The engine may add **extra** query diagnostics inside `query: |`.
@@ -46,6 +54,12 @@ Pydantic remains CLI authority. The LSP emits the same `{code, field_path, sever
 - Web: `wasm32-unknown-unknown` `highlight(language_id, bytes)` — do **not** mix WASI + wasm-bindgen in one artifact
 - vscode.dev: `wasm32-wasip1` of the same binary
 - TypeScript: `createOpentideClient({ transport: "stdio" | "worker" | "wasi" })`
+
+## Structure providers
+
+`initialize` advertises document symbols, workspace symbols, document
+highlight, code actions, folding, selection range, inlay hints, and pull
+diagnostics. Behavior and the quickfix range pitfall: [EDITORS.md](EDITORS.md).
 
 ## Custom RPCs
 

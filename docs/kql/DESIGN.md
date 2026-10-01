@@ -74,22 +74,56 @@ join kind=Kind [hint.strategy=Strategy] RightTable on Predicate
 Other option-bearing operators (see `operator-options.toml`): `union kind=`,
 `parse kind=`, `lookup kind=`, `make-series`, `mv-expand`, `evaluate`.
 
-Signature help triggers on `(` for functions (`ago(`, `datetime(`, `dynamic(`)
-and on `join ` / `kind=` for tabular options.
+Signature help (`signature_help`) prefers the innermost `(` call. A catalog
+function uses its `signature` string, or `{name}(…)` when that string is
+empty. An evaluate plugin uses its `signature` only when one is set. If no
+call matches, the operator after the last `|` uses the operator `signature`
+from `operators.toml` (`join`, `where`, `parse`, …). `(` , `,`, and `=` are
+LSP trigger characters.
 
 `dynamic([...])` is a **type constructor** (HighlightSpec `type`), not a
 user function.
 
-## Detection policy (diagnostics, not rewrite)
+Refresh function, operator, and plugin signatures from a checkout of
+[MicrosoftDocs/dataexplorer-docs](https://github.com/MicrosoftDocs/dataexplorer-docs)
+(`data-explorer/kusto/query`):
 
-| Pattern | Sentinel analytics | Defender custom / NRT |
-| --- | --- | --- |
-| `search *` / `union *` | illegal | illegal |
-| `join` / `union` / `externaldata` | allowed | **banned in NRT** |
-| Comments | allowed | banned in NRT |
-| Output columns | n/a | `Timestamp`/`TimeGenerated` + `DeviceId`/`ReportId` (see defender-tables.md) |
+```bash
+python3 scripts/sync_kql_learn_signatures.py --docs /path/to/dataexplorer-docs
+python3 scripts/sync_kql_learn_signatures.py --docs /path/to/dataexplorer-docs --write
+```
 
-The engine does **not** rewrite authored KQL.
+Without `--write` the script prints repaired, skipped, and suspicious rows
+and leaves the TOML files alone. A row whose article cannot be read is
+skipped and kept as-is. `encode_base64` / `decode_base64` are not on the
+cited Learn page; the script fills `base64_encodestring` /
+`base64_decodestring` instead of copying a neighbor signature.
+`column_names_of` and `project-by-names` are added when the article exists
+and the catalog row does not.
+
+## Slow-query warnings
+
+`crates/opentide-kql/src/perf.rs` emits **warnings**. The query text is left
+as authored. Every message cites
+[Kusto query best practices](https://learn.microsoft.com/en-us/kusto/query/best-practices).
+The same codes fire on a raw `.kql` file and inside
+`configurations.sentinel.query` / `configurations.defender_for_endpoint.query`.
+
+| Code | Fires when |
+| --- | --- |
+| `kql_where_not_first` | The source is a table name, the first operator is not `where` or `filter`, and a later `where` / `filter` exists. The range is that later operator. `SecurityEvent \| where … \| extend …` is clean. |
+| `kql_join_summarize_before_project` | `join` or `summarize` runs while columns are still wide **and** a later `project`, `project-keep`, or `project-away` narrows them. `summarize` with no later project is clean. A project already before the operator is clean. |
+| `kql_unscoped_search` | A leading `search` has a predicate and no `in (Table, …)` list. `search *` uses this code. `search in (SecurityEvent) "error"` and `SecurityEvent \| search "error"` are clean. |
+| `kql_wildcard_table` | A leading `*` table, or `*` inside `search in (…)` . |
+| `kql_unscoped_union` | `union` (at the start or after `\|`) takes a `*` table argument. |
+
+Join cardinality and `hint.shufflekey` are omitted: the text does not say
+which side is larger.
+
+Defender output columns stay a separate diagnostic,
+`defender_output_columns` (see [defender-tables.md](defender-tables.md)).
+Defender NRT bans (`join`, `union`, `externaldata`, comments) stay inventory
+legend only — [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md).
 
 ## Highlight overlay
 

@@ -12,6 +12,12 @@ There is **no YAML formatter**. The LSP does not rename object `name`.
 | `objective::1.0` | `objective.threats[]` → threat UUIDs |
 | `threat::1.0` | `threat.impact` / `threat.leverage` are non-empty lists. `threat.chaining[].vector` / `relation` are not schema properties in 0.5.0 |
 
+An array field written as one YAML string (`impact: High`) is
+`schema_validation`: "{path} must be a YAML list of {name} vocabulary names,
+not a single string". The diagnostic's `suggestion` is `- {text}`. A list
+shorter than the field's `min_items` is also `schema_validation`. Unknown
+names inside the list are `vocab_unknown`.
+
 ## Diagnostic codes (CLI-compatible)
 
 Pydantic stays CLI authority. LSP emits the same `{code, field_path, severity}`:
@@ -23,11 +29,17 @@ Pydantic stays CLI authority. LSP emits the same `{code, field_path, severity}`:
 - `invalid_ref`
 - `chaining_relation_unknown`
 - `deprecated_field`
-- `filename_slug`
-- `missing_author`
-- `missing_organisation`
+- `filename_slug` — warning. The file stem must equal `slugify(name)` or start with `{slug}-`. `slugify` lowercases ASCII alphanumerics and collapses other characters to a single `-` (`Sentinel KQL Rule` → `sentinel-kql-rule`). Suggestion text is `{slug}.yaml`.
+- `missing_author` — warning when `metadata.author` is absent.
+- `missing_organisation` — warning when `metadata.organisation` is absent.
 
-Query extras (engine may add these inside `query: |`):
+Query extras come from the KQL and SPL engines. They fire on raw `.kql` /
+`.spl` files and on the same text inside an injected block. Slow-shape
+codes (`kql_where_not_first`, `kql_unscoped_search`, `kql_unscoped_union`,
+`kql_wildcard_table`, `kql_join_summarize_before_project`, `kql_render_not_valid`,
+`spl_wildcard`, `spl_leading_not`, `spl_subsearch_truncation`) are warnings.
+Unknown operators, unknown commands, control commands, and parse errors are
+errors. Rules: [kql/DESIGN.md](kql/DESIGN.md), [spl/DESIGN.md](spl/DESIGN.md).
 
 - `kql_control_command_unsupported`
 - `kql_unknown_operator`
@@ -58,5 +70,6 @@ Snippets come from the same templates `opentide generate` writes (`catalogs/tide
 
 - `textDocument/definition` and `references` on UUIDs
 - Completions = names + UUIDs of the target type
-- `workspace/symbol` by name / uuid / schema
+- `workspace/symbol` by name / uuid / schema (location range is the name token)
 - `duplicate_id` across the workspace
+- Inlay hints and the other structure providers: [EDITORS.md](EDITORS.md)
