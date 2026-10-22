@@ -54,69 +54,31 @@ reason = "Kusto.Language parses `materialize(...)` and `toscalar(...)` as their 
 names = ["materialize", "toscalar"]
 
 [[kql]]
-id = "kql-plugin-name-case"
-reason = "Learn titles the plugin `R`; Kusto.Language names it `r`, which is the spelling `evaluate r(...)` needs. Plugin names are case-sensitive."
-names = ["R", "r"]
-
-[[kql]]
-id = "kql-percentiles-array-tdigest"
-reason = "The catalog has `percentile_array_tdigest` (from the Learn page slug); Kusto.Language knows `percentiles_array_tdigest`."
-names = ["percentile_array_tdigest", "percentiles_array_tdigest"]
-
-[[kql]]
 id = "kql-plugins-missing-from-kusto-language"
 reason = "Documented on Learn and in catalogs/kql/core/evaluate-plugins.toml, but absent from Kusto.Language 12.4.1."
 names = ["diffpatterns_text", "schema_merge"]
 
 [[kql]]
-id = "kql-evaluate-plugin-flagged"
-reason = "`bag_unpack` is in both catalogs, but ours reports kql_unknown_function for `evaluate bag_unpack(...)` in real rules."
-names = ["bag_unpack"]
-
-[[kql]]
-id = "kql-deprecated-aliases"
-reason = "Obsolete names Kusto.Language still resolves. Real rules use them (SigninBruteForce: makelist; ADFS rules: any), and ours reports kql_unknown_function where a deprecation warning is due."
-names = [
-  "any", "anyif", "argmax", "argmin", "cnt", "makelist", "makeset",
-  "columnifexists", "current_cursor", "datepart", "extentid", "make_string",
-  "notnull", "row_rank", "to_utf8", "toobject", "totime", "ai_embed_text",
-]
+id = "kql-obsolete-without-learn-replacement"
+reason = "Obsolete in Kusto.Language, and no Learn article names a replacement, so the catalog has nothing to cite for them."
+names = ["cnt", "row_rank", "ai_embed_text"]
 
 [[kql]]
 id = "kql-hidden-symbols"
-reason = "Hidden in Kusto.Language (no Learn page) but still resolved; ours reports kql_unknown_function."
+reason = "Hidden in Kusto.Language and undocumented on Learn. Not catalogued on purpose; ours reports them only when they look like a typo of a catalogued name."
 names = [
   "current_node_id", "hll_isvalid", "iscolumnexists", "rowstore_ordinal_range",
   "tdigest_isvalid", "make_dictionary", "passthrough", "dax_request", "postgresql_request",
 ]
 
 [[kql]]
-id = "kql-functions-missing-from-catalog"
-reason = "Kusto.Language functions and aggregates not in catalogs/kql/core/functions.toml; ours reports kql_unknown_function on valid queries."
+id = "kql-no-learn-article"
+reason = "Kusto.Language functions and plugins with no Learn article: graph-match internals (all, map, node_*, inner_nodes), Azure Data Explorer service plugins (execute_query, csharp, identity, ...). Not catalogued until Learn documents them."
 names = [
-  "all", "around", "array_strcat", "assert", "bag_zip", "base64_encode_fromarray",
-  "datetime_list_timezones", "dynamic_to_json", "entity_group", "external_table",
-  "format_bytes", "getmonth", "graph", "gzip_compress_to_base64_string",
-  "gzip_decompress_from_base64_string", "inner_nodes", "isascii", "isutf8", "labels",
-  "map", "materialized_view", "new_guid", "node_degree_in", "node_degree_out", "node_id",
-  "punycode_domain_from_string", "punycode_domain_to_string", "regex_quote", "row_id",
-  "set_equals", "stored_query_result", "string_size", "unicode_codepoints_from_string",
-  "unicode_codepoints_to_string", "week_of_year", "zlib_compress_to_base64_string",
-  "zlib_decompress_from_base64_string",
-  "covariance", "covarianceif", "covariancep", "covariancepif", "percentilew",
-]
-
-[[kql]]
-id = "kql-plugins-missing-from-catalog"
-reason = "Kusto.Language plugins not in catalogs/kql/core/evaluate-plugins.toml. Most are Azure Data Explorer only (http_request, execute_query, csharp); ours reports them as unknown."
-names = [
-  "active_users_count", "activity_counts_metrics", "activity_engagement", "activity_metrics",
-  "ai_chat_completion", "ai_chat_completion_prompt", "ai_embeddings", "csharp",
-  "estimate_rows_count", "execute_query", "execute_show_command", "external_datatable",
-  "funnel_sequence", "funnel_sequence_completion", "geo_line_lookup", "geo_polygon_lookup",
-  "http_request", "http_request_post", "identity", "identity_v3",
-  "infer_storage_schema_with_suggestions", "new_activity_metrics", "session_count",
-  "sliding_window_counts",
+  "all", "array_strcat", "entity_group", "inner_nodes", "map", "node_degree_in",
+  "node_degree_out", "node_id", "row_id", "set_equals",
+  "csharp", "estimate_rows_count", "execute_query", "execute_show_command",
+  "external_datatable", "identity", "identity_v3",
 ]
 
 # ---------------------------------------------------------------------------

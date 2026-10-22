@@ -73,6 +73,9 @@ pub struct FunctionRow {
     pub citation: Option<String>,
     #[serde(default)]
     pub parameters: Vec<ParamRow>,
+    /// The function that replaces this deprecated alias.
+    #[serde(default)]
+    pub deprecated: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -625,14 +628,46 @@ fn collect_function_diagnostics(
     catalog: &Catalog,
     out: &mut Vec<Diagnostic>,
 ) {
-    if node.kind() == "function_call" {
+    let is_plugin = node.parent().map(|p| p.kind()) == Some("evaluate_operator");
+    if node.kind() == "function_call" && is_plugin {
         if let Some(name) = child_text(node, "name", source) {
-            if catalog.function(&name).is_none() && catalog.operator(&name).is_none() {
+            if catalog.plugin(&name).is_none() {
+                let mut d = Diagnostic::error(
+                    codes::KQL_UNKNOWN_FUNCTION,
+                    format!("unknown evaluate plugin '{name}'"),
+                    node_range(source, node),
+                );
+                if let Some(s) = catalog
+                    .plugins
+                    .iter()
+                    .map(|p| (p.name.clone(), strsim_distance(&p.name, &name)))
+                    .filter(|(_, d)| *d <= 2)
+                    .min_by_key(|(_, d)| *d)
+                    .map(|(n, _)| n)
+                {
+                    d = d.with_suggestion(s);
+                }
+                out.push(d);
+            }
+        }
+    } else if node.kind() == "function_call" {
+        if let Some(name) = child_text(node, "name", source) {
+            if let Some(replacement) = catalog.function(&name).and_then(|f| f.deprecated.as_ref()) {
+                out.push(
+                    Diagnostic::warning(
+                        codes::KQL_DEPRECATED_FUNCTION,
+                        format!("'{name}' is deprecated; use {replacement}()"),
+                        node_range(source, node),
+                    )
+                    .with_suggestion(replacement.clone()),
+                );
+            } else if catalog.function(&name).is_none() && catalog.operator(&name).is_none() {
                 // Operators used as functions are fine; unknown names get a diagnostic.
                 // Many scalar functions are not yet catalogued — only flag if it looks like a typo of a known one.
                 if let Some(suggestion) = catalog
                     .functions
                     .iter()
+                    .filter(|f| f.deprecated.is_none())
                     .map(|f| (f.name.clone(), strsim_distance(&f.name, &name)))
                     .filter(|(_, d)| *d > 0 && *d <= 2)
                     .min_by_key(|(_, d)| *d)
@@ -1108,6 +1143,7 @@ pub fn completions(source: &str, offset: usize, profile: Profile) -> Vec<Complet
     let mut items: Vec<CompletionItem> = catalog
         .functions
         .iter()
+        .filter(|f| f.deprecated.is_none())
         .map(|f| {
             complete_item(
                 f.name.clone(),
