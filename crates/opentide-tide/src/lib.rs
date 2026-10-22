@@ -3,6 +3,7 @@
 //! Pydantic remains CLI authority. The LSP emits the same `{code, field_path, severity}`
 //! with real source ranges. opentide LSP owns Tide diagnostics — disable yamlls on `objects/**`.
 
+mod elastic;
 mod intel;
 mod vocabs;
 mod yaml_path;
@@ -20,6 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::OnceLock;
 use uuid::Uuid;
 
+pub use elastic::{duration_millis, elastic_query_language};
 pub use intel::{
     TideInlay, completions_tide, field_markdown, hover_tide, inlay_hints, resolve_completion,
 };
@@ -33,7 +35,9 @@ const THREAT_TEMPLATE: &str =
     include_str!("../../../catalogs/tide/templates/threat.1.0.template.yaml");
 
 /// Map a YAML field path to an injected query language.
-/// CrowdStrike is unsupported — never fake validation.
+/// CrowdStrike is unsupported — never fake validation. Elastic is not a
+/// path: its language comes from the block's `type` and `language`
+/// ([`elastic_query_language`]).
 pub fn language_for_field_path(path: &[&str]) -> Option<LanguageId> {
     match path {
         ["configurations", "sentinel", "query"] => Some(LanguageId::Kql),
@@ -160,6 +164,8 @@ pub fn extract_injections(source: &str) -> Vec<InjectedQuery> {
         byte += line.len();
         i += 1;
     }
+    out.extend(elastic::elastic_injections(source));
+    out.sort_by_key(|inj| inj.host_span.start);
     out
 }
 
@@ -751,6 +757,39 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
                     }
                 }
             }
+            LanguageId::Esql | LanguageId::Eql | LanguageId::Kuery | LanguageId::Lucene => {
+                let (found, query_tokens) = match inj.language {
+                    LanguageId::Esql => {
+                        let r = opentide_esql::analyze(&inj.inner);
+                        (r.diagnostics, r.tokens)
+                    }
+                    LanguageId::Eql => {
+                        let r = opentide_eql::analyze(&inj.inner);
+                        diagnostics.extend(elastic::maxspan_advisories(
+                            input.source,
+                            object.configurations.as_ref(),
+                            inj,
+                        ));
+                        (r.diagnostics, r.tokens)
+                    }
+                    LanguageId::Kuery => {
+                        let r = opentide_kuery::analyze(&inj.inner);
+                        (r.diagnostics, r.tokens)
+                    }
+                    _ => {
+                        let r = opentide_lucene::analyze(&inj.inner);
+                        (r.diagnostics, r.tokens)
+                    }
+                };
+                for d in found {
+                    diagnostics.push(remap_diagnostic(input.source, inj, d));
+                }
+                for t in query_tokens {
+                    if let Some(mapped) = remap_token(input.source, inj, &t) {
+                        tokens.push(mapped);
+                    }
+                }
+            }
             LanguageId::TideYaml => {}
         }
     }
@@ -765,25 +804,35 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
 }
 
 fn remap_diagnostic(source: &str, inj: &InjectedQuery, mut d: Diagnostic) -> Diagnostic {
-    let inner_start = {
-        // approximate: use the diagnostic range's start character on line 0 of inner
-        let line = d.range.start.line as usize;
-        let mut offset = 0usize;
-        for (i, l) in inj.inner.split('\n').enumerate() {
-            if i == line {
-                offset += d.range.start.character as usize;
-                break;
-            }
-            offset += l.len() + 1;
-        }
-        offset
-    };
-    let span = remap_span(inj, ByteSpan::new(inner_start, inner_start + 1));
+    let start = inner_offset(&inj.inner, d.range.start);
+    let end = inner_offset(&inj.inner, d.range.end).max(start + 1);
+    let span = remap_span(inj, ByteSpan::new(start, end));
     d.range = span_to_range(source, span);
     if d.field_path.is_none() {
         d.field_path = Some(inj.field_path.clone());
     }
     d
+}
+
+/// Byte offset of an LSP position (UTF-16 columns) inside an injected query.
+fn inner_offset(inner: &str, position: opentide_core::Position) -> usize {
+    let mut line = 0u32;
+    let mut col = 0u32;
+    for (idx, ch) in inner.char_indices() {
+        if line == position.line && col >= position.character {
+            return idx;
+        }
+        if ch == '\n' {
+            if line == position.line {
+                return idx;
+            }
+            line += 1;
+            col = 0;
+        } else {
+            col += ch.len_utf16() as u32;
+        }
+    }
+    inner.len()
 }
 
 fn remap_token(

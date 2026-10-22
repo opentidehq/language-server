@@ -10,9 +10,16 @@ fn main() {
         &root.join("grammars/tree-sitter-opentide-spl/src"),
         "tree-sitter-opentide-spl",
     );
+    for lang in ["esql", "eql", "kuery", "lucene"] {
+        compile_grammar(
+            &root.join(format!("grammars/tree-sitter-opentide-{lang}/src")),
+            &format!("tree-sitter-opentide-{lang}"),
+        );
+    }
 
-    println!("cargo:rerun-if-changed=../../grammars/tree-sitter-opentide-kql/src/parser.c");
-    println!("cargo:rerun-if-changed=../../grammars/tree-sitter-opentide-spl/src/parser.c");
+    for lang in ["kql", "spl", "esql", "eql", "kuery", "lucene"] {
+        println!("cargo:rerun-if-changed=../../grammars/tree-sitter-opentide-{lang}/src/parser.c");
+    }
 }
 
 fn compile_grammar(src: &std::path::Path, name: &str) {

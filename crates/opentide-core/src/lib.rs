@@ -16,6 +16,18 @@ pub enum LanguageId {
     Spl,
     #[serde(rename = "opentide-yaml", alias = "yaml", alias = "tide")]
     TideYaml,
+    /// Elasticsearch ES|QL (Elastic Security `esql` rules).
+    #[serde(rename = "esql", alias = "opentide-esql")]
+    Esql,
+    /// Elasticsearch Event Query Language (Elastic Security `eql` rules).
+    #[serde(rename = "eql", alias = "opentide-eql")]
+    Eql,
+    /// Kibana Query Language. Kibana's API calls it `kuery`; `KQL` stays Kusto.
+    #[serde(rename = "kuery", alias = "opentide-kuery")]
+    Kuery,
+    /// Lucene query string syntax (Elastic `language: lucene`).
+    #[serde(rename = "lucene", alias = "opentide-lucene")]
+    Lucene,
 }
 
 impl LanguageId {
@@ -24,6 +36,10 @@ impl LanguageId {
             Self::Kql => "kql",
             Self::Spl => "spl",
             Self::TideYaml => "opentide-yaml",
+            Self::Esql => "esql",
+            Self::Eql => "eql",
+            Self::Kuery => "kuery",
+            Self::Lucene => "lucene",
         }
     }
 
@@ -32,9 +48,37 @@ impl LanguageId {
             "kql" | "opentide-kql" | "KQL" | "kusto" => Some(Self::Kql),
             "spl" | "opentide-spl" | "SPL" => Some(Self::Spl),
             "opentide-yaml" | "yaml" | "tide" | "tide-yaml" => Some(Self::TideYaml),
+            "esql" | "opentide-esql" | "ES|QL" | "es|ql" | "ESQL" => Some(Self::Esql),
+            "eql" | "opentide-eql" | "EQL" => Some(Self::Eql),
+            "kuery" | "opentide-kuery" | "kibana-kql" => Some(Self::Kuery),
+            "lucene" | "opentide-lucene" | "Lucene" => Some(Self::Lucene),
             _ => None,
         }
     }
+
+    /// Language of a raw query file, from its extension. Anything else is
+    /// Tide YAML or unknown, which the caller decides.
+    pub fn from_extension(extension: &str) -> Option<Self> {
+        match extension {
+            "kql" => Some(Self::Kql),
+            "spl" => Some(Self::Spl),
+            "esql" => Some(Self::Esql),
+            "eql" => Some(Self::Eql),
+            "kuery" => Some(Self::Kuery),
+            "lucene" => Some(Self::Lucene),
+            _ => None,
+        }
+    }
+
+    /// Query languages with a tree-sitter grammar and an engine.
+    pub const QUERY_LANGUAGES: [Self; 6] = [
+        Self::Kql,
+        Self::Spl,
+        Self::Esql,
+        Self::Eql,
+        Self::Kuery,
+        Self::Lucene,
+    ];
 }
 
 impl fmt::Display for LanguageId {
@@ -283,6 +327,28 @@ pub mod codes {
     pub const SPL_WILDCARD: &str = "spl_wildcard";
     pub const SPL_LEADING_NOT: &str = "spl_leading_not";
     pub const SPL_SUBSEARCH_TRUNCATION: &str = "spl_subsearch_truncation";
+    pub const ESQL_PARSE_ERROR: &str = "esql_parse_error";
+    pub const ESQL_UNKNOWN_COMMAND: &str = "esql_unknown_command";
+    pub const ESQL_UNKNOWN_FUNCTION: &str = "esql_unknown_function";
+    pub const ESQL_UNAVAILABLE: &str = "esql_unavailable";
+    pub const ESQL_METADATA_ID: &str = "esql_metadata_id";
+    pub const EQL_PARSE_ERROR: &str = "eql_parse_error";
+    pub const EQL_UNKNOWN_FUNCTION: &str = "eql_unknown_function";
+    pub const EQL_UNSUPPORTED: &str = "eql_unsupported";
+    pub const EQL_MAXSPAN_UNIT: &str = "eql_maxspan_unit";
+    pub const EQL_MAXSPAN_WINDOW: &str = "eql_maxspan_window";
+    pub const EQL_FUNCTION_ARITY: &str = "eql_function_arity";
+    pub const EQL_CASE_SENSITIVE: &str = "eql_case_sensitive";
+    pub const EQL_LITERAL_WILDCARD: &str = "eql_literal_wildcard";
+    pub const KUERY_PARSE_ERROR: &str = "kuery_parse_error";
+    pub const KUERY_LUCENE_SYNTAX: &str = "kuery_lucene_syntax";
+    pub const KUERY_ESCAPE: &str = "kuery_escape";
+    pub const KUERY_QUOTED_WILDCARD: &str = "kuery_quoted_wildcard";
+    pub const LUCENE_PARSE_ERROR: &str = "lucene_parse_error";
+    pub const LUCENE_LOWERCASE_OPERATOR: &str = "lucene_lowercase_operator";
+    pub const LUCENE_MIXED_OPERATORS: &str = "lucene_mixed_operators";
+    pub const LUCENE_ESCAPE: &str = "lucene_escape";
+    pub const LUCENE_KUERY_SYNTAX: &str = "lucene_kuery_syntax";
     pub const CROWDSTRIKE_UNSUPPORTED: &str = "crowdstrike_unsupported";
     pub const FILENAME_SLUG: &str = "filename_slug";
     pub const MISSING_AUTHOR: &str = "missing_author";
@@ -311,11 +377,20 @@ mod tests {
 
     #[test]
     fn language_id_roundtrip() {
-        for id in [LanguageId::Kql, LanguageId::Spl, LanguageId::TideYaml] {
+        for id in LanguageId::QUERY_LANGUAGES
+            .into_iter()
+            .chain([LanguageId::TideYaml])
+        {
             assert_eq!(LanguageId::parse(id.as_str()), Some(id));
         }
         assert_eq!(LanguageId::parse("kusto"), Some(LanguageId::Kql));
+        // `KQL` is Kusto. Kibana's language is `kuery`.
+        assert_eq!(LanguageId::parse("KQL"), Some(LanguageId::Kql));
+        assert_eq!(LanguageId::parse("kibana-kql"), Some(LanguageId::Kuery));
         assert_eq!(LanguageId::parse("sql"), None);
+        assert_eq!(LanguageId::parse("esql"), Some(LanguageId::Esql));
+        assert_eq!(LanguageId::from_extension("sql"), None);
+        assert_eq!(LanguageId::from_extension("eql"), Some(LanguageId::Eql));
     }
 
     #[test]

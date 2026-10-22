@@ -44,13 +44,9 @@ impl Session {
         if let Some(id) = reported.and_then(LanguageId::parse) {
             return id;
         }
-        if uri.ends_with(".kql") {
-            LanguageId::Kql
-        } else if uri.ends_with(".spl") {
-            LanguageId::Spl
-        } else {
-            LanguageId::TideYaml
-        }
+        uri.rsplit_once('.')
+            .and_then(|(_, ext)| LanguageId::from_extension(ext))
+            .unwrap_or(LanguageId::TideYaml)
     }
 }
 

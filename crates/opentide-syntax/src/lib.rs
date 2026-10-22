@@ -1,11 +1,15 @@
 //! Tree-sitter language bindings. Parser C is vendored; do not hand-edit `parser.c`.
 
 use opentide_core::{ByteSpan, LanguageId};
-use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator, Tree};
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor, StreamingIterator, Tree};
 
 unsafe extern "C" {
     fn tree_sitter_opentide_kql() -> *const ();
     fn tree_sitter_opentide_spl() -> *const ();
+    fn tree_sitter_opentide_esql() -> *const ();
+    fn tree_sitter_opentide_eql() -> *const ();
+    fn tree_sitter_opentide_kuery() -> *const ();
+    fn tree_sitter_opentide_lucene() -> *const ();
 }
 
 fn from_raw(ptr: *const ()) -> Language {
@@ -17,6 +21,10 @@ pub fn language(id: LanguageId) -> Option<Language> {
     match id {
         LanguageId::Kql => Some(kql_language()),
         LanguageId::Spl => Some(spl_language()),
+        LanguageId::Esql => Some(unsafe { from_raw(tree_sitter_opentide_esql()) }),
+        LanguageId::Eql => Some(unsafe { from_raw(tree_sitter_opentide_eql()) }),
+        LanguageId::Kuery => Some(unsafe { from_raw(tree_sitter_opentide_kuery()) }),
+        LanguageId::Lucene => Some(unsafe { from_raw(tree_sitter_opentide_lucene()) }),
         LanguageId::TideYaml => None,
     }
 }
@@ -38,6 +46,31 @@ pub fn parse(id: LanguageId, source: &str) -> Option<Tree> {
 
 pub fn has_error(tree: &Tree) -> bool {
     tree.root_node().has_error()
+}
+
+/// First `ERROR` or `MISSING` node in document order, for a parse-error range.
+pub fn first_error(node: Node<'_>) -> Option<Node<'_>> {
+    if node.is_error() || node.is_missing() {
+        return Some(node);
+    }
+    if !node.has_error() {
+        return None;
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if let Some(found) = first_error(child) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Byte span of a node, never empty so editors can show it.
+pub fn node_span(node: Node<'_>) -> ByteSpan {
+    ByteSpan::new(
+        node.start_byte(),
+        node.end_byte().max(node.start_byte() + 1),
+    )
 }
 
 /// Run a highlights.scm query. First capture wins for an identical span so
