@@ -207,6 +207,30 @@ fn kql_invalid_fixtures_exist_per_required_rule() {
 }
 
 #[test]
+fn spl_valid_fixtures_parse() {
+    let dir = repo_root().join("testdata/corpus/spl");
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        let name = path.file_name().unwrap().to_string_lossy();
+        if !name.contains("__valid") {
+            continue;
+        }
+        let src = fs::read_to_string(&path).unwrap();
+        let body = src
+            .lines()
+            .filter(|l| !l.starts_with("``` prod:"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let tree = parse(LanguageId::Spl, &body).expect("parser");
+        assert!(
+            !has_error(&tree),
+            "{name} sexp={}",
+            tree.root_node().to_sexp()
+        );
+    }
+}
+
+#[test]
 fn spl_valid_bare_search_and_unknown_command_parse() {
     let tree = parse(LanguageId::Spl, "index=main | head 1").unwrap();
     assert!(!has_error(&tree), "{}", tree.root_node().to_sexp());

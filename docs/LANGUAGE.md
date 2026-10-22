@@ -69,6 +69,9 @@ Control commands are parsed so the engine can reject them. They are not valid de
 | spl.tstats | `tstats_command` | `tstats_command__valid` | `keyword` |
 | spl.unknown | `unknown_command` | `unknown_command__valid` | `error` (`spl_unknown_command`) |
 | spl.pipe | `"\|"` | `head_command__valid` | `operator.pipe` |
+| spl.search-group | `search_group` | `search_group__valid` | `punctuation.bracket` |
+| spl.field-name | `field_name` | `field_name__valid` | `variable` |
+| spl.dedup-option | `dedup_option` | `dedup_option__valid` | `keyword` |
 
 Authored text is tokenized as written. An implicit leading `| search` is a Splunk runtime default, not a rewrite of the source.
 

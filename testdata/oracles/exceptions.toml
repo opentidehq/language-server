@@ -86,53 +86,15 @@ names = [
 # text that does not start with `|`, as Splunk does; docs/spl/README.md)
 # ---------------------------------------------------------------------------
 
-[[spl]]
-id = "spl-multiple-aggregations"
-reason = "More than one aggregation in `stats` or `tstats` (`count min(_time) as firstTime ...`) fails to parse. Every ESCU tstats detection uses it."
-paths = [
-  "testdata/oracles/spl/stats_multiple_aggregations.spl",
-  "testdata/oracles/spl/tstats_multiple_aggregations.spl",
-  "testdata/corpus/spl/tstats_datamodel__valid.spl",
-]
+# Probes in testdata/oracles/spl/ are one form each, taken from ESCU
+# detections. All of them parse; a probe listed here is a regression.
 
-[[spl]]
-id = "spl-leading-macro"
-reason = "A search that starts with a macro followed by terms (`` `sysmon` EventCode=1 ``) fails to parse."
-paths = ["testdata/oracles/spl/leading_macro.spl"]
-
-[[spl]]
-id = "spl-boolean-group"
-reason = "Parenthesized boolean groups in a search (`(A OR B) NOT C`) fail to parse."
-paths = ["testdata/oracles/spl/boolean_group.spl"]
-
-[[spl]]
-id = "spl-table-field-list"
-reason = "`table` with a space-separated field list fails to parse."
-paths = ["testdata/oracles/spl/table_field_list.spl"]
-
-[[spl]]
-id = "spl-real-rules-hit-grammar-gaps"
-reason = "ESCU detections that use multiple tstats aggregations or a leading macro. external_corpus.rs checks a parsing prefix of each; the oracle checks the whole rule."
-paths = [
-  "testdata/conformance/external/spl/7zip_commandline_to_smb_share_path.spl",
-  "testdata/conformance/external/spl/access_lsass_memory_for_dump_creation.spl",
-  "testdata/conformance/external/spl/active_setup_registry_autostart.spl",
-  "testdata/conformance/external/spl/add_defaultuser_and_password_in_registry.spl",
-  "testdata/conformance/external/spl/add_or_set_windows_defender_exclusion.spl",
-  "testdata/conformance/external/spl/adsisearcher_account_discovery.spl",
-  "testdata/conformance/external/spl/advanced_ip_or_port_scanner_execution.spl",
-  "testdata/conformance/external/spl/allow_file_and_printing_sharing_in_firewall.spl",
-  "testdata/conformance/external/spl/allow_inbound_traffic_by_firewall_rule_registry.spl",
-  "testdata/conformance/external/spl/allow_inbound_traffic_in_firewall_rule.spl",
-  "testdata/conformance/external/spl/allow_network_discovery_in_firewall.spl",
-  "testdata/conformance/external/spl/allow_operation_with_consent_admin.spl",
-]
-
-# Corpus fixtures labelled invalid where Splunk disagrees.
+# Corpus fixtures labelled invalid that Splunk's parser accepts. Each is kept
+# on purpose: the form is always an authoring mistake in a detection.
 
 [[spl]]
 id = "spl-trailing-pipe"
-reason = "Splunk ignores an empty trailing pipeline stage (`search |`, `index=main |`); ours reports a syntax error."
+reason = "Kept on purpose. Splunk ignores an empty trailing pipeline stage (`search |`, `index=main |`); ours reports a syntax error because it is always a truncated query."
 paths = [
   "testdata/corpus/spl/search_command__invalid.spl",
   "testdata/corpus/spl/unknown_command__invalid.spl",
@@ -140,7 +102,7 @@ paths = [
 
 [[spl]]
 id = "spl-argumentless-commands"
-reason = "Splunk's search parser accepts `fields`, `lookup`, `stats` and `where` with no arguments; ours rejects them."
+reason = "Kept on purpose. Splunk's search parser accepts `fields`, `lookup`, `stats` and `where` with no arguments; ours reports a syntax error because none of them does anything useful without one."
 paths = [
   "testdata/corpus/spl/fields_command__invalid.spl",
   "testdata/corpus/spl/lookup_command__invalid.spl",
@@ -150,36 +112,22 @@ paths = [
 
 [[spl]]
 id = "spl-leading-word-is-a-search-term"
-reason = "Without a leading `|`, Splunk reads `index` and `tstats` as search terms of the implicit `search`; ours reads them as commands."
+reason = "Kept on purpose. Without a leading `|`, Splunk reads `index` and `tstats` as search terms of the implicit `search`, so the query silently searches for those words; ours reports the missing pipe."
 paths = [
   "testdata/corpus/spl/bare_search__invalid.spl",
   "testdata/corpus/spl/tstats_command__invalid.spl",
 ]
 
-[[spl]]
-id = "spl-dedup-without-fields"
-reason = "Ours accepts `dedup` with no field although the fixture is labelled invalid; Splunk requires at least one field."
-paths = ["testdata/corpus/spl/dedup_command__invalid.spl"]
-
 # Names: catalogs/spl/commands.toml against Splunk searchbnf.conf.
 
 [[spl]]
-id = "spl-command-aliases"
-reason = "searchbnf aliases (transam = transaction, summaryindex = collect, ...) missing from catalogs/spl/commands.toml; ours reports spl_unknown_command."
-names = [
-  "af", "ar", "common", "counttable", "ctable", "discretize", "excerpt", "hilite",
-  "macro", "maketable", "outlierfilter", "run", "savedsplunk", "slc", "stash",
-  "sumindex", "summaryindex", "transam",
-]
-
-[[spl]]
 id = "spl-public-commands-missing"
-reason = "searchbnf marks these usage = public but they are not in the Search Reference-derived catalog; ours reports spl_unknown_command."
+reason = "searchbnf marks these usage = public, but no Search Reference page could be cited for them, so they are not catalogued; ours reports spl_unknown_command."
 names = ["federate", "ingestpreview", "oldreturn"]
 
 [[spl]]
 id = "spl-internal-commands"
-reason = "searchbnf marks these usage = internal, debug or deprecated. They are not for detections, but Splunk still runs them."
+reason = "searchbnf marks these usage = internal, debug or deprecated. Not for detections, so not catalogued; Splunk still runs them."
 names = [
   "createrss", "debug", "dump", "editinfo", "findkeywords", "makejson", "mcatalog",
   "mrollup", "nokv", "outputraw", "outputtelemetry", "prjob", "rawstats",
