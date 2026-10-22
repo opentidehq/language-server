@@ -71,12 +71,6 @@ def toml_str(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def clean(text: str) -> str:
-    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
-    text = text.replace("{{es}}", "Elasticsearch")
-    return " ".join(text.split())
-
-
 def sections(text: str) -> list[tuple[str, str, str]]:
     found = list(SECTION.finditer(text))
     out = []
@@ -84,14 +78,6 @@ def sections(text: str) -> list[tuple[str, str, str]]:
         end = found[i + 1].start() if i + 1 < len(found) else len(text)
         out.append((match.group(1), match.group(2), text[match.end() : end]))
     return out
-
-
-def first_paragraph(body: str) -> str:
-    for block in re.split(r"\n\s*\n", body):
-        block = block.strip()
-        if block and not block.startswith(("**", "```", ":::", "#")):
-            return clean(block)
-    return ""
 
 
 def syntax_line(body: str) -> str:

@@ -48,7 +48,7 @@ fn every_public_elastic_rule_is_free_of_engine_errors() {
     };
     let root = PathBuf::from(root);
     let mut files = Vec::new();
-    for dir in ["rules", "rules_building_block"] {
+    for dir in ["rules", "rules_building_block", "hunting"] {
         rule_files(&root.join(dir), &mut files);
     }
     files.sort();
@@ -65,11 +65,48 @@ fn every_public_elastic_rule_is_free_of_engine_errors() {
         let Ok(doc) = text.parse::<toml::Table>() else {
             continue;
         };
+        let mut queries = Vec::new();
+        if let Some(hunt) = doc.get("hunt").and_then(|h| h.as_table()) {
+            // Hunts list their languages; analyse those with exactly one.
+            let languages: Vec<&str> = hunt
+                .get("language")
+                .and_then(|l| l.as_array())
+                .map(|l| l.iter().filter_map(|v| v.as_str()).collect())
+                .unwrap_or_default();
+            let language = match languages.as_slice() {
+                ["ES|QL"] => Some(LanguageId::Esql),
+                ["EQL"] => Some(LanguageId::Eql),
+                _ => None,
+            };
+            let hunt_queries = hunt.get("query").and_then(|q| q.as_array());
+            if let (Some(language), Some(list)) = (language, hunt_queries) {
+                queries.extend(
+                    list.iter()
+                        .filter_map(|q| q.as_str())
+                        .map(|q| (language, q)),
+                );
+            }
+        }
         let Some(rule) = doc.get("rule").and_then(|r| r.as_table()) else {
+            for (language, query) in queries {
+                *checked.entry(language.as_str()).or_default() += 1;
+                let query = query.trim();
+                for d in analyze(language, query) {
+                    if d.severity == Severity::Error {
+                        errors.push(format!(
+                            "{}: {} {}:{} {}",
+                            path.strip_prefix(&root).unwrap_or(path).display(),
+                            d.code,
+                            d.range.start.line + 1,
+                            d.range.start.character + 1,
+                            d.message
+                        ));
+                    }
+                }
+            }
             continue;
         };
         let get = |key: &str| rule.get(key).and_then(|v| v.as_str());
-        let mut queries = Vec::new();
         if let (Some(query), Some(language)) = (
             get("query"),
             elastic_query_language(get("type"), get("language")),

@@ -13,3 +13,4 @@ grammars/*/node_modules
 coverage
 lcov.info
 /tmp
+__pycache__/

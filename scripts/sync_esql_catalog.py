@@ -202,19 +202,6 @@ def stack_lifecycle(text: str) -> str:
     return ""
 
 
-def first_paragraph(text: str) -> str:
-    body = APPLIES.sub("", text)
-    body = re.sub(r"^%.*$", "", body, flags=re.M)
-    for block in re.split(r"\n\s*\n", body):
-        block = block.strip()
-        if not block or block.startswith((":::", "#", "```", "::::")):
-            continue
-        block = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", block)
-        block = block.replace("{{esql}}", "ES|QL").replace("{{es}}", "Elasticsearch")
-        return " ".join(block.split())
-    return ""
-
-
 def syntax_block(text: str) -> str:
     match = re.search(r"## Syntax.*?```esql\n(.*?)```", text, re.S)
     return match.group(1).strip() if match else ""

@@ -43,6 +43,9 @@ function encodeMessage(body: unknown): Uint8Array {
   return out;
 }
 
+/** Language ids whose raw-file suffix is the id itself. */
+const QUERY_EXTENSIONS = new Set(["kql", "spl", "esql", "eql", "kuery", "lucene"]);
+
 export function createOpentideClient(options: OpentideClientOptions): OpentideClient {
   if (options.transport !== "stdio" && options.transport !== "worker" && options.transport !== "wasi") {
     throw new Error(`unsupported transport ${String(options.transport)}`);
@@ -60,7 +63,9 @@ export function createOpentideClient(options: OpentideClientOptions): OpentideCl
         const { tmpdir } = await import("node:os");
         const { join } = await import("node:path");
         const dir = mkdtempSync(join(tmpdir(), "opentide-hl-"));
-        const ext = languageId.includes("yaml") || languageId === "tide" ? "yaml" : languageId === "spl" ? "spl" : "kql";
+        const ext = languageId.includes("yaml") || languageId === "tide"
+          ? "yaml"
+          : QUERY_EXTENSIONS.has(languageId) ? languageId : "kql";
         const file = join(dir, `query.${ext}`);
         writeFileSync(file, text);
         try {

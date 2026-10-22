@@ -58,4 +58,131 @@ Control commands are parsed so the engine can reject them. They are not valid de
 
 Authored text is tokenized as written. An implicit leading `| search` is a Splunk runtime default, not a rewrite of the source.
 
-Corpus lives in `testdata/corpus/{kql,spl}/` tagged `prod:<rule>`.
+## ES|QL
+
+Language id `esql` (`.esql`). Commands and keywords are case-insensitive. The catalog in `catalogs/esql/` records each command's and function's `applies_to` lifecycle from the pinned Elasticsearch docs. `esql_unavailable` is an error for snapshot-only commands and information for anything an 8.19 cluster lacks or that is still in technical preview.
+
+| id | grammar rule | fixture ids | capture |
+| --- | --- | --- | --- |
+| esql.change-point | `change_point_command` | `change_point_command__valid`, `change_point_command__invalid` | `keyword` |
+| esql.comment | `comment` | `comment__valid`, `comment__invalid` | `comment` |
+| esql.completion | `completion_command` | `completion_command__valid`, `completion_command__invalid` | `keyword` |
+| esql.dedup | `dedup_command` | `dedup_command__valid`, `dedup_command__invalid` | `keyword` |
+| esql.dense-vector | `dense_vector_command` | `dense_vector_command__valid`, `dense_vector_command__invalid` | `keyword` |
+| esql.dissect | `dissect_command` | `dissect_command__valid`, `dissect_command__invalid` | `keyword` |
+| esql.drop | `drop_command` | `drop_command__valid`, `drop_command__invalid` | `keyword` |
+| esql.enrich | `enrich_command` | `enrich_command__valid`, `enrich_command__invalid` | `keyword` |
+| esql.eval | `eval_command` | `eval_command__valid`, `eval_command__invalid` | `keyword` |
+| esql.explain | `explain_command` | `explain_command__valid`, `explain_command__invalid` | `keyword` |
+| esql.fill-null | `fill_null_command` | `fill_null_command__valid`, `fill_null_command__invalid` | `keyword` |
+| esql.fork | `fork_command` | `fork_command__valid`, `fork_command__invalid` | `keyword` |
+| esql.from | `from_command` | `from_command__valid`, `from_command__invalid` | `keyword` |
+| esql.function-call | `function_call` | `function_call__valid`, `function_call__invalid` | `function` |
+| esql.fuse | `fuse_command` | `fuse_command__valid`, `fuse_command__invalid` | `keyword` |
+| esql.grok | `grok_command` | `grok_command__valid`, `grok_command__invalid` | `keyword` |
+| esql.highlight | `highlight_command` | `highlight_command__valid`, `highlight_command__invalid` | `keyword` |
+| esql.in-expression | `in_expression` | `in_expression__valid`, `in_expression__invalid` | `keyword` |
+| esql.inline-cast | `inline_cast` | `inline_cast__valid`, `inline_cast__invalid` | `operator`, `type` |
+| esql.inline-stats | `inline_stats_command` | `inline_stats_command__valid`, `inline_stats_command__invalid` | `keyword` |
+| esql.ip-location | `ip_location_command` | `ip_location_command__valid`, `ip_location_command__invalid` | `keyword` |
+| esql.is-null-expression | `is_null_expression` | `is_null_expression__valid`, `is_null_expression__invalid` | `keyword`, `constant` |
+| esql.join | `join_command` | `join_command__valid`, `join_command__invalid` | `keyword` |
+| esql.keep | `keep_command` | `keep_command__valid`, `keep_command__invalid` | `keyword` |
+| esql.like-expression | `like_expression` | `like_expression__valid`, `like_expression__invalid` | `keyword` |
+| esql.limit | `limit_command` | `limit_command__valid`, `limit_command__invalid` | `keyword` |
+| esql.map-expression | `map_expression` | `map_expression__valid`, `map_expression__invalid` | `punctuation.bracket` |
+| esql.match-expression | `match_expression` | `match_expression__valid`, `match_expression__invalid` | `operator` |
+| esql.metadata | `metadata` | `metadata__valid`, `metadata__invalid` | `keyword`, `constant` |
+| esql.metrics-info | `metrics_info_command` | `metrics_info_command__valid`, `metrics_info_command__invalid` | `keyword` |
+| esql.mmr | `mmr_command` | `mmr_command__valid`, `mmr_command__invalid` | `keyword` |
+| esql.mv-expand | `mv_expand_command` | `mv_expand_command__valid`, `mv_expand_command__invalid` | `keyword` |
+| esql.number | `number` | `number__valid`, `number__invalid` | `number` |
+| esql.parameter | `parameter` | `parameter__valid`, `parameter__invalid` | `constant` |
+| esql.promql | `promql_command` | `promql_command__valid`, `promql_command__invalid` | `keyword`, `string` |
+| esql.qualified-interval | `qualified_interval` | `qualified_interval__valid`, `qualified_interval__invalid` | `number`, `constant` |
+| esql.registered-domain | `registered_domain_command` | `registered_domain_command__valid`, `registered_domain_command__invalid` | `keyword` |
+| esql.rename | `rename_command` | `rename_command__valid`, `rename_command__invalid` | `keyword` |
+| esql.rerank | `rerank_command` | `rerank_command__valid`, `rerank_command__invalid` | `keyword` |
+| esql.row | `row_command` | `row_command__valid`, `row_command__invalid` | `keyword` |
+| esql.sample | `sample_command` | `sample_command__valid`, `sample_command__invalid` | `keyword` |
+| esql.set | `set_command` | `set_command__valid`, `set_command__invalid` | `keyword` |
+| esql.show | `show_command` | `show_command__valid`, `show_command__invalid` | `keyword` |
+| esql.sort | `sort_command` | `sort_command__valid`, `sort_command__invalid` | `keyword` |
+| esql.source-subquery | `source_subquery` | `source_subquery__valid`, `source_subquery__invalid` | `punctuation.bracket` |
+| esql.stats | `stats_command` | `stats_command__valid`, `stats_command__invalid` | `keyword` |
+| esql.string | `string` | `string__valid`, `string__invalid` | `string` |
+| esql.ts-collapse | `ts_collapse_command` | `ts_collapse_command__valid`, `ts_collapse_command__invalid` | `keyword` |
+| esql.ts | `ts_command` | `ts_command__valid`, `ts_command__invalid` | `keyword` |
+| esql.ts-info | `ts_info_command` | `ts_info_command__valid`, `ts_info_command__invalid` | `keyword` |
+| esql.unknown | `unknown_command` | `unknown_command__valid`, `unknown_command__invalid` | `error` (`esql_unknown_command`) |
+| esql.uri-parts | `uri_parts_command` | `uri_parts_command__valid`, `uri_parts_command__invalid` | `keyword` |
+| esql.user-agent | `user_agent_command` | `user_agent_command__valid`, `user_agent_command__invalid` | `keyword` |
+| esql.where | `where_command` | `where_command__valid`, `where_command__invalid` | `keyword` |
+
+## EQL
+
+Language id `eql` (`.eql`). Keywords are lowercase and reserved. Elastic Security rejects `join` and relationship (`descendant of`, `child of`, `event of`) queries, so they parse and report `eql_unsupported`.
+
+| id | grammar rule | fixture ids | capture |
+| --- | --- | --- | --- |
+| eql.any | `any` | `any__valid`, `any__invalid` | `type` |
+| eql.comment | `comment` | `comment__valid`, `comment__invalid` | `comment` |
+| eql.comparison | `comparison` | `comparison__valid`, `comparison__invalid` | `operator` |
+| eql.event-query | `event_query` | `event_query__valid`, `event_query__invalid` | `type`, `keyword` |
+| eql.field | `field` | `field__valid`, `field__invalid` | `property` |
+| eql.function-call | `function_call` | `function_call__valid`, `function_call__invalid` | `function` |
+| eql.join | `join` | `join__valid`, `join__invalid` | `keyword` (error `eql_unsupported`) |
+| eql.missing-event-open | `missing_event_open` | `missing_event_open__valid`, `missing_event_open__invalid` | `operator` |
+| eql.number | `number` | `number__valid`, `number__invalid` | `number` |
+| eql.pipe | `pipe` | `pipe__valid`, `pipe__invalid` | `operator.pipe`, `keyword` |
+| eql.predicate-expression | `predicate_expression` | `predicate_expression__valid`, `predicate_expression__invalid` | `operator` |
+| eql.relationship | `relationship` | `relationship__valid`, `relationship__invalid` | `error` (`eql_unsupported`) |
+| eql.sample | `sample` | `sample__valid`, `sample__invalid` | `keyword` |
+| eql.sequence | `sequence` | `sequence__valid`, `sequence__invalid` | `keyword` |
+| eql.string | `string` | `string__valid`, `string__invalid` | `string` |
+| eql.subquery | `subquery` | `subquery__valid`, `subquery__invalid` | `punctuation.bracket` |
+| eql.term-option | `term_option` | `term_option__valid`, `term_option__invalid` | `keyword` |
+| eql.time-unit | `time_unit` | `time_unit__valid`, `time_unit__invalid` | `constant` |
+
+## Kibana KQL (kuery)
+
+Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Language Elastic rules call `language: kuery`, not Microsoft KQL. `or`, `and`, and `not` are case-insensitive keywords; everything else is a literal.
+
+| id | grammar rule | fixture ids | capture |
+| --- | --- | --- | --- |
+| kuery.and-list | `and_list` | `and_list__valid`, `and_list__invalid` | `keyword` |
+| kuery.and-query | `and_query` | `and_query__valid`, `and_query__invalid` | `keyword` |
+| kuery.field | `field` | `field__valid`, `field__invalid` | `property` |
+| kuery.field-value-expression | `field_value_expression` | `field_value_expression__valid`, `field_value_expression__invalid` | `property`, `operator` |
+| kuery.group | `group` | `group__valid`, `group__invalid` | `punctuation.bracket` |
+| kuery.nested-query | `nested_query` | `nested_query__valid`, `nested_query__invalid` | `punctuation.bracket` |
+| kuery.not-list | `not_list` | `not_list__valid`, `not_list__invalid` | `keyword` |
+| kuery.not-query | `not_query` | `not_query__valid`, `not_query__invalid` | `keyword` |
+| kuery.or-list | `or_list` | `or_list__valid`, `or_list__invalid` | `keyword` |
+| kuery.or-query | `or_query` | `or_query__valid`, `or_query__invalid` | `keyword` |
+| kuery.quoted-string | `quoted_string` | `quoted_string__valid`, `quoted_string__invalid` | `string` |
+| kuery.range-expression | `range_expression` | `range_expression__valid`, `range_expression__invalid` | `operator` |
+| kuery.unquoted-literal | `unquoted_literal` | `unquoted_literal__valid`, `unquoted_literal__invalid` | `string` |
+| kuery.value-expression | `value_expression` | `value_expression__valid`, `value_expression__invalid` | `string` |
+| kuery.value-list | `value_list` | `value_list__valid`, `value_list__invalid` | `punctuation.bracket` |
+
+## Lucene
+
+Language id `lucene` (`.lucene`). Elastic's `query_string` syntax: `AND`, `OR`, and `NOT` are operators only in upper case, so lowercase `and`/`or` are terms (`lucene_lowercase_operator`).
+
+| id | grammar rule | fixture ids | capture |
+| --- | --- | --- | --- |
+| lucene.boolean-query | `boolean_query` | `boolean_query__valid`, `boolean_query__invalid` | `keyword` |
+| lucene.boost | `boost` | `boost__valid`, `boost__invalid` | `number` |
+| lucene.field-query | `field_query` | `field_query__valid`, `field_query__invalid` | `property` |
+| lucene.fuzzy | `fuzzy` | `fuzzy__valid`, `fuzzy__invalid` | `number` |
+| lucene.group | `group` | `group__valid`, `group__invalid` | `punctuation.bracket` |
+| lucene.modified-clause | `modified_clause` | `modified_clause__valid`, `modified_clause__invalid` | `operator` |
+| lucene.phrase-query | `phrase_query` | `phrase_query__valid`, `phrase_query__invalid` | `string` |
+| lucene.range-query | `range_query` | `range_query__valid`, `range_query__invalid` | `keyword`, `number` |
+| lucene.regexp-query | `regexp_query` | `regexp_query__valid`, `regexp_query__invalid` | `string` |
+| lucene.star | `star` | `star__valid`, `star__invalid` | `operator` |
+| lucene.term-query | `term_query` | `term_query__valid`, `term_query__invalid` | `string` |
+| lucene.wildcard-term | `wildcard_term` | `wildcard_term__valid`, `wildcard_term__invalid` | `string` |
+
+Corpus lives in `testdata/corpus/{kql,spl,esql,eql,kuery,lucene}/` tagged `prod:<rule>`.

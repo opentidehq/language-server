@@ -2,7 +2,7 @@
 
 The opentide LSP owns Tide diagnostics. Disable yamlls / Red Hat YAML on `objects/**`.
 
-Languages: `opentide-yaml`, `kql`, `spl` (never `sql`).
+Languages: `opentide-yaml`, `kql`, `spl`, `esql`, `eql`, `kuery` (Kibana KQL), `lucene` (never `sql`).
 
 Semantic tokens come from the server. TextMate grammars must be **copied from the language-server highlight zip**, never hand-authored.
 

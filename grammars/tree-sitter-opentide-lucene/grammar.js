@@ -128,6 +128,8 @@ module.exports = grammar({
 
     phrase: (_) => token(seq('"', repeat(choice(/[^"\\]/, ESCAPED)), '"')),
 
-    regexp: (_) => token(seq("/", repeat(choice(/[^\/\\]/, /\\[\s\S]/)), "/")),
+    // Lucene's REGEXPTERM: any character but `/`, or the pair `\/`. Other
+    // backslashes are ordinary characters, so `/(^|\\/)x/` is one regex.
+    regexp: (_) => token(seq("/", repeat(choice(/[^\/]/, "\\/")), "/")),
   },
 });

@@ -790,6 +790,47 @@ mod tests {
         }
     }
 
+    /// Each grammar ships a copy of its highlight query for tree-sitter
+    /// tooling; it must match the one the engine compiles.
+    #[test]
+    fn grammar_query_copies_match_highlight_queries() {
+        let copies = [
+            (
+                LanguageId::Kql,
+                include_str!("../../../grammars/tree-sitter-opentide-kql/queries/highlights.scm"),
+            ),
+            (
+                LanguageId::Spl,
+                include_str!("../../../grammars/tree-sitter-opentide-spl/queries/highlights.scm"),
+            ),
+            (
+                LanguageId::Esql,
+                include_str!("../../../grammars/tree-sitter-opentide-esql/queries/highlights.scm"),
+            ),
+            (
+                LanguageId::Eql,
+                include_str!("../../../grammars/tree-sitter-opentide-eql/queries/highlights.scm"),
+            ),
+            (
+                LanguageId::Kuery,
+                include_str!("../../../grammars/tree-sitter-opentide-kuery/queries/highlights.scm"),
+            ),
+            (
+                LanguageId::Lucene,
+                include_str!(
+                    "../../../grammars/tree-sitter-opentide-lucene/queries/highlights.scm"
+                ),
+            ),
+        ];
+        for (language, copy) in copies {
+            assert_eq!(
+                copy,
+                highlights_scm(language),
+                "grammars/tree-sitter-opentide-{language}/queries/highlights.scm is stale"
+            );
+        }
+    }
+
     #[test]
     fn tide_highlights_scm_lists_every_field_catalog_key() {
         let re = Regex::new(r#"\^\(([^)]+)\)\$"#).unwrap();

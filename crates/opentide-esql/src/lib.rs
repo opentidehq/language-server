@@ -79,6 +79,10 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             if let Some(d) = function_diagnostic(node, source, catalog) {
                 diagnostics.push(d);
             }
+        } else if node.kind() == "qualified_name" {
+            if let Some(d) = reserved_name(node, source) {
+                diagnostics.push(d);
+            }
         } else if node.kind() == "string" {
             if let Some(d) = string_escape(node, source) {
                 diagnostics.push(d);
@@ -102,6 +106,32 @@ pub fn analyze(source: &str) -> AnalyzeResult {
         diagnostics,
         tokens,
     }
+}
+
+/// Words the expression lexer always reads as keywords. A field with one of
+/// these names needs backticks: `` `by` ``.
+const EXPRESSION_KEYWORDS: &[&str] = &[
+    "and", "asc", "by", "desc", "false", "first", "in", "is", "last", "like", "not", "null",
+    "nulls", "on", "or", "rlike", "true", "where", "with",
+];
+
+fn reserved_name(node: Node, source: &str) -> Option<Diagnostic> {
+    let mut cursor = node.walk();
+    let part = node.named_children(&mut cursor).find(|part| {
+        part.kind() == "identifier"
+            && EXPRESSION_KEYWORDS.contains(&text(*part, source).to_ascii_lowercase().as_str())
+    })?;
+    let word = text(part, source);
+    Some(
+        Diagnostic::error(
+            codes::ESQL_PARSE_ERROR,
+            format!(
+                "`{word}` is an ES|QL keyword here; quote a field with that name as `` `{word}` ``"
+            ),
+            range(source, node_span(part)),
+        )
+        .with_suggestion(format!("`{word}`")),
+    )
 }
 
 /// Double-quoted strings allow only `\t \n \r \" \\`; anything else, such as
@@ -803,6 +833,19 @@ mod tests {
             codes_of("FROM logs-* METADATA _id | WHERE a =~ \"x\"")
                 .contains(&codes::ESQL_PARSE_ERROR.to_string())
         );
+    }
+
+    #[test]
+    fn expression_keywords_are_reserved() {
+        let c = codes_of("FROM logs-* METADATA _id | INLINE STATS BY");
+        assert!(c.contains(&codes::ESQL_PARSE_ERROR.to_string()), "{c:?}");
+        assert!(codes_of("FROM logs-* METADATA _id | WHERE `by` == 1").is_empty());
+        assert!(
+            codes_of("FROM logs-* | STATS f = FIRST(x, @timestamp) BY host.name")
+                .iter()
+                .all(|c| c != codes::ESQL_PARSE_ERROR)
+        );
+        assert!(codes_of("FROM logs-* METADATA _id | WHERE source.as.number == 1").is_empty());
     }
 
     #[test]

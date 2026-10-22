@@ -9,7 +9,7 @@ editors / @opentide/lsp-client / WASM worker
                 │
          opentide-analysis  (WorkspaceHost)
           /        |         \
-    opentide-kql  opentide-spl  opentide-tide
+    opentide-{kql,spl}  opentide-{esql,eql,kuery,lucene}  opentide-tide
           \        |         /
             opentide-syntax + opentide-highlight
                       |
@@ -18,7 +18,7 @@ editors / @opentide/lsp-client / WASM worker
 
 ## Layers
 
-- **Grammars** (`grammars/tree-sitter-opentide-{kql,spl}`) vendored `parser.c`. CI regenerates and fails on drift.
+- **Grammars** (`grammars/tree-sitter-opentide-{kql,spl,esql,eql,kuery,lucene}`) vendored `parser.c`. CI regenerates and fails on drift.
 - **Catalogs** (`catalogs/`) compiled into the engine with `include_str!`. Workspace override path: `.opentide/lsp/catalogs/`.
 - **HighlightSpec** (`highlights/spec.toml`) is frozen. Capture rename = major. Generated tmLanguage / Monaco / Helix maps are CI-checked.
 - **Injection**: block-scalar indent is stripped for analysis; tokens are remapped onto YAML coordinates.
@@ -31,6 +31,11 @@ editors / @opentide/lsp-client / WASM worker
 | `configurations.defender_for_endpoint.query` | KQL |
 | `configurations.splunk.query` | SPL |
 | `configurations.splunk.search` (legacy) | SPL |
+| `configurations.elastic.query` with `type: esql` | ES\|QL |
+| `configurations.elastic.query` with `type: eql` | EQL |
+| `configurations.elastic.query` with `type: query`, `threshold`, `new_terms`, or `threat_match` | `language: kuery` (default) → Kibana KQL; `language: lucene` → Lucene |
+| `configurations.elastic.threat.query` | `threat.language` (`kuery` default, or `lucene`) |
+| `configurations.elastic.query` with `type: machine_learning` | none |
 | `configurations.crowdstrike.*` | unsupported (`None`) |
 | `description` / `procedure.analysis` / `recommendation` / other `markdown = true` fields | Markdown (HighlightSpec `markdown.*`) |
 

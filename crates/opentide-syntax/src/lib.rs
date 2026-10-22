@@ -49,6 +49,10 @@ pub fn has_error(tree: &Tree) -> bool {
 }
 
 /// First `ERROR` or `MISSING` node in document order, for a parse-error range.
+///
+/// A MISSING token that the grammar hides (a `_`-prefixed rule) is not a
+/// visible node, so the smallest visible node that still reports the error
+/// stands in for it.
 pub fn first_error(node: Node<'_>) -> Option<Node<'_>> {
     if node.is_error() || node.is_missing() {
         return Some(node);
@@ -58,11 +62,11 @@ pub fn first_error(node: Node<'_>) -> Option<Node<'_>> {
     }
     let mut cursor = node.walk();
     for child in node.children(&mut cursor) {
-        if let Some(found) = first_error(child) {
-            return Some(found);
+        if child.has_error() || child.is_missing() {
+            return first_error(child).or(Some(child));
         }
     }
-    None
+    Some(node)
 }
 
 /// Byte span of a node, never empty so editors can show it.
@@ -174,6 +178,14 @@ mod tests {
             .collect();
         assert!(keywords.iter().any(|k| k == "where"), "{keywords:?}");
         assert!(keywords.iter().any(|k| k == "take"), "{keywords:?}");
+    }
+
+    #[test]
+    fn hidden_missing_tokens_still_report_an_error() {
+        let tree = parse(LanguageId::Esql, "FROM | LIMIT 10").unwrap();
+        assert!(has_error(&tree));
+        let err = first_error(tree.root_node()).expect("error node");
+        assert!(err.start_byte() <= 5, "{}", tree.root_node().to_sexp());
     }
 
     #[test]

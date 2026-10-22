@@ -1,6 +1,6 @@
 ---
 name: catalogs
-description: Load opentide catalogs and conformance corpora. Covers include_str, OnceLock, toml 0.8, HighlightSpec capture freezes, Pydantic schema sync for opentide 0.16.1, and external KQL/SPL fault twins. Use when editing catalogs/, highlights/spec.toml, testdata/conformance, or scripts/sync_opentide_schemas.py.
+description: Load opentide catalogs and conformance corpora. Covers include_str, OnceLock, toml 0.8, HighlightSpec capture freezes, Pydantic schema sync for opentide 0.16.1, and external KQL/SPL/Elastic fault twins. Use when editing catalogs/, highlights/spec.toml, testdata/conformance, or scripts/sync_opentide_schemas.py.
 license: EUPL-1.2
 metadata:
   author: opentidehq
@@ -41,6 +41,15 @@ Unknown operators, functions, tables, and commands are diagnostics (`kql_unknown
 
 Slow-query warnings (`kql_where_not_first`, `kql_unscoped_search`, `spl_wildcard`, `spl_leading_not`, and the rest of `opentide_core::codes`) come from the `perf` modules. They are warnings about public query shapes, not style nits. Do not add a warning that contradicts `docs/kql/` or `docs/spl/`.
 
+## Elastic catalogs
+
+| Path | Contents |
+| --- | --- |
+| `catalogs/esql/` | commands, functions, operators with `applies_to` lifecycle |
+| `catalogs/eql/` | functions (arity, case-insensitive `~` support), pipes |
+
+`scripts/sync_esql_catalog.py` and `scripts/sync_eql_catalog.py` regenerate them from a pinned `elastic/elasticsearch` docs commit. Elastic's docs are not EUPL-compatible, so the catalogs keep facts only (names, signatures, arity, versions) and the summaries are written in the scripts. Do not paste Elastic prose into a catalog. The 9.x docs do not list 8.x versions, so a feature first documented at `FIRST_AFTER_FLOOR` (9.2) or later is treated as missing on 8.19, the oldest supported stack (`Lifecycle::after_floor`). That is `esql_unavailable` information, not an error.
+
 ## Tide objects
 
 `scripts/sync_opentide_schemas.py` pins `opentide==0.16.1` (`scripts/requirements-opentide.txt`) and writes `catalogs/tide/generated/`. Pydantic is the CLI authority. The LSP emits the same `{code, field_path, severity}` with ranges. `scripts/pydantic_object_issues.py` is the comparison source. Do not re-encode the object schema as hand-written Rust structs when the generated field catalog already has the answer.
@@ -54,6 +63,7 @@ Injection, from `language_for_field_path`:
 | `configurations.sentinel.query` | KQL |
 | `configurations.defender_for_endpoint.query` | KQL |
 | `configurations.splunk.query` and legacy `configurations.splunk.search` | SPL |
+| `configurations.elastic.query` and `threat.query` | ES\|QL, EQL, kuery, or Lucene from `type` and `language` (`elastic_query_language`) |
 | `configurations.crowdstrike.*` | unsupported |
 | markdown fields | HighlightSpec `markdown.*`, not a query engine |
 
@@ -61,7 +71,7 @@ Block-scalar indent is stripped for analysis. Tokens are remapped onto the origi
 
 ## Conformance
 
-`testdata/conformance/external/<id>/` holds real public rules and a `.broken.` twin (`frobnicate` or `.show` for KQL, `notacommand` for SPL). `crates/opentide-analysis/tests/external_corpus.rs` does not require the full valid file to parse. v1 grammars still miss forms such as `summarize min =`, `between`, leading SPL macros, and `stats ... BY`. The test keeps the full rule, finds the longest prefix that parses (at most 16 lines, and the prefix must contain `|`), injects the fault on that prefix, and requires `kql_unknown_operator` or `spl_unknown_command`. The broken full file must produce at least one diagnostic. A corpus that catches the fault on fewer than 5 KQL prefixes or 2 SPL prefixes fails. Sources and licenses are `testdata/conformance/external/SOURCES.md`. Do not add a rule whose license is unclear, and do not trim a public rule down to the prefix the grammar already accepts.
+`testdata/conformance/external/<id>/` holds real public rules and a `.broken.` twin (`frobnicate` or `.show` for KQL, `notacommand` for SPL). `crates/opentide-analysis/tests/external_corpus.rs` does not require the full valid file to parse. v1 grammars still miss forms such as `summarize min =`, `between`, leading SPL macros, and `stats ... BY`. The test keeps the full rule, finds the longest prefix that parses (at most 16 lines, and the prefix must contain `|`), injects the fault on that prefix, and requires `kql_unknown_operator` or `spl_unknown_command`. The broken full file must produce at least one diagnostic. A corpus that catches the fault on fewer than 5 KQL prefixes or 2 SPL prefixes fails. The Elastic twins (`esql/`, `eql/`, `lucene/`, SigmaHQ conversions under DRL-1.1, listed in `sigma.tsv`) are checked by `crates/opentide-analysis/tests/external_elastic.rs`: every valid file is free of errors and every `.broken.` twin has one. Sources and licenses are `testdata/conformance/external/SOURCES.md`. Do not add a rule whose license is unclear, and do not trim a public rule down to the prefix the grammar already accepts.
 
 `testdata/conformance/pydantic/` and `crates/opentide-analysis/tests/tide_corpus.rs` check object issues. `testdata/oracles/exceptions.toml` lists Kusto.Language disagreements. The Kusto.Language oracle is CI-only (`scripts/ci-oracle.sh`, `continue-on-error`). Do not vendor Microsoft Kusto.Language in the binary.
 
