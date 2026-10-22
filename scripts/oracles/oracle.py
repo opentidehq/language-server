@@ -127,6 +127,10 @@ def ours(language: str, queries: list[Query], scratch: pathlib.Path) -> dict[str
         stdout=sys.stderr,
     )
     exe = ROOT / "target/debug" / ("opentide-lsp.exe" if os.name == "nt" else "opentide-lsp")
+    # Without an `objects/` above it, `analyze` loads every YAML file under the
+    # file's grandparent (the system temp directory). An empty one keeps each
+    # query a standalone document, as the reference sees it.
+    (scratch / "objects").mkdir(exist_ok=True)
 
     def analyze(item: tuple[int, Query]) -> tuple[str, list[dict]]:
         n, query = item
@@ -134,10 +138,11 @@ def ours(language: str, queries: list[Query], scratch: pathlib.Path) -> dict[str
         path.write_text(query.text)
         run = subprocess.run(
             [str(exe), "analyze", "--language", language, str(path)],
-            check=True,
             capture_output=True,
             text=True,
         )
+        if run.returncode != 0:
+            sys.exit(f"opentide-lsp analyze failed on {query.id}: {run.stderr.strip()}")
         return query.id, json.loads(run.stdout)
 
     with concurrent.futures.ThreadPoolExecutor() as pool:
