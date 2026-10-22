@@ -111,8 +111,8 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: license scan (no Kusto.Language)
-        run: bash scripts/check-no-kusto.sh dist
+      - name: license scan (no oracle references)
+        run: bash scripts/license-scan.sh dist
       - name: attach GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

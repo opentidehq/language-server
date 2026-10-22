@@ -63,7 +63,16 @@ Block-scalar indent is stripped for analysis. Tokens are remapped onto the origi
 
 `testdata/conformance/external/<id>/` holds real public rules and a `.broken.` twin (`frobnicate` or `.show` for KQL, `notacommand` for SPL). `crates/opentide-analysis/tests/external_corpus.rs` does not require the full valid file to parse. v1 grammars still miss forms such as `summarize min =`, `between`, leading SPL macros, and `stats ... BY`. The test keeps the full rule, finds the longest prefix that parses (at most 16 lines, and the prefix must contain `|`), injects the fault on that prefix, and requires `kql_unknown_operator` or `spl_unknown_command`. The broken full file must produce at least one diagnostic. A corpus that catches the fault on fewer than 5 KQL prefixes or 2 SPL prefixes fails. Sources and licenses are `testdata/conformance/external/SOURCES.md`. Do not add a rule whose license is unclear, and do not trim a public rule down to the prefix the grammar already accepts.
 
-`testdata/conformance/pydantic/` and `crates/opentide-analysis/tests/tide_corpus.rs` check object issues. `testdata/oracles/exceptions.toml` lists Kusto.Language disagreements. The Kusto.Language oracle is CI-only (`.github/workflows/oracle.yml` on `main`, `development`, tags, and PRs that touch the KQL corpus). `scripts/ci-oracle.sh` runs `KustoCode.Parse` (`scripts/kusto-oracle/`, NuGet-locked) over `testdata/corpus/kql/*__valid.kql` and the non-broken `testdata/conformance/external/kql/*.kql`. A rejected file fails the build unless a `[[kql]]` entry lists it in `paths`. An entry whose files now parse is stale and also fails. Locally the script skips without the .NET 10 SDK. Do not vendor Microsoft Kusto.Language in the binary. `scripts/check-no-kusto.sh dist` scans release artifacts for it.
+`testdata/conformance/pydantic/` and `crates/opentide-analysis/tests/tide_corpus.rs` check object issues against the opentide CLI's Pydantic models.
+
+## Oracles
+
+`.github/workflows/oracle.yml` compares the engine with Microsoft Kusto.Language and with Splunk's search parser (`scripts/oracles/README.md`). It runs every corpus query, external rule, perf sample, probe in `testdata/oracles/<lang>/`, and Tide rule query through both sides, and compares catalog names with `GlobalState.Default` and `searchbnf.conf`. `testdata/oracles/exceptions.toml` is the exact ledger of disagreements: an unlisted one fails, and so does a listed one that is gone.
+
+- A grammar or catalog fix that closes a gap deletes its path or name from the ledger in the same change. CI tells you which.
+- A new form from a real rule gets a one-line probe in `testdata/oracles/<lang>/`, not a trimmed copy of the rule.
+- A `.broken.` twin must break the query for the reference too. Inject the fault on a live line, never inside a comment or string.
+- The references are CI-only. Do not vendor Kusto.Language, Splunk, or a Splunk SDK; `scripts/license-scan.sh` checks release artifacts.
 
 ## Configuration TOML is not a catalog yet
 

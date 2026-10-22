@@ -1,33 +1,70 @@
 name: Oracle
 
-# CI-only Kusto.Language syntax oracle. Kusto.Language is restored from NuGet
-# here and never ships; release.yml scans the artifacts for it.
+# CI-only differential oracles (scripts/oracles/README.md). The engine is
+# compared with Microsoft Kusto.Language and with Splunk's search parser. A
+# disagreement not listed in testdata/oracles/exceptions.toml is a red build,
+# and so is a listed one that is gone. The references never ship; release.yml
+# runs scripts/license-scan.sh on every artifact.
 on:
   push:
     branches: [main, development]
     tags: ["v*.*.*"]
   pull_request:
     paths:
-      - "testdata/corpus/kql/**"
-      - "testdata/conformance/external/kql/**"
-      - "testdata/oracles/**"
+      - "crates/**"
+      - "grammars/**"
+      - "catalogs/kql/**"
+      - "catalogs/spl/**"
+      - "testdata/**"
+      - "scripts/oracles/**"
       - "scripts/ci-oracle.sh"
-      - "scripts/kusto_oracle.py"
-      - "scripts/kusto-oracle/**"
       - ".github/workflows/oracle.yml"
   workflow_dispatch:
 
+env:
+  CARGO_TERM_COLOR: always
+  OPENTIDE_ORACLE_REQUIRED: "1"
+
 jobs:
-  kusto:
+  kql:
+    name: Kusto.Language
     runs-on: ubuntu-latest
-    env:
-      OPENTIDE_ORACLE_REQUIRED: "1"
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: bash scripts/ci-oracle.sh
+      - run: pip install pyyaml
+      - run: bash scripts/ci-oracle.sh kql
+
+  spl:
+    name: Splunk
+    runs-on: ubuntu-latest
+    env:
+      SPLUNK_URL: https://127.0.0.1:8089
+      SPLUNK_PASSWORD: opentide-oracle-${{ github.run_id }}
+    services:
+      splunk:
+        image: splunk/splunk:10.6.1
+        # Starting the container accepts the Splunk General Terms for this
+        # throwaway instance. It only answers search/parser requests.
+        env:
+          SPLUNK_START_ARGS: --accept-license
+          SPLUNK_GENERAL_TERMS: --accept-sgt-current-at-splunk-com
+          SPLUNK_PASSWORD: opentide-oracle-${{ github.run_id }}
+        ports:
+          - 8089:8089
+        # splunkd takes minutes to start; oracle.py waits for it instead.
+        options: --no-healthcheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml
+      - run: bash scripts/ci-oracle.sh spl

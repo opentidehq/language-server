@@ -1,18 +1,310 @@
-# Oracles are CI-only. Do not ship Microsoft Kusto.Language or Splunk SDKs
-# in the language-server binary.
+# Known disagreements between the opentide engine and the reference parsers.
+# scripts/ci-oracle.sh enforces this file (see scripts/oracles/README.md):
 #
-# [[kql]] entries are enforced by scripts/ci-oracle.sh. Each one lists the
-# valid corpus files that Kusto.Language's KustoCode.Parse rejects. A rejected
-# file that no entry lists fails the build, and so does a listed file that
-# Kusto.Language accepts. Shape:
+# - A query where ours and the reference disagree fails CI unless an entry
+#   lists it in `paths`. Paths are repository-relative; a query inside a Tide
+#   rule is `<file>#configurations.<platform>.<field>`.
+# - A function, plugin or command name the two sides disagree on fails CI
+#   unless an entry lists it in `names`.
+# - A listed path or name that no longer disagrees fails CI too. Delete it
+#   in the change that fixes it.
 #
-#   [[kql]]
-#   id = "short-slug"
-#   reason = "Why our grammar accepts what Kusto.Language rejects."
-#   paths = ["testdata/corpus/kql/example__valid.kql"]
-#
-# There is no Splunk oracle yet. [[spl]] entries record intended differences.
+# Every entry has an `id`, a `reason`, and exactly one of `paths` or `names`.
+# The references are CI-only. Do not ship Microsoft Kusto.Language, Splunk,
+# or a Splunk SDK in any release artifact (scripts/license-scan.sh).
+
+# ---------------------------------------------------------------------------
+# KQL: Microsoft Kusto.Language
+# ---------------------------------------------------------------------------
+
+# Grammar gaps. Each probe in testdata/oracles/kql/ is one form taken from a
+# real Sentinel or Defender rule that Kusto.Language accepts and ours rejects.
+
+[[kql]]
+id = "kql-summarize-named-aggregate"
+reason = "`summarize Name = agg(...)` fails to parse. Almost every Sentinel rule names its aggregates (StartTime = min(TimeGenerated))."
+paths = ["testdata/oracles/kql/summarize_named_aggregate.kql"]
+
+[[kql]]
+id = "kql-multi-value-list"
+reason = "A list with more than one value after `in`, `in~`, `!in` or `has_any` fails to parse; a single value parses."
+paths = [
+  "testdata/oracles/kql/in_list.kql",
+  "testdata/oracles/kql/in_case_insensitive_list.kql",
+  "testdata/oracles/kql/has_any_list.kql",
+]
+
+[[kql]]
+id = "kql-dynamic-literal"
+reason = "`dynamic([...])` and `dynamic({...})` literals fail to parse, and ours also reports `dynamic` as an unknown function."
+paths = ["testdata/oracles/kql/dynamic_literal.kql"]
+
+[[kql]]
+id = "kql-between"
+reason = "`between (a .. b)` fails to parse, although `between` is in catalogs/kql/core/operators-scalar.toml."
+paths = ["testdata/oracles/kql/between.kql"]
+
+[[kql]]
+id = "kql-member-and-index-access"
+reason = "Member access after a call (`parse_xml(x).a.b`) and indexing (`split(x, y)[-1]`) fail to parse."
+paths = [
+  "testdata/oracles/kql/member_access.kql",
+  "testdata/oracles/kql/array_index.kql",
+]
+
+[[kql]]
+id = "kql-mv-expand-mv-apply"
+reason = "`mv-expand Name = Column` and `mv-apply ... on (subquery)` fail to parse; plain `mv-expand Column` parses."
+paths = [
+  "testdata/oracles/kql/mv_expand_assignment.kql",
+  "testdata/oracles/kql/mv_apply.kql",
+]
+
+[[kql]]
+id = "kql-union-options"
+reason = "`union isfuzzy=true T1, T2` fails to parse."
+paths = ["testdata/oracles/kql/union_isfuzzy.kql"]
+
+[[kql]]
+id = "kql-tabular-let"
+reason = "A parenthesized tabular `let` (`let X = (T | ...);`) and a tabular function (`let f = (t: string) { ... };`) fail to parse."
+paths = [
+  "testdata/oracles/kql/parenthesized_tabular_let.kql",
+  "testdata/oracles/kql/tabular_function_let.kql",
+]
+
+[[kql]]
+id = "kql-make-series-datatable-print"
+reason = "`make-series`, `datatable(...) [...]` and a named `print` column (`print Now = now()`) fail to parse."
+paths = [
+  "testdata/oracles/kql/make_series.kql",
+  "testdata/oracles/kql/datatable.kql",
+  "testdata/oracles/kql/print_assignment.kql",
+]
+
+[[kql]]
+id = "kql-real-rules-hit-grammar-gaps"
+reason = "Real rules that use the forms above (named aggregates, multi-value lists, dynamic literals, member access, mv-expand/mv-apply, union options, tabular lets). external_corpus.rs checks a parsing prefix of each; the oracle checks the whole rule."
+paths = [
+  "testdata/conformance/external/kql/ADFSDBNamedPipeConnection.kql",
+  "testdata/conformance/external/kql/ADFSDomainTrustMods.kql",
+  "testdata/conformance/external/kql/ADFSRemoteAuthSyncConnection.kql",
+  "testdata/conformance/external/kql/ADFSRemoteHTTPNetworkConnection.kql",
+  "testdata/conformance/external/kql/ADFSSignInLogsPasswordSpray.kql",
+  "testdata/conformance/external/kql/AccountCreatedDeletedByNonApprovedUser.kql",
+  "testdata/conformance/external/kql/AccountCreatedandDeletedinShortTimeframe.kql",
+  "testdata/conformance/external/kql/AdminPromoAfterRoleMgmtAppPermissionGrant.kql",
+  "testdata/conformance/external/kql/AnomalousUserAppSigninLocationIncrease-detection.kql",
+  "testdata/conformance/external/kql/ExcessiveLogonFailures.kql",
+  "testdata/conformance/external/kql/ExchangeOABVirtualDirectoryAttributeContainingPotentialWebshell.kql",
+  "testdata/conformance/external/kql/GainCodeExecutionADFSViaSMB.kql",
+  "testdata/conformance/external/kql/LocalDeviceJoinInfoAndTransportKeyRegKeysAccess.kql",
+  "testdata/conformance/external/kql/MultipleFailedFollowedBySuccess.kql",
+  "testdata/conformance/external/kql/SigninBruteForce.kql",
+  "testdata/objects/rules/shai-hulud-bulk-credential-candidate-file-access-on-developer-hosts.yaml#configurations.defender_for_endpoint.query",
+]
+
+# Corpus fixtures labelled invalid that Kusto.Language accepts.
+
+[[kql]]
+id = "kql-empty-operator-lists"
+reason = "Kusto.Language parses and analyzes `T | project`, `project-away`, `project-rename` and `summarize` with nothing after them; our grammar requires at least one item."
+paths = [
+  "testdata/corpus/kql/project_operator__invalid.kql",
+  "testdata/corpus/kql/project_away_operator__invalid.kql",
+  "testdata/corpus/kql/project_rename_operator__invalid.kql",
+  "testdata/corpus/kql/summarize_operator__invalid.kql",
+]
+
+[[kql]]
+id = "kql-number-suffix"
+reason = "Kusto.Language lexes `42x` as a name and rejects it only in semantic analysis (KS142); our lexer rejects it as a malformed number."
+paths = ["testdata/corpus/kql/number__invalid.kql"]
+
+[[kql]]
+id = "kql-control-command-arguments"
+reason = "Kusto.Language parses the whole `.create table X (a:string)` command; our grammar parses only enough of a control command to report kql_control_command_unsupported, which still fires."
+paths = ["testdata/corpus/kql/control_command__invalid.kql"]
+
+# Names: catalogs/kql/core against Kusto.Language GlobalState.Default.
+
+[[kql]]
+id = "kql-log-analytics-functions"
+reason = "Log Analytics / Sentinel functions. Kusto.Language's default GlobalState holds Azure Data Explorer functions only."
+names = ["_GetWatchlist", "workspace"]
+
+[[kql]]
+id = "kql-special-forms"
+reason = "Kusto.Language parses `materialize(...)` and `toscalar(...)` as their own syntax, not as function symbols."
+names = ["materialize", "toscalar"]
+
+[[kql]]
+id = "kql-plugin-name-case"
+reason = "Learn titles the plugin `R`; Kusto.Language names it `r`, which is the spelling `evaluate r(...)` needs. Plugin names are case-sensitive."
+names = ["R", "r"]
+
+[[kql]]
+id = "kql-percentiles-array-tdigest"
+reason = "The catalog has `percentile_array_tdigest` (from the Learn page slug); Kusto.Language knows `percentiles_array_tdigest`."
+names = ["percentile_array_tdigest", "percentiles_array_tdigest"]
+
+[[kql]]
+id = "kql-plugins-missing-from-kusto-language"
+reason = "Documented on Learn and in catalogs/kql/core/evaluate-plugins.toml, but absent from Kusto.Language 12.4.1."
+names = ["diffpatterns_text", "schema_merge"]
+
+[[kql]]
+id = "kql-evaluate-plugin-flagged"
+reason = "`bag_unpack` is in both catalogs, but ours reports kql_unknown_function for `evaluate bag_unpack(...)` in real rules."
+names = ["bag_unpack"]
+
+[[kql]]
+id = "kql-deprecated-aliases"
+reason = "Obsolete names Kusto.Language still resolves. Real rules use them (SigninBruteForce: makelist; ADFS rules: any), and ours reports kql_unknown_function where a deprecation warning is due."
+names = [
+  "any", "anyif", "argmax", "argmin", "cnt", "makelist", "makeset",
+  "columnifexists", "current_cursor", "datepart", "extentid", "make_string",
+  "notnull", "row_rank", "to_utf8", "toobject", "totime", "ai_embed_text",
+]
+
+[[kql]]
+id = "kql-hidden-symbols"
+reason = "Hidden in Kusto.Language (no Learn page) but still resolved; ours reports kql_unknown_function."
+names = [
+  "current_node_id", "hll_isvalid", "iscolumnexists", "rowstore_ordinal_range",
+  "tdigest_isvalid", "make_dictionary", "passthrough", "dax_request", "postgresql_request",
+]
+
+[[kql]]
+id = "kql-functions-missing-from-catalog"
+reason = "Kusto.Language functions and aggregates not in catalogs/kql/core/functions.toml; ours reports kql_unknown_function on valid queries."
+names = [
+  "all", "around", "array_strcat", "assert", "bag_zip", "base64_encode_fromarray",
+  "datetime_list_timezones", "dynamic_to_json", "entity_group", "external_table",
+  "format_bytes", "getmonth", "graph", "gzip_compress_to_base64_string",
+  "gzip_decompress_from_base64_string", "inner_nodes", "isascii", "isutf8", "labels",
+  "map", "materialized_view", "new_guid", "node_degree_in", "node_degree_out", "node_id",
+  "punycode_domain_from_string", "punycode_domain_to_string", "regex_quote", "row_id",
+  "set_equals", "stored_query_result", "string_size", "unicode_codepoints_from_string",
+  "unicode_codepoints_to_string", "week_of_year", "zlib_compress_to_base64_string",
+  "zlib_decompress_from_base64_string",
+  "covariance", "covarianceif", "covariancep", "covariancepif", "percentilew",
+]
+
+[[kql]]
+id = "kql-plugins-missing-from-catalog"
+reason = "Kusto.Language plugins not in catalogs/kql/core/evaluate-plugins.toml. Most are Azure Data Explorer only (http_request, execute_query, csharp); ours reports them as unknown."
+names = [
+  "active_users_count", "activity_counts_metrics", "activity_engagement", "activity_metrics",
+  "ai_chat_completion", "ai_chat_completion_prompt", "ai_embeddings", "csharp",
+  "estimate_rows_count", "execute_query", "execute_show_command", "external_datatable",
+  "funnel_sequence", "funnel_sequence_completion", "geo_line_lookup", "geo_polygon_lookup",
+  "http_request", "http_request_post", "identity", "identity_v3",
+  "infer_storage_schema_with_suggestions", "new_activity_metrics", "session_count",
+  "sliding_window_counts",
+]
+
+# ---------------------------------------------------------------------------
+# SPL: Splunk search/parser (scripts/oracles/oracle.py prefixes `search` to
+# text that does not start with `|`, as Splunk does; docs/spl/README.md)
+# ---------------------------------------------------------------------------
 
 [[spl]]
-id = "implicit-search-prefix"
-reason = "Authored text is not rewritten with an implicit `| search`."
+id = "spl-multiple-aggregations"
+reason = "More than one aggregation in `stats` or `tstats` (`count min(_time) as firstTime ...`) fails to parse. Every ESCU tstats detection uses it."
+paths = [
+  "testdata/oracles/spl/stats_multiple_aggregations.spl",
+  "testdata/oracles/spl/tstats_multiple_aggregations.spl",
+  "testdata/corpus/spl/tstats_datamodel__valid.spl",
+]
+
+[[spl]]
+id = "spl-leading-macro"
+reason = "A search that starts with a macro followed by terms (`` `sysmon` EventCode=1 ``) fails to parse."
+paths = ["testdata/oracles/spl/leading_macro.spl"]
+
+[[spl]]
+id = "spl-boolean-group"
+reason = "Parenthesized boolean groups in a search (`(A OR B) NOT C`) fail to parse."
+paths = ["testdata/oracles/spl/boolean_group.spl"]
+
+[[spl]]
+id = "spl-table-field-list"
+reason = "`table` with a space-separated field list fails to parse."
+paths = ["testdata/oracles/spl/table_field_list.spl"]
+
+[[spl]]
+id = "spl-real-rules-hit-grammar-gaps"
+reason = "ESCU detections that use multiple tstats aggregations or a leading macro. external_corpus.rs checks a parsing prefix of each; the oracle checks the whole rule."
+paths = [
+  "testdata/conformance/external/spl/7zip_commandline_to_smb_share_path.spl",
+  "testdata/conformance/external/spl/access_lsass_memory_for_dump_creation.spl",
+  "testdata/conformance/external/spl/active_setup_registry_autostart.spl",
+  "testdata/conformance/external/spl/add_defaultuser_and_password_in_registry.spl",
+  "testdata/conformance/external/spl/add_or_set_windows_defender_exclusion.spl",
+  "testdata/conformance/external/spl/adsisearcher_account_discovery.spl",
+  "testdata/conformance/external/spl/advanced_ip_or_port_scanner_execution.spl",
+  "testdata/conformance/external/spl/allow_file_and_printing_sharing_in_firewall.spl",
+  "testdata/conformance/external/spl/allow_inbound_traffic_by_firewall_rule_registry.spl",
+  "testdata/conformance/external/spl/allow_inbound_traffic_in_firewall_rule.spl",
+  "testdata/conformance/external/spl/allow_network_discovery_in_firewall.spl",
+  "testdata/conformance/external/spl/allow_operation_with_consent_admin.spl",
+]
+
+# Corpus fixtures labelled invalid where Splunk disagrees.
+
+[[spl]]
+id = "spl-trailing-pipe"
+reason = "Splunk ignores an empty trailing pipeline stage (`search |`, `index=main |`); ours reports a syntax error."
+paths = [
+  "testdata/corpus/spl/search_command__invalid.spl",
+  "testdata/corpus/spl/unknown_command__invalid.spl",
+]
+
+[[spl]]
+id = "spl-argumentless-commands"
+reason = "Splunk's search parser accepts `fields`, `lookup`, `stats` and `where` with no arguments; ours rejects them."
+paths = [
+  "testdata/corpus/spl/fields_command__invalid.spl",
+  "testdata/corpus/spl/lookup_command__invalid.spl",
+  "testdata/corpus/spl/stats_command__invalid.spl",
+  "testdata/corpus/spl/where_command__invalid.spl",
+]
+
+[[spl]]
+id = "spl-leading-word-is-a-search-term"
+reason = "Without a leading `|`, Splunk reads `index` and `tstats` as search terms of the implicit `search`; ours reads them as commands."
+paths = [
+  "testdata/corpus/spl/bare_search__invalid.spl",
+  "testdata/corpus/spl/tstats_command__invalid.spl",
+]
+
+[[spl]]
+id = "spl-dedup-without-fields"
+reason = "Ours accepts `dedup` with no field although the fixture is labelled invalid; Splunk requires at least one field."
+paths = ["testdata/corpus/spl/dedup_command__invalid.spl"]
+
+# Names: catalogs/spl/commands.toml against Splunk searchbnf.conf.
+
+[[spl]]
+id = "spl-command-aliases"
+reason = "searchbnf aliases (transam = transaction, summaryindex = collect, ...) missing from catalogs/spl/commands.toml; ours reports spl_unknown_command."
+names = [
+  "af", "ar", "common", "counttable", "ctable", "discretize", "excerpt", "hilite",
+  "macro", "maketable", "outlierfilter", "run", "savedsplunk", "slc", "stash",
+  "sumindex", "summaryindex", "transam",
+]
+
+[[spl]]
+id = "spl-public-commands-missing"
+reason = "searchbnf marks these usage = public but they are not in the Search Reference-derived catalog; ours reports spl_unknown_command."
+names = ["federate", "ingestpreview", "oldreturn"]
+
+[[spl]]
+id = "spl-internal-commands"
+reason = "searchbnf marks these usage = internal, debug or deprecated. They are not for detections, but Splunk still runs them."
+names = [
+  "createrss", "debug", "dump", "editinfo", "findkeywords", "makejson", "mcatalog",
+  "mrollup", "nokv", "outputraw", "outputtelemetry", "prjob", "rawstats",
+  "runshellscript", "showargs", "surrounding",
+]
