@@ -1,0 +1,33 @@
+name: Oracle
+
+# CI-only Kusto.Language syntax oracle. Kusto.Language is restored from NuGet
+# here and never ships; release.yml scans the artifacts for it.
+on:
+  push:
+    branches: [main, development]
+    tags: ["v*.*.*"]
+  pull_request:
+    paths:
+      - "testdata/corpus/kql/**"
+      - "testdata/conformance/external/kql/**"
+      - "testdata/oracles/**"
+      - "scripts/ci-oracle.sh"
+      - "scripts/kusto_oracle.py"
+      - "scripts/kusto-oracle/**"
+      - ".github/workflows/oracle.yml"
+  workflow_dispatch:
+
+jobs:
+  kusto:
+    runs-on: ubuntu-latest
+    env:
+      OPENTIDE_ORACLE_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: bash scripts/ci-oracle.sh

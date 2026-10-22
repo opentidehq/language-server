@@ -57,10 +57,3 @@ jobs:
           node-version: "22"
       - run: npm install --prefix /tmp/ts-cli tree-sitter-cli@0.25.10
       - run: bash scripts/check-grammars.sh
-
-  oracle:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - run: bash scripts/ci-oracle.sh

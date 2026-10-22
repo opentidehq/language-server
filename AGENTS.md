@@ -45,7 +45,7 @@ cargo test --workspace
 cargo run -p opentide-lsp -- generate-highlights --check
 ```
 
-Grammar edits also need `bash scripts/check-grammars.sh` from the repository root (CLI 0.25.10). CI sets `RUSTFLAGS=-Dwarnings`.
+KQL corpus edits can also run `bash scripts/ci-oracle.sh` (Kusto.Language oracle; needs the .NET 10 SDK, skips without it). Grammar edits also need `bash scripts/check-grammars.sh` from the repository root (CLI 0.25.10). CI sets `RUSTFLAGS=-Dwarnings`.
 
 ## Upstream docs, not downloaded skills
 

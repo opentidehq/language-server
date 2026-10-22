@@ -13,3 +13,5 @@ grammars/*/node_modules
 coverage
 lcov.info
 /tmp
+scripts/kusto-oracle/bin
+scripts/kusto-oracle/obj

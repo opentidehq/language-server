@@ -1,9 +1,17 @@
 # Oracles are CI-only. Do not ship Microsoft Kusto.Language or Splunk SDKs
 # in the language-server binary.
-
-[[kql]]
-id = "control-command-syntax"
-reason = "Control commands are parsed by our grammar but rejected as detections."
+#
+# [[kql]] entries are enforced by scripts/ci-oracle.sh. Each one lists the
+# valid corpus files that Kusto.Language's KustoCode.Parse rejects. A rejected
+# file that no entry lists fails the build, and so does a listed file that
+# Kusto.Language accepts. Shape:
+#
+#   [[kql]]
+#   id = "short-slug"
+#   reason = "Why our grammar accepts what Kusto.Language rejects."
+#   paths = ["testdata/corpus/kql/example__valid.kql"]
+#
+# There is no Splunk oracle yet. [[spl]] entries record intended differences.
 
 [[spl]]
 id = "implicit-search-prefix"
