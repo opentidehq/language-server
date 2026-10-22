@@ -17,103 +17,18 @@
 # KQL: Microsoft Kusto.Language
 # ---------------------------------------------------------------------------
 
-# Grammar gaps. Each probe in testdata/oracles/kql/ is one form taken from a
-# real Sentinel or Defender rule that Kusto.Language accepts and ours rejects.
-
-[[kql]]
-id = "kql-summarize-named-aggregate"
-reason = "`summarize Name = agg(...)` fails to parse. Almost every Sentinel rule names its aggregates (StartTime = min(TimeGenerated))."
-paths = ["testdata/oracles/kql/summarize_named_aggregate.kql"]
-
-[[kql]]
-id = "kql-multi-value-list"
-reason = "A list with more than one value after `in`, `in~`, `!in` or `has_any` fails to parse; a single value parses."
-paths = [
-  "testdata/oracles/kql/in_list.kql",
-  "testdata/oracles/kql/in_case_insensitive_list.kql",
-  "testdata/oracles/kql/has_any_list.kql",
-]
-
-[[kql]]
-id = "kql-dynamic-literal"
-reason = "`dynamic([...])` and `dynamic({...})` literals fail to parse, and ours also reports `dynamic` as an unknown function."
-paths = ["testdata/oracles/kql/dynamic_literal.kql"]
-
-[[kql]]
-id = "kql-between"
-reason = "`between (a .. b)` fails to parse, although `between` is in catalogs/kql/core/operators-scalar.toml."
-paths = ["testdata/oracles/kql/between.kql"]
-
-[[kql]]
-id = "kql-member-and-index-access"
-reason = "Member access after a call (`parse_xml(x).a.b`) and indexing (`split(x, y)[-1]`) fail to parse."
-paths = [
-  "testdata/oracles/kql/member_access.kql",
-  "testdata/oracles/kql/array_index.kql",
-]
-
-[[kql]]
-id = "kql-mv-expand-mv-apply"
-reason = "`mv-expand Name = Column` and `mv-apply ... on (subquery)` fail to parse; plain `mv-expand Column` parses."
-paths = [
-  "testdata/oracles/kql/mv_expand_assignment.kql",
-  "testdata/oracles/kql/mv_apply.kql",
-]
-
-[[kql]]
-id = "kql-union-options"
-reason = "`union isfuzzy=true T1, T2` fails to parse."
-paths = ["testdata/oracles/kql/union_isfuzzy.kql"]
-
-[[kql]]
-id = "kql-tabular-let"
-reason = "A parenthesized tabular `let` (`let X = (T | ...);`) and a tabular function (`let f = (t: string) { ... };`) fail to parse."
-paths = [
-  "testdata/oracles/kql/parenthesized_tabular_let.kql",
-  "testdata/oracles/kql/tabular_function_let.kql",
-]
-
-[[kql]]
-id = "kql-make-series-datatable-print"
-reason = "`make-series`, `datatable(...) [...]` and a named `print` column (`print Now = now()`) fail to parse."
-paths = [
-  "testdata/oracles/kql/make_series.kql",
-  "testdata/oracles/kql/datatable.kql",
-  "testdata/oracles/kql/print_assignment.kql",
-]
-
-[[kql]]
-id = "kql-real-rules-hit-grammar-gaps"
-reason = "Real rules that use the forms above (named aggregates, multi-value lists, dynamic literals, member access, mv-expand/mv-apply, union options, tabular lets). external_corpus.rs checks a parsing prefix of each; the oracle checks the whole rule."
-paths = [
-  "testdata/conformance/external/kql/ADFSDBNamedPipeConnection.kql",
-  "testdata/conformance/external/kql/ADFSDomainTrustMods.kql",
-  "testdata/conformance/external/kql/ADFSRemoteAuthSyncConnection.kql",
-  "testdata/conformance/external/kql/ADFSRemoteHTTPNetworkConnection.kql",
-  "testdata/conformance/external/kql/ADFSSignInLogsPasswordSpray.kql",
-  "testdata/conformance/external/kql/AccountCreatedDeletedByNonApprovedUser.kql",
-  "testdata/conformance/external/kql/AccountCreatedandDeletedinShortTimeframe.kql",
-  "testdata/conformance/external/kql/AdminPromoAfterRoleMgmtAppPermissionGrant.kql",
-  "testdata/conformance/external/kql/AnomalousUserAppSigninLocationIncrease-detection.kql",
-  "testdata/conformance/external/kql/ExcessiveLogonFailures.kql",
-  "testdata/conformance/external/kql/ExchangeOABVirtualDirectoryAttributeContainingPotentialWebshell.kql",
-  "testdata/conformance/external/kql/GainCodeExecutionADFSViaSMB.kql",
-  "testdata/conformance/external/kql/LocalDeviceJoinInfoAndTransportKeyRegKeysAccess.kql",
-  "testdata/conformance/external/kql/MultipleFailedFollowedBySuccess.kql",
-  "testdata/conformance/external/kql/SigninBruteForce.kql",
-  "testdata/objects/rules/shai-hulud-bulk-credential-candidate-file-access-on-developer-hosts.yaml#configurations.defender_for_endpoint.query",
-]
+# Probes in testdata/oracles/kql/ are one form each, taken from real Sentinel
+# and Defender rules. All of them parse; a probe listed here is a regression.
 
 # Corpus fixtures labelled invalid that Kusto.Language accepts.
 
 [[kql]]
-id = "kql-empty-operator-lists"
-reason = "Kusto.Language parses and analyzes `T | project`, `project-away`, `project-rename` and `summarize` with nothing after them; our grammar requires at least one item."
+id = "kql-empty-column-lists"
+reason = "Kept on purpose. Kusto.Language parses `T | project`, `project-away` and `project-rename` with no columns; ours reports a syntax error because an empty column list is always a mistake in a detection. (`summarize` with no aggregates parses, since `summarize by x` is valid.)"
 paths = [
   "testdata/corpus/kql/project_operator__invalid.kql",
   "testdata/corpus/kql/project_away_operator__invalid.kql",
   "testdata/corpus/kql/project_rename_operator__invalid.kql",
-  "testdata/corpus/kql/summarize_operator__invalid.kql",
 ]
 
 [[kql]]

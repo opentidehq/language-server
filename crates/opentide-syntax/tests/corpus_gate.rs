@@ -140,6 +140,16 @@ fn kql_named_rules_in_grammar_json_are_known() {
         "project_keep_operator",
         "project_reorder_operator",
         "top_operator",
+        // pieces of the productions above, covered by their fixtures
+        "column_item",
+        "subquery",
+        "type",
+        "parameter",
+        "json_value",
+        "hint_name",
+        "parse_column",
+        "mv_expand_item",
+        "star",
     ]
     .into_iter()
     .collect();
