@@ -8,3 +8,29 @@ reason = "Control commands are parsed by our grammar but rejected as detections.
 [[spl]]
 id = "implicit-search-prefix"
 reason = "Authored text is not rewritten with an implicit `| search`."
+
+# Elastic oracles (scripts/ci-oracle-elastic.sh). The oracles are parsers;
+# these engine codes are checks Elasticsearch makes after parsing, so an
+# engine error made only of them is expected where the parser accepts.
+[elastic.beyond_parser]
+esql = ["esql_unknown_function", "esql_unavailable"]
+eql = [
+  "eql_unknown_function",
+  "eql_function_arity",
+  "eql_unsupported",
+  "eql_maxspan_unit",
+]
+kuery = []
+lucene = []
+
+[[esql]]
+file = "^corpus__unknown_command__valid"
+reason = "An unknown command parses on purpose so esql_unknown_command can name it; Elasticsearch rejects it."
+
+[[eql]]
+file = "^corpus__(sample|subquery|term_option)__invalid"
+reason = "Elasticsearch's LogicalPlanBuilder rejects these after the grammar accepts them (sample without join keys, missing events without maxspan, unknown term option), as a ParsingException; the engine reports them as eql_parse_error too."
+
+[[kuery]]
+file = "^corpus__(and_list|not_list|or_list|or_query)__invalid"
+reason = "Known engine bug (#79): Kibana reads a trailing `or`/`and`/`not` as a value word, so these parse there. Remove once the engine accepts them."

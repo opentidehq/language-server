@@ -691,6 +691,9 @@ configurations:
         .and_then(|a| a.iter().find(|i| i["label"] == "process.parent.name"))
         .cloned()
         .unwrap_or_else(|| panic!("ECS field completion: {items}"));
-    assert_eq!(item["textEdit"]["range"]["start"]["character"], 16, "{item}");
+    assert_eq!(
+        item["textEdit"]["range"]["start"]["character"], 16,
+        "{item}"
+    );
     assert_eq!(item["textEdit"]["newText"], "process.parent.name");
 }

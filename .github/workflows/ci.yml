@@ -64,3 +64,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash scripts/ci-oracle.sh
+
+  # Every public Elastic rule passes Elasticsearch's parser, so any engine
+  # error on them is an engine bug (#82). The rules are ELv2: checked out
+  # here at a pinned commit, never vendored.
+  elastic-sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: elastic/detection-rules
+          ref: 2b30453d7dede69f980472cff51a2ae9a6917bae
+          path: detection-rules
+          sparse-checkout: |
+            rules
+            rules_building_block
+            hunting
+      - uses: dtolnay/rust-toolchain@stable
+      - name: detection-rules sweep
+        env:
+          OPENTIDE_DETECTION_RULES: ${{ github.workspace }}/detection-rules
+        run: cargo test -p opentide-analysis --test elastic_detection_rules -- --nocapture
+
+  # Elasticsearch's EQL grammar, @elastic/esql, Kibana's KQL grammar, and the
+  # Lucene query parser, fetched at pinned versions and never shipped (#83).
+  elastic-oracle:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: elastic/detection-rules
+          ref: 2b30453d7dede69f980472cff51a2ae9a6917bae
+          path: detection-rules
+          sparse-checkout: |
+            rules
+            rules_building_block
+            hunting
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - run: bash scripts/ci-oracle-elastic.sh "$GITHUB_WORKSPACE/detection-rules"
