@@ -13,6 +13,7 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "addend"
+docs = "A number; `add` takes exactly two."
 types = ["integer", "float", "null"]
 required = true
 
@@ -28,21 +29,25 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to search in."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "left"
+docs = "Marker that precedes the wanted text; it is not part of the result."
 types = ["string"]
 required = true
 
 [[functions.parameters]]
 name = "right"
+docs = "Marker that follows the wanted text; it is not part of the result."
 types = ["string"]
 required = true
 
 [[functions.parameters]]
 name = "greedy_matching"
+docs = "`true` extends the match to the last `right`; `false` (the default) stops at the first."
 types = ["Boolean"]
 required = false
 
@@ -57,11 +62,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "ip_address"
+docs = "An `ip`-typed field; a string literal is rejected."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "cidr_block"
+docs = "A CIDR range written as a string constant, for example `\"10.0.0.0/8\"`; list as many as needed."
 types = ["string", "null"]
 required = true
 
@@ -76,6 +83,7 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "value"
+docs = "Any value, converted to text; list as many as needed."
 types = []
 required = true
 
@@ -91,11 +99,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "dividend"
+docs = "The number being divided."
 types = ["integer", "float", "null"]
 required = true
 
 [[functions.parameters]]
 name = "divisor"
+docs = "The number to divide by; must not be zero."
 types = ["integer", "float", "null"]
 required = true
 
@@ -111,11 +121,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to test."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "substring"
+docs = "Suffix to look for at the end of `source`."
 types = ["string", "null"]
 required = true
 
@@ -131,16 +143,19 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to search in."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "substring"
+docs = "Text to find."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "start_pos"
+docs = "Integer offset (from 0) where the search begins; 0 when omitted."
 types = ["integer", "null"]
 required = false
 
@@ -156,6 +171,7 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "string"
+docs = "Text whose characters are counted."
 types = ["string", "null"]
 required = true
 
@@ -171,11 +187,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "dividend"
+docs = "The number being divided."
 types = ["integer", "float", "null"]
 required = true
 
 [[functions.parameters]]
 name = "divisor"
+docs = "The number to divide by; the remainder is returned."
 types = ["integer", "float", "null"]
 required = true
 
@@ -191,6 +209,7 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "factor"
+docs = "A number; `multiply` takes exactly two."
 types = ["integer", "float", "null"]
 required = true
 
@@ -206,11 +225,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "string"
+docs = "Text that holds an integer or decimal number."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "base_num"
+docs = "Integer radix to read the text in; 16 for a `0x` prefix, otherwise 10."
 types = ["integer", "null"]
 required = false
 
@@ -226,11 +247,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to test."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "substring"
+docs = "Prefix to look for at the start of `source`."
 types = ["string", "null"]
 required = true
 
@@ -246,6 +269,7 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "value"
+docs = "Any value to turn into text."
 types = []
 required = true
 
@@ -261,11 +285,13 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to search in."
 types = ["string", "null"]
 required = true
 
 [[functions.parameters]]
 name = "substring"
+docs = "Text to look for anywhere in `source`."
 types = ["string", "null"]
 required = true
 
@@ -281,16 +307,19 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "source"
+docs = "Text to take a slice of."
 types = ["string"]
 required = true
 
 [[functions.parameters]]
 name = "start_pos"
+docs = "Integer offset (from 0) of the first character kept; negative counts back from the end."
 types = ["integer"]
 required = true
 
 [[functions.parameters]]
 name = "end_pos"
+docs = "Integer offset where the slice stops, exclusive; the rest of the text when omitted."
 types = ["integer"]
 required = false
 
@@ -306,10 +335,12 @@ citation = "https://www.elastic.co/docs/reference/query-languages/eql/eql-functi
 
 [[functions.parameters]]
 name = "minuend"
+docs = "The number to subtract from."
 types = ["integer", "float", "null"]
 required = true
 
 [[functions.parameters]]
 name = "subtrahend"
+docs = "The number taken away; required, despite the docs."
 types = ["integer", "float", "null"]
 required = true
