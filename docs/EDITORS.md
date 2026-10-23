@@ -20,7 +20,11 @@ See `editors/zed/opentide.json`.
 
 ## VS Code
 
-Lives in **opentidehq/vscode-extension** (other repository). MIT client, EUPL engine notices.
+Lives in **opentidehq/vscode-extension** (other repository, #17). MIT client, EUPL engine notices.
+
+Language ids are the server's: `opentide-yaml`, `kql`, `spl`, `esql`, `eql`, `kuery`, `lucene`. Use `DOCUMENT_SELECTOR` from `@opentide/lsp-client`, which matches each language by id and by file pattern.
+
+`esql` is also the id of Elastic's own ES|QL extension. The ids are the shared vocabulary, so the opentide extension registers `esql` too, never a second id for the same language. Its TextMate grammar uses the scope `source.opentide.esql`, not Elastic's `source.esql`, so the two grammars never collide. The server's semantic tokens are authoritative for colour either way. The other three Elastic ids (`eql`, `kuery`, `lucene`) have no prior VS Code owner.
 
 ## Web
 
