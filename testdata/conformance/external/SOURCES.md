@@ -6,6 +6,9 @@ Queries are extracted from public detection content for conformance.
 Each broken file is the same query with one injected fault.
 
 ## KQL — Azure/Azure-Sentinel (MIT)
+
+Licence text: [`LICENSE.MIT-Azure-Sentinel.txt`](LICENSE.MIT-Azure-Sentinel.txt). The queries are extracted from the rules' YAML; the `.broken.` files are modified copies (one injected fault each).
+
 - `ADFSDBNamedPipeConnection` from `Solutions` analytic rule `ADFSDBNamedPipeConnection.yaml`
 - `ADFSDomainTrustMods` from `Solutions` analytic rule `ADFSDomainTrustMods.yaml`
 - `ADFSRemoteAuthSyncConnection` from `Solutions` analytic rule `ADFSRemoteAuthSyncConnection.yaml`
@@ -23,6 +26,9 @@ Each broken file is the same query with one injected fault.
 - `SigninBruteForce` from `Solutions` analytic rule `SigninBruteForce.yaml`
 
 ## SPL — splunk/security_content (Apache-2.0)
+
+Licence text: [`LICENSE.Apache-2.0.txt`](LICENSE.Apache-2.0.txt). The repository ships no `NOTICE` file. The searches are extracted from the detections' YAML; the `.broken.` files are modified copies (one injected fault each), as Apache-2.0 §4(b) asks us to state.
+
 - `7zip_commandline_to_smb_share_path` from `detections/endpoint/7zip_commandline_to_smb_share_path.yml`
 - `access_lsass_memory_for_dump_creation` from `detections/endpoint/access_lsass_memory_for_dump_creation.yml`
 - `active_directory_lateral_movement_identified` from `detections/endpoint/active_directory_lateral_movement_identified.yml`
