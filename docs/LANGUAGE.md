@@ -155,6 +155,13 @@ Checks beyond the grammar: `eql_argument_type` (literal types the Verifier rejec
 
 Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Language Elastic rules call `language: kuery`, not Microsoft KQL. `or`, `and`, and `not` are case-insensitive keywords; everything else is a literal.
 
+`or`, `and`, and `not` are keywords only with whitespace after them: at the very end of the query or before `)` or `}` they are value text, as in Kibana (`f:a or`, `f:(not)`), while `f:a or ` (trailing space) fails. Engine checks below the grammar:
+
+- `kuery_parse_error` messages name the problem (no implicit `and` in `a:1 b:2`, an unclosed `(` or quote, a missing value or operand). They are not Kibana's PEG messages word for word: tree-sitter recovers at a different point than Kibana's parser.
+- `kuery_question_mark` (hint): `?` is a literal in KQL, not a single-character wildcard. URL query strings (`/path?x=1`) are skipped.
+- `kuery_free_text` (hint): a value with no field searches every field; after `f:a and b` the hint suggests `f:(a and b)`.
+- `kuery_looks_like_lucene` (warning): two different kinds of Lucene syntax (ranges, `_exists_`, prefixes, `&&`, regexps, fuzzy or boost, text only Lucene parses) suggest `language: lucene`.
+
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |
 | kuery.and-list | `and_list` | `and_list__valid`, `and_list__invalid` | `keyword` |
@@ -176,6 +183,16 @@ Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Lan
 ## Lucene
 
 Language id `lucene` (`.lucene`). Elastic's `query_string` syntax: `AND`, `OR`, and `NOT` are operators only in upper case, so lowercase `and`/`or` are terms (`lucene_lowercase_operator`).
+
+Engine checks below the grammar (Elastic dialect unless noted):
+
+- `lucene_regexp`: the body of `/regexp/` is Lucene's own regular-expression grammar. A body Lucene's `RegExp` rejects (`\b`, `\n`, an unclosed `"` or `<`, `(a|)`) is an error; so is one whose determinization exceeds `max_determinized_states` (10000) on both Elasticsearch 8.19 (Lucene 9) and 9.x (Lucene 10). When only one stack rejects it, it is a warning naming that stack. `(?:`, `(?i)`, `^`, and `$` are literal text in Lucene (warning), and a body over the default `index.max_regex_length` (1000) is a warning. On an index whose `query_string` is lenient (the default when `index.query.default_field` is `*`), Elasticsearch turns a rejected regexp into a clause that matches nothing instead of failing the search; either way the clause never matches.
+- `lucene_fuzzy`: Elasticsearch reads `term~N` as a fuzziness and accepts only `0`, `1`, `2`, `AUTO`, or a bare `~` (error otherwise, including `~3` and `~0.5`, which Lucene alone would clamp or read as a similarity). Phrase slop (`"a b"~5`) is not checked.
+- `lucene_range_operator` (warning): `f:> 10` searches `f` for `>`; the value must follow the operator (`f:>10`).
+- `lucene_unescaped_slash` (warning): `a/b/c` or `path:/var/log` reads `/b/` or `/var/` as a regexp. An unclosed `/` is a `lucene_parse_error` that says so.
+- `lucene_bare_term` (hint; warning for Carbon Black): `f:v w` searches `w` in every field.
+- `lucene_looks_like_kuery` (warning): two different kinds of KQL syntax (lower-case operators, `f >= 10`, a leading `not`, text only KQL parses) suggest `language: kuery`.
+- Carbon Black Cloud (`configurations.carbon_black_cloud.query`): newlines count as spaces (deploy joins lines), `_exists_`, `f:>v`, and `f\*:` are `lucene_elasticsearch_only` warnings, regexp and fuzzy problems are warnings (the Solr version is not known), and upper-case letters in a regexp get a hint because Carbon Black matches lower-cased tokens. There is no Carbon Black field catalogue yet.
 
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |

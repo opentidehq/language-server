@@ -23,7 +23,9 @@ eql = [
   "eql_field_comparison",
 ]
 kuery = []
-lucene = []
+# Elasticsearch parses fuzziness itself (Fuzziness.fromString); the jar
+# clamps `~3` and reads `~0.5` as a similarity.
+lucene = ["lucene_fuzzy"]
 
 [[esql]]
 file = "^corpus__unknown_command__valid"
@@ -36,7 +38,3 @@ reason = "8.19-only forms (`COMPLETION ... WITH endpoint`, `FROM x [METADATA ...
 [[eql]]
 file = "^corpus__(sample|subquery|term_option)__invalid"
 reason = "Elasticsearch's LogicalPlanBuilder rejects these after the grammar accepts them (sample without join keys, missing events without maxspan, unknown term option), as a ParsingException; the engine reports them as eql_parse_error too."
-
-[[kuery]]
-file = "^corpus__(and_list|not_list|or_list|or_query)__invalid"
-reason = "Known engine bug (#79): Kibana reads a trailing `or`/`and`/`not` as a value word, so these parse there. Remove once the engine accepts them."

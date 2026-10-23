@@ -45,6 +45,7 @@ pub fn language_for_field_path(path: &[&str]) -> Option<LanguageId> {
         ["configurations", "splunk", "query"] | ["configurations", "splunk", "search"] => {
             Some(LanguageId::Spl)
         }
+        ["configurations", "carbon_black_cloud", "query"] => Some(LanguageId::Lucene),
         ["configurations", "crowdstrike", ..] => None,
         _ => None,
     }
@@ -795,7 +796,12 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
                         (r.diagnostics, r.tokens)
                     }
                     _ => {
-                        let r = opentide_lucene::analyze(&inj.inner);
+                        let dialect = if inj.field_path.iter().any(|p| p == "carbon_black_cloud") {
+                            opentide_lucene::Dialect::CarbonBlack
+                        } else {
+                            opentide_lucene::Dialect::Elastic
+                        };
+                        let r = opentide_lucene::analyze_dialect(&inj.inner, dialect);
                         (r.diagnostics, r.tokens)
                     }
                 };
@@ -1634,6 +1640,10 @@ threat:
             language_for_field_path(&["configurations", "crowdstrike", "query"]),
             None
         );
+        assert_eq!(
+            language_for_field_path(&["configurations", "carbon_black_cloud", "query"]),
+            Some(LanguageId::Lucene)
+        );
     }
 
     #[test]
@@ -1783,6 +1793,55 @@ threat:
         let mut sorted = starts.clone();
         sorted.sort();
         assert_eq!(starts, sorted, "semantic tokens must be in document order");
+    }
+
+    #[test]
+    fn carbon_black_query_is_lucene_in_its_dialect() {
+        let src = r#"name: Carbon Black rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000019
+  schema: rule::1.0
+configurations:
+  carbon_black_cloud:
+    enabled: true
+    schema: platform::carbon_black_cloud::1.0
+    query: |
+      process_name:cmd.exe AND _exists_:parent_name
+      AND netconn_count:[1 TO
+      5]
+"#;
+        let r = analyze(AnalyzeInput {
+            path: "objects/rules/carbon-black-rule.yaml",
+            source: src,
+            workspace: &[],
+        });
+        let lucene: Vec<_> = r
+            .diagnostics
+            .iter()
+            .filter(|d| d.code.starts_with("lucene_"))
+            .collect();
+        // `_exists_` is Elasticsearch-only; the newline inside the range is
+        // fine because deploy joins lines with spaces.
+        assert!(
+            lucene
+                .iter()
+                .any(|d| d.code == codes::LUCENE_ELASTICSEARCH_ONLY
+                    && d.field_path.as_deref()
+                        == Some(
+                            &[
+                                "configurations".to_string(),
+                                "carbon_black_cloud".into(),
+                                "query".into()
+                            ][..]
+                        )),
+            "{lucene:?}"
+        );
+        assert!(
+            lucene
+                .iter()
+                .all(|d| d.severity != opentide_core::Severity::Error),
+            "{lucene:?}"
+        );
     }
 
     #[test]
