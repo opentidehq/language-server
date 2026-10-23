@@ -393,8 +393,13 @@ fn check_string(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
     } else {
         None
     };
+    // Elasticsearch's lexer has no token for these, so they fail to parse.
     if let Some(message) = message {
-        out.push(unsupported(node, source, message, node_span(node)));
+        out.push(Diagnostic::error(
+            codes::EQL_PARSE_ERROR,
+            message,
+            range(source, node_span(node)),
+        ));
         return;
     }
     if t.starts_with("\"\"\"") {
@@ -1408,8 +1413,12 @@ mod tests {
 
     #[test]
     fn endgame_syntax_is_unsupported() {
+        assert!(
+            codes_of("process where process.name == 'cmd.exe'")
+                .contains(&codes::EQL_PARSE_ERROR.to_string()),
+            "single quotes are a lexer error in Elasticsearch"
+        );
         for src in [
-            "process where process.name == 'cmd.exe'",
             "process where descendant of [process where true]",
             "process where true | unique process.name",
             "join [process where true] [file where true]",
