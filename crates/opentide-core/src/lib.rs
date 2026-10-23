@@ -368,6 +368,7 @@ pub mod codes {
     pub const KUERY_QUESTION_MARK: &str = "kuery_question_mark";
     pub const KUERY_FREE_TEXT: &str = "kuery_free_text";
     pub const KUERY_LOOKS_LIKE_LUCENE: &str = "kuery_looks_like_lucene";
+    pub const KUERY_RANGE_TYPE: &str = "kuery_range_type";
     // elastic-1.0 Advisories on the block itself (specifications#57).
     pub const LOOKBACK_ZERO: &str = "lookback_zero";
     pub const LOOKBACK_LONG: &str = "lookback_long";

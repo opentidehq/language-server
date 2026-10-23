@@ -69,6 +69,11 @@ pub fn analyze(source: &str) -> AnalyzeResult {
                 diagnostics.push(d);
             }
         }
+        "range_expression" => {
+            if let Some(d) = range_type(node, source) {
+                diagnostics.push(d);
+            }
+        }
         "value_expression" => {
             if let Some(d) = free_text(node, source) {
                 diagnostics.push(d);
@@ -85,6 +90,29 @@ pub fn analyze(source: &str) -> AnalyzeResult {
         diagnostics,
         tokens,
     }
+}
+
+/// `kuery_range_type` (hint): a range on a field ECS maps as a string type
+/// compares text, not numbers (`"10" < "9"`). Fields outside ECS, or with a
+/// numeric, date, or ip type, are left alone: the list is never closed.
+fn range_type(node: Node, source: &str) -> Option<Diagnostic> {
+    let field = node.child_by_field_name("field")?;
+    let name = text(field, source).trim_matches('"');
+    let ecs = opentide_ecs::field(name)?;
+    if ecs.class() != opentide_ecs::TypeClass::Text {
+        return None;
+    }
+    let mut d = Diagnostic::warning(
+        codes::KUERY_RANGE_TYPE,
+        format!(
+            "ECS {} maps `{name}` as `{}`: a range compares it as text, so \"10\" sorts before \"9\"",
+            opentide_ecs::version(),
+            ecs.type_name
+        ),
+        range(source, node_span(node)),
+    );
+    d.severity = opentide_core::Severity::Hint;
+    Some(d)
 }
 
 fn is_word_char(c: char) -> bool {
@@ -696,6 +724,22 @@ fn position_to_offset(source: &str, position: Position) -> usize {
 mod tests {
     use super::*;
 
+    #[test]
+    fn range_on_an_ecs_text_field_is_a_hint() {
+        let hints = |src: &str| -> Vec<String> {
+            analyze(src)
+                .diagnostics
+                .into_iter()
+                .filter(|d| d.code == codes::KUERY_RANGE_TYPE)
+                .map(|d| d.message)
+                .collect()
+        };
+        assert_eq!(hints("process.name >= 10").len(), 1);
+        assert!(hints("source.port >= 1024").is_empty());
+        assert!(hints("@timestamp > now-1d").is_empty());
+        assert!(hints("my.custom.count > 5").is_empty());
+    }
+
     fn codes_of(src: &str) -> Vec<String> {
         analyze(src)
             .diagnostics
@@ -706,7 +750,7 @@ mod tests {
 
     #[test]
     fn detection_query_is_clean() {
-        let src = "event.category:process and process.name:(\"cmd.exe\" or powershell.exe) and not user.name:SYSTEM and event.code >= 4624";
+        let src = "event.category:process and process.name:(\"cmd.exe\" or powershell.exe) and not user.name:SYSTEM and source.port >= 1024";
         let r = analyze(src);
         assert!(r.diagnostics.is_empty(), "{:?}", r.diagnostics);
         assert!(r.tokens.iter().any(|t| t.capture == "property"));
