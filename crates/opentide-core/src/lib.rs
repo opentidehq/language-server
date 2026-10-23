@@ -354,6 +354,8 @@ pub mod codes {
     pub const MISSING_AUTHOR: &str = "missing_author";
     pub const MISSING_ORGANISATION: &str = "missing_organisation";
     pub const DEFENDER_OUTPUT_COLUMNS: &str = "defender_output_columns";
+    /// `::type` names no Elasticsearch release can cast to.
+    pub const ESQL_UNKNOWN_TYPE: &str = "esql_unknown_type";
 }
 
 #[derive(Debug, Error)]
