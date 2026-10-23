@@ -36,6 +36,7 @@ editors / @opentide/lsp-client / WASM worker
 | `configurations.elastic.query` with `type: query`, `threshold`, `new_terms`, or `threat_match` | `language: kuery` (default) → Kibana KQL; `language: lucene` → Lucene |
 | `configurations.elastic.threat.query` | `threat.language` (`kuery` default, or `lucene`) |
 | `configurations.elastic.query` with `type: machine_learning` | none |
+| `response.procedure.searches[].query` with `system: elastic` | `language` on the entry (`esql`, `eql`, `kuery`, `lucene`); none when omitted (specifications#58) |
 | `configurations.crowdstrike.*` | unsupported (`None`) |
 | `description` / `procedure.analysis` / `recommendation` / other `markdown = true` fields | Markdown (HighlightSpec `markdown.*`) |
 

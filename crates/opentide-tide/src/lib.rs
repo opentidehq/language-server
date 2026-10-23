@@ -724,6 +724,21 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
         }
     }
 
+    if object_type == "rule"
+        && object
+            .configurations
+            .as_ref()
+            .is_some_and(|c| c.get("elastic").is_some())
+    {
+        if let Ok(rule) = serde_yaml::from_str::<serde_yaml::Value>(input.source) {
+            diagnostics.extend(elastic::block_advisories(
+                input.source,
+                &rule,
+                input.workspace,
+            ));
+        }
+    }
+
     // Injected query analysis
     let injections = extract_injections(input.source);
     let skip: Vec<ByteSpan> = injections.iter().map(|inj| inj.host_span).collect();
@@ -765,11 +780,14 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
                     }
                     LanguageId::Eql => {
                         let r = opentide_eql::analyze(&inj.inner);
-                        diagnostics.extend(elastic::maxspan_advisories(
-                            input.source,
-                            object.configurations.as_ref(),
-                            inj,
-                        ));
+                        // Hunts have no schedule; only the rule query is compared.
+                        if inj.field_path.first().map(String::as_str) == Some("configurations") {
+                            diagnostics.extend(elastic::maxspan_advisories(
+                                input.source,
+                                object.configurations.as_ref(),
+                                inj,
+                            ));
+                        }
                         (r.diagnostics, r.tokens)
                     }
                     LanguageId::Kuery => {

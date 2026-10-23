@@ -7,8 +7,9 @@
 //! take `language` (`kuery` when omitted, or `lucene`). The indicator query
 //! `threat.query` takes `threat.language` the same way.
 
-use crate::{InjectedQuery, remap_span};
-use opentide_core::{ByteSpan, Diagnostic, LanguageId, codes, span_to_range};
+use crate::vocabs::bundled_vocabs;
+use crate::{IndexedObject, InjectedQuery, remap_span};
+use opentide_core::{ByteSpan, Diagnostic, LanguageId, Range, codes, span_to_range};
 
 /// Query language of `configurations.elastic.query`, or of `threat.query`
 /// when `rule_type` is `threat_match` and `language` is `threat.language`.
@@ -143,6 +144,39 @@ pub(crate) fn elastic_injections(source: &str) -> Vec<InjectedQuery> {
                 elastic_query_language(Some("threat_match"), threat_language.as_deref()),
                 vec!["configurations", "elastic", "threat", "query"],
             )
+        } else if path_is(&key.path, &SEARCH_QUERY) {
+            let Some((index, system, language)) = search_item(&lines, &keys, key.line) else {
+                continue;
+            };
+            if system.as_deref() != Some("elastic") {
+                continue;
+            }
+            let language = match language.as_deref() {
+                Some("esql") => Some(LanguageId::Esql),
+                Some("eql") => Some(LanguageId::Eql),
+                Some("kuery") => Some(LanguageId::Kuery),
+                Some("lucene") => Some(LanguageId::Lucene),
+                _ => None,
+            };
+            let Some(language) = language else {
+                continue;
+            };
+            let field_path = ["response", "procedure", "searches"]
+                .into_iter()
+                .map(String::from)
+                .chain([index.to_string(), "query".into()])
+                .collect();
+            if let Some(inj) = scalar_injection(
+                source,
+                &lines,
+                key.line,
+                line_starts[key.line],
+                language,
+                field_path,
+            ) {
+                out.push(inj);
+            }
+            continue;
         } else {
             continue;
         };
@@ -162,6 +196,34 @@ pub(crate) fn elastic_injections(source: &str) -> Vec<InjectedQuery> {
         }
     }
     out
+}
+
+const SEARCH_QUERY: [&str; 5] = ["response", "procedure", "searches", "[]", "query"];
+
+/// For the `response.procedure.searches[]` entry holding the key on `line`:
+/// its index and its `system` and `language` values. A search's language is
+/// never guessed from its text (specifications#58): with `system: elastic`
+/// and no `language`, the query is not analysed.
+fn search_item(
+    lines: &[&str],
+    keys: &[KeyLine],
+    line: usize,
+) -> Option<(usize, Option<String>, Option<String>)> {
+    let in_searches = |k: &KeyLine| k.path.len() == 5 && path_is(&k.path[..4], &SEARCH_QUERY[..4]);
+    let starts: Vec<usize> = keys
+        .iter()
+        .filter(|k| in_searches(k) && lines[k.line].trim_start().starts_with("- "))
+        .map(|k| k.line)
+        .collect();
+    let index = starts.iter().rposition(|s| *s <= line)?;
+    let start = starts[index];
+    let end = starts.get(index + 1).copied().unwrap_or(usize::MAX);
+    let value = |name: &str| {
+        keys.iter()
+            .find(|k| in_searches(k) && k.line >= start && k.line < end && k.path[4] == name)
+            .and_then(|k| scalar(&k.value))
+    };
+    Some((index, value("system"), value("language")))
 }
 
 /// The value of the `key: value` on `lines[i]`: a block scalar (`|`, `>`), or a
@@ -369,9 +431,10 @@ fn parts(text: &str, units: &[(char, u64)]) -> Option<u64> {
 }
 
 /// `eql_maxspan_window`: an EQL `sequence ... with maxspan=` longer than the
-/// rule's window (interval + lookback) cannot match; longer than `lookback`
-/// alone, a sequence that straddles two runs is missed ([elastic-1.0]
-/// Advisories). Defaults are `interval: 5m`, `lookback: 1m`.
+/// rule's window (interval + lookback) cannot match. `eql_maxspan_lookback`:
+/// longer than `lookback` alone, a sequence that straddles two runs is
+/// missed ([elastic-1.0] Advisories). Defaults are `interval: 5m`,
+/// `lookback: 1m`.
 pub(crate) fn maxspan_advisories(
     source: &str,
     configurations: Option<&serde_yaml::Value>,
@@ -397,26 +460,279 @@ pub(crate) fn maxspan_advisories(
     };
     let mut out = Vec::new();
     for (span, maxspan) in opentide_eql::sequence_maxspans(&injection.inner) {
-        let message = if maxspan > interval + lookback {
-            format!(
-                "EQL maxspan exceeds the rule window, interval + lookback ({interval_text} + {lookback_text}); the sequence cannot fit one run"
+        let (code, message) = if maxspan > interval + lookback {
+            (
+                codes::EQL_MAXSPAN_WINDOW,
+                format!(
+                    "EQL maxspan exceeds the rule window, interval + lookback ({interval_text} + {lookback_text}); the sequence cannot fit one run"
+                ),
             )
         } else if maxspan > lookback {
-            format!(
-                "EQL maxspan exceeds scheduling.lookback ({lookback_text}); a sequence that straddles two runs is missed"
+            (
+                codes::EQL_MAXSPAN_LOOKBACK,
+                format!(
+                    "EQL maxspan exceeds scheduling.lookback ({lookback_text}); a sequence that straddles two runs is missed"
+                ),
             )
         } else {
             continue;
         };
         let host = remap_span(injection, span);
         out.push(
-            Diagnostic::warning(
-                codes::EQL_MAXSPAN_WINDOW,
-                message,
-                span_to_range(source, host),
-            )
-            .with_field_path(injection.field_path.clone()),
+            Diagnostic::warning(code, message, span_to_range(source, host))
+                .with_field_path(injection.field_path.clone()),
         );
+    }
+    out
+}
+
+/// Completion docs for `configurations.elastic.type`, `language`, and
+/// `threat.language` values: which engine the block's query gets.
+pub(crate) fn value_docs(path: &str, value: &str) -> Option<&'static str> {
+    match (path, value) {
+        ("configurations.elastic.type", "query") => Some(
+            "Custom query rule. `query` is Kibana KQL (`language: kuery`, the default) or Lucene (`language: lucene`).",
+        ),
+        ("configurations.elastic.type", "eql") => {
+            Some("Event correlation rule. `query` is EQL; `language` does not apply.")
+        }
+        ("configurations.elastic.type", "esql") => Some(
+            "ES|QL rule. `query` is ES|QL; `language` does not apply. A non-aggregating query needs `METADATA _id` before Kibana 9.4.",
+        ),
+        ("configurations.elastic.type", "threshold") => Some(
+            "Threshold rule. `query` is Kibana KQL or Lucene per `language`; needs a `threshold` block.",
+        ),
+        ("configurations.elastic.type", "new_terms") => Some(
+            "New terms rule. `query` is Kibana KQL or Lucene per `language`; needs `new_terms.fields` and `history_window_start`.",
+        ),
+        ("configurations.elastic.type", "threat_match") => Some(
+            "Indicator match rule. `query` and `threat.query` are Kibana KQL or Lucene per `language` and `threat.language`.",
+        ),
+        ("configurations.elastic.type", "machine_learning") => Some(
+            "Machine learning rule. No query: it needs `machine_learning.job_id` and `anomaly_threshold`.",
+        ),
+        ("configurations.elastic.language" | "configurations.elastic.threat.language", "kuery") => {
+            Some(
+                "Kibana Query Language (the default). `field: value`, `and`/`or`/`not`, `*` wildcards outside quotes. Not Microsoft KQL.",
+            )
+        }
+        (
+            "configurations.elastic.language" | "configurations.elastic.threat.language",
+            "lucene",
+        ) => Some(
+            "Lucene `query_string` syntax. Upper-case `AND`/`OR`/`NOT`, `field:value`, `[a TO b]` ranges, `/regex/`.",
+        ),
+        _ => None,
+    }
+}
+
+/// Range of the key at `path` (`["configurations", "elastic", ...]`), or of
+/// the nearest ancestor key that is written.
+fn path_range(source: &str, path: &[&str]) -> Range {
+    let lines: Vec<&str> = source.split_inclusive('\n').collect();
+    let keys = key_lines(&lines);
+    for depth in (1..=path.len()).rev() {
+        let want = &path[..depth];
+        if let Some(k) = keys
+            .iter()
+            .find(|k| k.path.len() == want.len() && k.path.iter().zip(want).all(|(a, b)| a == b))
+        {
+            let line_start: usize = lines[..k.line].iter().map(|l| l.len()).sum();
+            let key = want[depth - 1];
+            let col = lines[k.line].find(key).unwrap_or(0);
+            let start = line_start + col;
+            return span_to_range(source, ByteSpan::new(start, start + key.len()));
+        }
+    }
+    Range::point(0, 0)
+}
+
+/// Kibana's risk score band for an `alert_severity` value ([elastic-1.0]
+/// Severity and risk): Informational and Low map to `low`.
+fn risk_band(alert_severity: &str) -> Option<(&'static str, i64, i64)> {
+    match alert_severity.to_ascii_lowercase().as_str() {
+        "informational" | "low" => Some(("low", 0, 21)),
+        "medium" => Some(("medium", 22, 47)),
+        "high" => Some(("high", 48, 73)),
+        "critical" => Some(("critical", 74, 100)),
+        _ => None,
+    }
+}
+
+/// Techniques a rule inherits through `detection_model`: the objective's
+/// `mitre_attack`, else those of its threats.
+fn inherited_techniques(detection_model: &str, workspace: &[IndexedObject]) -> Vec<String> {
+    let strings = |v: Option<&serde_yaml::Value>| -> Vec<String> {
+        v.and_then(|v| v.as_sequence())
+            .map(|s| {
+                s.iter()
+                    .filter_map(|t| t.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let Some(objective) = workspace
+        .iter()
+        .find(|o| o.object_type == "objective" && o.uuid == detection_model)
+    else {
+        return Vec::new();
+    };
+    let body = objective.body.get("objective");
+    let own = strings(body.and_then(|b| b.get("mitre_attack")));
+    if !own.is_empty() {
+        return own;
+    }
+    strings(body.and_then(|b| b.get("threats")))
+        .iter()
+        .filter_map(|id| {
+            workspace
+                .iter()
+                .find(|o| o.object_type == "threat" && &o.uuid == id)
+        })
+        .flat_map(|t| strings(t.body.get("threat").and_then(|b| b.get("mitre_attack"))))
+        .collect()
+}
+
+/// [elastic-1.0] Advisories that read the block, not its query: `lookback`
+/// zero or over an hour, a threshold rule whose `lookback` exceeds its
+/// `interval`, an explicit risk score outside its severity's band, and
+/// techniques that deploy skips because they are not Enterprise ATT&CK.
+pub(crate) fn block_advisories(
+    source: &str,
+    rule: &serde_yaml::Value,
+    workspace: &[IndexedObject],
+) -> Vec<Diagnostic> {
+    let Some(block) = rule.get("configurations").and_then(|c| c.get("elastic")) else {
+        return Vec::new();
+    };
+    let base = ["configurations", "elastic"];
+    let at = |rest: &[&str]| -> (Range, Vec<String>) {
+        let path: Vec<&str> = base.iter().chain(rest).copied().collect();
+        (
+            path_range(source, &path),
+            path.iter().map(|s| s.to_string()).collect(),
+        )
+    };
+    let warn = |code: &str, message: String, rest: &[&str]| {
+        let (range, path) = at(rest);
+        Diagnostic::warning(code, message, range).with_field_path(path)
+    };
+    let mut out = Vec::new();
+
+    let scheduling = block.get("scheduling");
+    let read = |key: &str| scheduling.and_then(|s| s.get(key)).and_then(|v| v.as_str());
+    let lookback_text = read("lookback");
+    let interval_text = read("interval").unwrap_or("5m");
+    let lookback = lookback_text.map_or(Some(60_000), duration_millis);
+    let interval = duration_millis(interval_text);
+    if let Some(lookback) = lookback {
+        if lookback_text.is_some() && lookback == 0 {
+            out.push(warn(
+                codes::LOOKBACK_ZERO,
+                "scheduling.lookback is zero: the next run starts as this window ends, so late events are missed; Elastic recommends at least 1m".into(),
+                &["scheduling", "lookback"],
+            ));
+        }
+        if lookback > 3_600_000 {
+            out.push(warn(
+                codes::LOOKBACK_LONG,
+                "scheduling.lookback exceeds 1h: in Elastic it is overlap added to interval, not the whole query window as in Sentinel".into(),
+                &["scheduling", "lookback"],
+            ));
+        }
+        let rule_type = block.get("type").and_then(|v| v.as_str());
+        if rule_type == Some("threshold") && interval.is_some_and(|i| lookback > i) {
+            out.push(warn(
+                codes::THRESHOLD_LOOKBACK,
+                format!(
+                    "threshold rule's lookback exceeds its interval ({interval_text}): threshold counts are not de-duplicated across overlapping runs"
+                ),
+                &["scheduling", "lookback"],
+            ));
+        }
+    }
+
+    let risk = block.get("risk");
+    let score = risk
+        .and_then(|r| r.as_i64())
+        .map(|s| (s, ["risk"].as_slice()))
+        .or_else(|| {
+            risk.and_then(|r| r.get("score"))
+                .and_then(|s| s.as_i64())
+                .map(|s| (s, ["risk", "score"].as_slice()))
+        });
+    if let Some((score, key)) = score {
+        let severity = block.get("severity");
+        let level = severity
+            .and_then(|s| s.as_str())
+            .or_else(|| {
+                severity
+                    .and_then(|s| s.get("default"))
+                    .and_then(|d| d.as_str())
+            })
+            .or_else(|| {
+                rule.get("response")
+                    .and_then(|r| r.get("alert_severity"))
+                    .and_then(|s| s.as_str())
+            })
+            .unwrap_or("Informational");
+        if let Some((band, low, high)) = risk_band(level) {
+            if (0..=100).contains(&score) && !(low..=high).contains(&score) {
+                out.push(warn(
+                    codes::RISK_BAND,
+                    format!(
+                        "risk score {score} is outside Kibana's {band} band ({low}–{high}) for alert severity {level}"
+                    ),
+                    key,
+                ));
+            }
+        }
+    }
+
+    if let Some(att) = bundled_vocabs().get("att&ck") {
+        let own: Vec<String> = rule
+            .get("techniques")
+            .and_then(|t| t.as_sequence())
+            .map(|s| {
+                s.iter()
+                    .filter_map(|t| t.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let model = rule.get("detection_model").and_then(|m| m.as_str());
+        let inherited = model
+            .map(|m| inherited_techniques(m, workspace))
+            .unwrap_or_default();
+        let mut seen = std::collections::BTreeSet::new();
+        for (id, is_own) in own
+            .iter()
+            .map(|t| (t, true))
+            .chain(inherited.iter().map(|t| (t, false)))
+        {
+            if !seen.insert(id.clone()) {
+                continue;
+            }
+            let Some(name) = att.get(id).and_then(|k| k.title.as_deref()) else {
+                continue;
+            };
+            if name.starts_with("Mobile : ") || name.starts_with("Industrial : ") {
+                let (key, how) = if is_own {
+                    ("techniques", "")
+                } else {
+                    ("detection_model", ", inherited through detection_model,")
+                };
+                out.push(
+                    Diagnostic::warning(
+                        codes::TECHNIQUE_NOT_ENTERPRISE,
+                        format!(
+                            "{id} ({name}){how} is not Enterprise ATT&CK; Elastic deploy skips it from the rule's threat mapping"
+                        ),
+                        path_range(source, &[key]),
+                    )
+                    .with_field_path(vec![key.to_string()]),
+                );
+            }
+        }
     }
     out
 }
@@ -424,6 +740,99 @@ pub(crate) fn maxspan_advisories(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn advisory_codes(source: &str, workspace: &[IndexedObject]) -> Vec<String> {
+        let rule: serde_yaml::Value = serde_yaml::from_str(source).unwrap();
+        block_advisories(source, &rule, workspace)
+            .into_iter()
+            .map(|d| d.code)
+            .collect()
+    }
+
+    fn block(extra: &str) -> String {
+        format!("name: r\nconfigurations:\n  elastic:\n    type: query\n    query: x\n{extra}")
+    }
+
+    #[test]
+    fn lookback_advisories() {
+        assert_eq!(advisory_codes(&block(""), &[]), Vec::<String>::new());
+        let zero = block("    scheduling:\n      lookback: 0m\n");
+        assert_eq!(advisory_codes(&zero, &[]), vec![codes::LOOKBACK_ZERO]);
+        let long = block("    scheduling:\n      lookback: 2h\n");
+        assert_eq!(advisory_codes(&long, &[]), vec![codes::LOOKBACK_LONG]);
+        let threshold = "name: r\nconfigurations:\n  elastic:\n    type: threshold\n    scheduling:\n      interval: 5m\n      lookback: 10m\n";
+        assert_eq!(
+            advisory_codes(threshold, &[]),
+            vec![codes::THRESHOLD_LOOKBACK]
+        );
+        let rule: serde_yaml::Value = serde_yaml::from_str(&zero).unwrap();
+        let d = &block_advisories(&zero, &rule, &[])[0];
+        assert_eq!(d.range.start.line, 6, "points at the lookback key");
+        assert_eq!(
+            d.field_path.as_deref().unwrap().join("."),
+            "configurations.elastic.scheduling.lookback"
+        );
+    }
+
+    #[test]
+    fn risk_score_band_follows_the_alert_severity() {
+        assert!(advisory_codes(&block("    severity: High\n    risk: 73\n"), &[]).is_empty());
+        assert_eq!(
+            advisory_codes(&block("    severity: High\n    risk: 90\n"), &[]),
+            vec![codes::RISK_BAND]
+        );
+        assert_eq!(
+            advisory_codes(
+                &block("    severity:\n      default: low\n    risk:\n      score: 50\n"),
+                &[]
+            ),
+            vec![codes::RISK_BAND]
+        );
+        let from_response = format!(
+            "response:\n  alert_severity: Critical\n{}",
+            block("    risk: 99\n")
+        );
+        assert!(advisory_codes(&from_response, &[]).is_empty());
+        // Informational is Kibana's low band.
+        assert_eq!(
+            advisory_codes(&block("    risk: 30\n"), &[]),
+            vec![codes::RISK_BAND]
+        );
+    }
+
+    #[test]
+    fn non_enterprise_techniques_are_reported_with_their_source() {
+        let own = format!("techniques:\n  - T1059\n  - T1626\n{}", block(""));
+        assert_eq!(
+            advisory_codes(&own, &[]),
+            vec![codes::TECHNIQUE_NOT_ENTERPRISE]
+        );
+        let objective = IndexedObject {
+            path: "objectives/o.yaml".into(),
+            object_type: "objective".into(),
+            uuid: "o-1".into(),
+            name: "o".into(),
+            body: serde_yaml::from_str("objective:\n  threats: [t-1]\n").unwrap(),
+        };
+        let threat = IndexedObject {
+            path: "threats/t.yaml".into(),
+            object_type: "threat".into(),
+            uuid: "t-1".into(),
+            name: "t".into(),
+            body: serde_yaml::from_str("threat:\n  mitre_attack: [T1626, T1059]\n").unwrap(),
+        };
+        let inherited = format!("detection_model: o-1\n{}", block(""));
+        let source = inherited.clone();
+        let rule: serde_yaml::Value = serde_yaml::from_str(&source).unwrap();
+        let found = block_advisories(&source, &rule, &[objective, threat]);
+        assert_eq!(found.len(), 1);
+        assert!(
+            found[0].message.contains("inherited"),
+            "{}",
+            found[0].message
+        );
+        assert_eq!(found[0].range.start.line, 0);
+    }
 
     #[test]
     fn language_follows_type_and_language() {
@@ -509,6 +918,49 @@ configurations:
                 (
                     "configurations.elastic.threat.query".into(),
                     LanguageId::Kuery
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn elastic_hunts_take_their_declared_language() {
+        let src = "\
+response:
+  procedure:
+    searches:
+      - purpose: rare parents
+        system: elastic
+        language: esql
+        query: |
+          FROM logs-* | STATS c = COUNT(*) BY process.parent.name
+      - purpose: no language, not analysed
+        system: elastic
+        query: process.name:cmd.exe
+      - system: sentinel
+        language: kuery
+        query: SecurityEvent
+      - query: 'event.category:process'
+        language: kuery
+        system: elastic
+";
+        let inj = elastic_injections(src);
+        let found: Vec<_> = inj
+            .iter()
+            .map(|i| (i.field_path.join("."), i.language, i.inner.as_str()))
+            .collect();
+        assert_eq!(
+            found,
+            vec![
+                (
+                    "response.procedure.searches.0.query".into(),
+                    LanguageId::Esql,
+                    "FROM logs-* | STATS c = COUNT(*) BY process.parent.name"
+                ),
+                (
+                    "response.procedure.searches.3.query".into(),
+                    LanguageId::Kuery,
+                    "event.category:process"
                 ),
             ]
         );

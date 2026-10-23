@@ -337,6 +337,7 @@ pub mod codes {
     pub const EQL_UNSUPPORTED: &str = "eql_unsupported";
     pub const EQL_MAXSPAN_UNIT: &str = "eql_maxspan_unit";
     pub const EQL_MAXSPAN_WINDOW: &str = "eql_maxspan_window";
+    pub const EQL_MAXSPAN_LOOKBACK: &str = "eql_maxspan_lookback";
     pub const EQL_FUNCTION_ARITY: &str = "eql_function_arity";
     pub const EQL_CASE_SENSITIVE: &str = "eql_case_sensitive";
     pub const EQL_LITERAL_WILDCARD: &str = "eql_literal_wildcard";
@@ -349,6 +350,12 @@ pub mod codes {
     pub const LUCENE_MIXED_OPERATORS: &str = "lucene_mixed_operators";
     pub const LUCENE_ESCAPE: &str = "lucene_escape";
     pub const LUCENE_KUERY_SYNTAX: &str = "lucene_kuery_syntax";
+    // elastic-1.0 Advisories on the block itself (specifications#57).
+    pub const LOOKBACK_ZERO: &str = "lookback_zero";
+    pub const LOOKBACK_LONG: &str = "lookback_long";
+    pub const THRESHOLD_LOOKBACK: &str = "threshold_lookback";
+    pub const RISK_BAND: &str = "risk_band";
+    pub const TECHNIQUE_NOT_ENTERPRISE: &str = "technique_not_enterprise";
     pub const CROWDSTRIKE_UNSUPPORTED: &str = "crowdstrike_unsupported";
     pub const FILENAME_SLUG: &str = "filename_slug";
     pub const MISSING_AUTHOR: &str = "missing_author";

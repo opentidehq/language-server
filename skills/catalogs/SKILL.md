@@ -64,6 +64,7 @@ Injection, from `language_for_field_path`:
 | `configurations.defender_for_endpoint.query` | KQL |
 | `configurations.splunk.query` and legacy `configurations.splunk.search` | SPL |
 | `configurations.elastic.query` and `threat.query` | ES\|QL, EQL, kuery, or Lucene from `type` and `language` (`elastic_query_language`) |
+| `response.procedure.searches[].query` with `system: elastic` | the entry's `language`; none when omitted |
 | `configurations.crowdstrike.*` | unsupported |
 | markdown fields | HighlightSpec `markdown.*`, not a query engine |
 
