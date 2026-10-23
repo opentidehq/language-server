@@ -904,6 +904,24 @@
     "type": "completion_command",
     "named": true,
     "fields": {
+      "inference_id": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "parameter",
+            "named": true
+          },
+          {
+            "type": "quoted_identifier",
+            "named": true
+          }
+        ]
+      },
       "options": {
         "multiple": false,
         "required": false,
@@ -2012,6 +2030,10 @@
             "named": true
           },
           {
+            "type": "in_tuple",
+            "named": true
+          },
+          {
             "type": "inline_cast",
             "named": true
           },
@@ -2059,9 +2081,19 @@
           }
         ]
       },
+      "subquery": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "source_subquery",
+            "named": true
+          }
+        ]
+      },
       "value": {
         "multiple": true,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "array",
@@ -2121,6 +2153,73 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "in_tuple",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "array",
+          "named": true
+        },
+        {
+          "type": "binary_expression",
+          "named": true
+        },
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "comparison",
+          "named": true
+        },
+        {
+          "type": "function_call",
+          "named": true
+        },
+        {
+          "type": "inline_cast",
+          "named": true
+        },
+        {
+          "type": "null",
+          "named": true
+        },
+        {
+          "type": "number",
+          "named": true
+        },
+        {
+          "type": "parameter",
+          "named": true
+        },
+        {
+          "type": "parenthesized_expression",
+          "named": true
+        },
+        {
+          "type": "qualified_interval",
+          "named": true
+        },
+        {
+          "type": "qualified_name",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "unary_expression",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2998,6 +3097,16 @@
     "type": "metadata",
     "named": true,
     "fields": {
+      "bracket": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "[",
+            "named": false
+          }
+        ]
+      },
       "field": {
         "multiple": true,
         "required": true,

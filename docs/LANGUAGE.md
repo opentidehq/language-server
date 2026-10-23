@@ -82,6 +82,7 @@ Language id `esql` (`.esql`). Commands and keywords are case-insensitive. The ca
 | esql.grok | `grok_command` | `grok_command__valid`, `grok_command__invalid` | `keyword` |
 | esql.highlight | `highlight_command` | `highlight_command__valid`, `highlight_command__invalid` | `keyword` |
 | esql.in-expression | `in_expression` | `in_expression__valid`, `in_expression__invalid` | `keyword` |
+| esql.in-tuple | `in_tuple` | `in_tuple__valid`, `in_tuple__invalid` | `punctuation.bracket` |
 | esql.inline-cast | `inline_cast` | `inline_cast__valid`, `inline_cast__invalid` | `operator`, `type` |
 | esql.inline-stats | `inline_stats_command` | `inline_stats_command__valid`, `inline_stats_command__invalid` | `keyword` |
 | esql.ip-location | `ip_location_command` | `ip_location_command__valid`, `ip_location_command__invalid` | `keyword` |
