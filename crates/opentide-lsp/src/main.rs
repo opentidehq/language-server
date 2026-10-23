@@ -93,6 +93,12 @@ fn cmd_analyze(file: &Path, language: Option<&str>) -> Result<()> {
     let mut files = vec![(file.display().to_string(), text.clone())];
     if let Some(root) = find_objects_root(file) {
         collect_yaml(&root, &mut files)?;
+        if let Some(workspace) = root.parent() {
+            let config = workspace.join(opentide_analysis::ELASTIC_CONFIGURATION);
+            if let Ok(text) = std::fs::read_to_string(&config) {
+                files.push((config.display().to_string(), text));
+            }
+        }
     }
     let host = MemoryWorkspace { files };
     let response = opentide_analysis::analyze(

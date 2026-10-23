@@ -36,6 +36,14 @@ impl Session {
                     }
                 }
             }
+            // Tenants, for the stack version Elastic queries are checked against.
+            let config = root.join(opentide_analysis::ELASTIC_CONFIGURATION);
+            let path = config.display().to_string();
+            if !files.iter().any(|(e, _)| e == &path) {
+                if let Ok(text) = std::fs::read_to_string(&config) {
+                    files.push((path, text));
+                }
+            }
         }
         MemoryWorkspace { files }
     }

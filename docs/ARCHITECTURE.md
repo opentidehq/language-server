@@ -44,6 +44,8 @@ Tide object intelligence is generated from the installed opentide package (`open
 
 ## Diagnostics
 
+**Elastic stack version.** ES|QL availability is checked against the lowest `setup.version` declared across a rule block's target tenants in `.opentide/configurations/platforms/elastic.toml` (the block's `tenants`, or every tenant). A target without a version, or no configuration, means the 8.19 floor (specifications#59). A declared 9.4+ or Serverless target also drops `esql_metadata_id`, because Kibana adds `METADATA _id` itself there.
+
 Pydantic remains CLI authority. The LSP emits the same `{code, field_path, severity}` with real ranges. The engine may add **extra** query diagnostics inside `query: |`.
 
 ## Hosts

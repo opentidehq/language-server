@@ -170,3 +170,45 @@ fn injected_eql_reports_maxspan_against_the_schedule() {
         "{found:?}"
     );
 }
+
+#[test]
+fn declared_tenant_versions_reach_esql_checks() {
+    let rule = elastic_rule("esql", None, "FROM logs-* | WHERE host.name == \"x\"");
+    let config = "[[tenants]]\nname = \"prod\"\n[tenants.setup]\nversion = \"9.5\"\n";
+    let run = |files: Vec<(&str, &str)>| -> Vec<String> {
+        let host = MemoryWorkspace {
+            files: files
+                .into_iter()
+                .map(|(p, t)| (p.to_string(), t.to_string()))
+                .collect(),
+        };
+        analyze(
+            &host,
+            AnalyzeRequest {
+                uri: "objects/rules/r.yaml".into(),
+                language: LanguageId::TideYaml,
+                text: rule.clone(),
+            },
+        )
+        .diagnostics
+        .into_iter()
+        .map(|d| d.code)
+        .collect()
+    };
+    // No tenants: the 8.19 floor, where Kibana does not add METADATA _id.
+    assert!(
+        run(vec![("objects/rules/r.yaml", &rule)]).contains(&codes::ESQL_METADATA_ID.to_string())
+    );
+    // Every target declares 9.5: Kibana adds it, so the advisory goes.
+    let found = run(vec![
+        ("objects/rules/r.yaml", &rule),
+        (
+            "/ws/.opentide/configurations/platforms/elastic.toml",
+            config,
+        ),
+    ]);
+    assert!(
+        !found.contains(&codes::ESQL_METADATA_ID.to_string()),
+        "{found:?}"
+    );
+}

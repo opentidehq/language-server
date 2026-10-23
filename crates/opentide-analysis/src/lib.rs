@@ -54,6 +54,21 @@ pub fn index_workspace(host: &dyn WorkspaceHost) -> Vec<IndexedObject> {
         .collect()
 }
 
+/// Workspace-relative path of the Elastic platform configuration (elastic-1.0
+/// Tenant setup). Hosts include it in [`WorkspaceHost::documents`] when it
+/// exists.
+pub const ELASTIC_CONFIGURATION: &str = ".opentide/configurations/platforms/elastic.toml";
+
+/// Elastic tenants declared in the workspace, if the host supplies the
+/// configuration file.
+pub fn elastic_tenants(host: &dyn WorkspaceHost) -> Vec<opentide_tide::ElasticTenant> {
+    host.documents()
+        .iter()
+        .find(|(path, _)| path.replace('\\', "/").ends_with(ELASTIC_CONFIGURATION))
+        .map(|(_, text)| opentide_tide::elastic_tenants(text))
+        .unwrap_or_default()
+}
+
 pub fn analyze(host: &dyn WorkspaceHost, request: AnalyzeRequest) -> AnalyzeResponse {
     let workspace = if request.language == LanguageId::TideYaml {
         index_workspace(host)
@@ -114,6 +129,7 @@ pub fn analyze(host: &dyn WorkspaceHost, request: AnalyzeRequest) -> AnalyzeResp
                 path: &request.uri,
                 source: &request.text,
                 workspace: &workspace,
+                elastic_tenants: &elastic_tenants(host),
             });
             AnalyzeResponse {
                 diagnostics: r.diagnostics,

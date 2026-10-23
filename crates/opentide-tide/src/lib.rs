@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use std::sync::OnceLock;
 use uuid::Uuid;
 
-pub use elastic::{duration_millis, elastic_query_language};
+pub use elastic::{ElasticTenant, duration_millis, elastic_query_language, elastic_tenants};
 pub use intel::{
     TideInlay, completions_tide, field_markdown, hover_tide, inlay_hints, resolve_completion,
 };
@@ -354,6 +354,9 @@ pub struct AnalyzeInput<'a> {
     pub path: &'a str,
     pub source: &'a str,
     pub workspace: &'a [IndexedObject],
+    /// Tenants from `.opentide/configurations/platforms/elastic.toml`, for
+    /// the stack version Elastic queries are checked against.
+    pub elastic_tenants: &'a [ElasticTenant],
 }
 
 pub struct TideAnalyzeResult {
@@ -776,7 +779,20 @@ pub fn analyze(input: AnalyzeInput<'_>) -> TideAnalyzeResult {
             LanguageId::Esql | LanguageId::Eql | LanguageId::Kuery | LanguageId::Lucene => {
                 let (found, query_tokens) = match inj.language {
                     LanguageId::Esql => {
-                        let r = opentide_esql::analyze(&inj.inner);
+                        // Hunts have no tenants; only the rule block is targeted.
+                        let target = (inj.field_path.first().map(String::as_str)
+                            == Some("configurations"))
+                        .then(|| {
+                            elastic::stack_target(
+                                object
+                                    .configurations
+                                    .as_ref()
+                                    .and_then(|c| c.get("elastic")),
+                                input.elastic_tenants,
+                            )
+                        })
+                        .flatten();
+                        let r = opentide_esql::analyze_for(&inj.inner, target);
                         (r.diagnostics, r.tokens)
                     }
                     LanguageId::Eql => {
@@ -1554,6 +1570,7 @@ meta:
             path: "objects/rules/legacy.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         let diag = r
             .diagnostics
@@ -1579,6 +1596,7 @@ meta:
             path: "objects/rules/overlay.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         install_deprecation_overlay(Vec::new());
         assert!(
@@ -1613,6 +1631,7 @@ threat:
             path: "objects/threats/t.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         let diag = r
             .diagnostics
@@ -1681,6 +1700,7 @@ threat:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: &src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.diagnostics.iter().any(|d| d.code == codes::VOCAB_UNKNOWN),
@@ -1696,6 +1716,7 @@ threat:
             path: "x.yaml",
             source: &src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(r.diagnostics.iter().any(|d| d.code == codes::INVALID_UUID));
     }
@@ -1710,6 +1731,7 @@ threat:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: &src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             !r.diagnostics.iter().any(|d| {
@@ -1726,6 +1748,7 @@ threat:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: RULE,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.diagnostics.iter().any(|d| d.code == codes::INVALID_REF),
@@ -1740,6 +1763,7 @@ threat:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: RULE,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.tokens.iter().any(|t| t.capture == "tide.property"),
@@ -1776,6 +1800,7 @@ threat:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: RULE,
             workspace: &[],
+            elastic_tenants: &[],
         });
         let uuid_vals = token_text(RULE, &r.tokens, "tide.uuid");
         assert!(
@@ -1814,6 +1839,7 @@ configurations:
             path: "objects/rules/carbon-black-rule.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         let lucene: Vec<_> = r
             .diagnostics
@@ -1869,6 +1895,7 @@ configurations:
             path: "objects/rules/hunt.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.tokens
@@ -1908,6 +1935,7 @@ configurations:
             path: "objects/rules/sentinel-kql-rule.yaml",
             source: RULE,
             workspace: &[obj],
+            elastic_tenants: &[],
         });
         assert!(r.diagnostics.iter().any(|d| d.code == codes::DUPLICATE_ID));
     }
@@ -1928,6 +1956,7 @@ threat:
             path: "objects/threats/threat.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.diagnostics
@@ -1945,6 +1974,7 @@ threat:
             path: "objects/rules/x.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(
             r.diagnostics
@@ -1959,6 +1989,7 @@ threat:
             path: "objects/rules/not-the-slug.yaml",
             source: RULE,
             workspace: &[],
+            elastic_tenants: &[],
         });
         assert!(r.diagnostics.iter().any(|d| d.code == codes::FILENAME_SLUG));
     }
@@ -1994,6 +2025,7 @@ configurations:
             path: "objects/rules/markdown-rule.yaml",
             source: src,
             workspace: &[],
+            elastic_tenants: &[],
         });
         let pairs: Vec<(&str, &str)> = r
             .tokens

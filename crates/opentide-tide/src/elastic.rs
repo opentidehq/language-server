@@ -526,6 +526,75 @@ pub(crate) fn value_docs(path: &str, value: &str) -> Option<&'static str> {
     }
 }
 
+/// An Elastic tenant from `.opentide/configurations/platforms/elastic.toml`:
+/// its name and its declared `setup.version`, if any (specifications#59).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ElasticTenant {
+    pub name: String,
+    pub version: Option<String>,
+}
+
+/// The `[[tenants]]` of an Elastic platform configuration file. A file that
+/// does not parse yields no tenants: configuration diagnostics are the
+/// configuration engine's job (#64), and unknown means the 8.19 floor.
+pub fn elastic_tenants(toml_text: &str) -> Vec<ElasticTenant> {
+    let Ok(doc) = toml_text.parse::<toml::Table>() else {
+        return Vec::new();
+    };
+    doc.get("tenants")
+        .and_then(|t| t.as_array())
+        .map(|tenants| {
+            tenants
+                .iter()
+                .filter_map(|t| {
+                    let name = t.get("name")?.as_str()?.to_string();
+                    let version = t
+                        .get("setup")
+                        .and_then(|s| s.get("version"))
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string);
+                    Some(ElasticTenant { name, version })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The stack an Elastic block's queries must run on: the lowest version
+/// declared across its target tenants (the block's `tenants`, or every
+/// tenant when omitted). `None` (the 8.19 floor) when there are no tenants,
+/// a target is unknown, or a target declares no valid version.
+pub(crate) fn stack_target(
+    block: Option<&serde_yaml::Value>,
+    tenants: &[ElasticTenant],
+) -> Option<opentide_esql::StackTarget> {
+    let named: Vec<&str> = block
+        .and_then(|b| b.get("tenants"))
+        .and_then(|t| t.as_sequence())
+        .map(|s| s.iter().filter_map(|v| v.as_str()).collect())
+        .unwrap_or_default();
+    let targets: Vec<&ElasticTenant> = if named.is_empty() {
+        tenants.iter().collect()
+    } else {
+        named
+            .iter()
+            .map(|n| tenants.iter().find(|t| t.name == *n))
+            .collect::<Option<_>>()?
+    };
+    if targets.is_empty() {
+        return None;
+    }
+    let versions: Option<Vec<_>> = targets
+        .iter()
+        .map(|t| {
+            t.version
+                .as_deref()
+                .and_then(opentide_esql::StackTarget::parse)
+        })
+        .collect();
+    opentide_esql::StackTarget::lowest(versions?)
+}
+
 /// Range of the key at `path` (`["configurations", "elastic", ...]`), or of
 /// the nearest ancestor key that is written.
 fn path_range(source: &str, path: &[&str]) -> Range {
@@ -780,6 +849,55 @@ mod tests {
 
     fn block(extra: &str) -> String {
         format!("name: r\nconfigurations:\n  elastic:\n    type: query\n    query: x\n{extra}")
+    }
+
+    #[test]
+    fn tenants_decide_the_stack_target() {
+        let toml = r#"
+[platform]
+identifier = "elastic"
+
+[[tenants]]
+name = "prod"
+[tenants.setup]
+version = "9.5"
+
+[[tenants]]
+name = "legacy"
+[tenants.setup]
+version = "8.19"
+
+[[tenants]]
+name = "unknown"
+[tenants.setup]
+ssl = true
+"#;
+        let tenants = elastic_tenants(toml);
+        assert_eq!(tenants.len(), 3);
+        let block = |names: &str| -> serde_yaml::Value {
+            serde_yaml::from_str(&format!("tenants: [{names}]")).unwrap()
+        };
+        let target =
+            |names: &str| stack_target(Some(&block(names)), &tenants).map(|t| t.to_string());
+        assert_eq!(target("prod"), Some("9.5".into()));
+        assert_eq!(target("prod, legacy"), Some("8.19".into()));
+        assert_eq!(
+            target("prod, unknown"),
+            None,
+            "a tenant without a version is the floor"
+        );
+        assert_eq!(target("missing"), None);
+        assert_eq!(
+            stack_target(None, &tenants),
+            None,
+            "every tenant, one unknown"
+        );
+        assert_eq!(
+            stack_target(None, &tenants[..1]).map(|t| t.to_string()),
+            Some("9.5".into())
+        );
+        assert_eq!(stack_target(None, &[]), None);
+        assert!(elastic_tenants("not toml [").is_empty());
     }
 
     #[test]

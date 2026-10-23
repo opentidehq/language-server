@@ -56,12 +56,43 @@ impl StackTarget {
         )))
     }
 
+    /// Whether this target is `version` or later. Serverless is later than
+    /// every `MAJOR.MINOR` (specifications#59).
+    pub fn at_least(self, version: StackVersion) -> bool {
+        match self {
+            Self::Serverless => true,
+            Self::Version(v) => v >= version,
+        }
+    }
+
+    /// The lowest of several targets: the one every target reaches.
+    pub fn lowest(targets: impl IntoIterator<Item = Self>) -> Option<Self> {
+        targets.into_iter().min()
+    }
+
     /// Index into [`RELEASES`] of the line this target is checked as.
     fn release(self) -> usize {
         match self {
             Self::Serverless => NEWEST,
             Self::Version(v) => RELEASES.iter().rposition(|r| *r <= v).unwrap_or(0),
         }
+    }
+}
+
+impl Ord for StackTarget {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::Serverless, Self::Serverless) => std::cmp::Ordering::Equal,
+            (Self::Serverless, Self::Version(_)) => std::cmp::Ordering::Greater,
+            (Self::Version(_), Self::Serverless) => std::cmp::Ordering::Less,
+            (Self::Version(a), Self::Version(b)) => a.cmp(b),
+        }
+    }
+}
+
+impl PartialOrd for StackTarget {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

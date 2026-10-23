@@ -146,8 +146,12 @@ pub fn analyze_for(source: &str, target: Option<StackTarget>) -> AnalyzeResult {
             }
         }
     });
-    if let Some(d) = metadata_id_advisory(root, source) {
-        diagnostics.push(d);
+    // Kibana 9.4 and later add `METADATA _id` themselves (elastic-1.0
+    // Advisories), so a declared 9.4+ or Serverless target skips the advisory.
+    if !target.is_some_and(|t| t.at_least(StackVersion::new(9, 4))) {
+        if let Some(d) = metadata_id_advisory(root, source) {
+            diagnostics.push(d);
+        }
     }
     let tokens = highlight(&spec, source, catalog);
     AnalyzeResult {
@@ -899,6 +903,29 @@ fn position_to_offset(source: &str, position: Position) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn declared_targets_order_and_skip_the_metadata_advisory() {
+        let t = |s: &str| StackTarget::parse(s).unwrap();
+        assert_eq!(
+            StackTarget::lowest([t("9.5"), t("8.19"), t("serverless")]),
+            Some(t("8.19"))
+        );
+        assert!(t("serverless").at_least(StackVersion::new(9, 4)));
+        assert!(!t("9.3").at_least(StackVersion::new(9, 4)));
+        let src = "FROM logs-* | WHERE a == 1";
+        let codes = |target| -> Vec<String> {
+            analyze_for(src, target)
+                .diagnostics
+                .into_iter()
+                .map(|d| d.code)
+                .collect()
+        };
+        assert!(codes(None).contains(&codes::ESQL_METADATA_ID.to_string()));
+        assert!(codes(Some(t("9.3"))).contains(&codes::ESQL_METADATA_ID.to_string()));
+        assert!(!codes(Some(t("9.4"))).contains(&codes::ESQL_METADATA_ID.to_string()));
+        assert!(!codes(Some(t("serverless"))).contains(&codes::ESQL_METADATA_ID.to_string()));
+    }
 
     fn codes_of(src: &str) -> Vec<String> {
         analyze(src)
