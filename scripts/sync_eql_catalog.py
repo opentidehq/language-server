@@ -9,7 +9,7 @@ case-insensitive `name~(` form, the argument counts Elasticsearch's function
 registry enforces, and the elastic.co anchor.
 
 Facts only. Elastic's prose is not copied (the docs are AGPL/SSPL/ELv2); the
-summaries below are this catalog's own words.
+function, parameter, and pipe summaries below are this catalog's own words.
 
 Usage:
     python scripts/sync_eql_catalog.py --elasticsearch ../elasticsearch
@@ -43,6 +43,42 @@ SUMMARIES = {
     "stringContains": "True when the source string contains the substring.",
     "substring": "Characters from `start_pos` up to `end_pos`; negative offsets count from the end.",
     "subtract": "Difference of two numbers. Same as binary `-`.",
+}
+
+# One line per parameter, keyed by (function, parameter) as the docs name
+# them. Our own wording, like SUMMARIES.
+PARAM_SUMMARIES = {
+    ("add", "addend"): "A number; `add` takes exactly two.",
+    ("between", "source"): "Text to search in.",
+    ("between", "left"): "Marker that precedes the wanted text; it is not part of the result.",
+    ("between", "right"): "Marker that follows the wanted text; it is not part of the result.",
+    ("between", "greedy_matching"): "`true` extends the match to the last `right`; `false` (the default) stops at the first.",
+    ("cidrMatch", "ip_address"): "An `ip`-typed field; a string literal is rejected.",
+    ("cidrMatch", "cidr_block"): "A CIDR range written as a string constant, for example `\"10.0.0.0/8\"`; list as many as needed.",
+    ("concat", "value"): "Any value, converted to text; list as many as needed.",
+    ("divide", "dividend"): "The number being divided.",
+    ("divide", "divisor"): "The number to divide by; must not be zero.",
+    ("endsWith", "source"): "Text to test.",
+    ("endsWith", "substring"): "Suffix to look for at the end of `source`.",
+    ("indexOf", "source"): "Text to search in.",
+    ("indexOf", "substring"): "Text to find.",
+    ("indexOf", "start_pos"): "Integer offset (from 0) where the search begins; 0 when omitted.",
+    ("length", "string"): "Text whose characters are counted.",
+    ("modulo", "dividend"): "The number being divided.",
+    ("modulo", "divisor"): "The number to divide by; the remainder is returned.",
+    ("multiply", "factor"): "A number; `multiply` takes exactly two.",
+    ("number", "string"): "Text that holds an integer or decimal number.",
+    ("number", "base_num"): "Integer radix to read the text in; 16 for a `0x` prefix, otherwise 10.",
+    ("startsWith", "source"): "Text to test.",
+    ("startsWith", "substring"): "Prefix to look for at the start of `source`.",
+    ("string", "value"): "Any value to turn into text.",
+    ("stringContains", "source"): "Text to search in.",
+    ("stringContains", "substring"): "Text to look for anywhere in `source`.",
+    ("substring", "source"): "Text to take a slice of.",
+    ("substring", "start_pos"): "Integer offset (from 0) of the first character kept; negative counts back from the end.",
+    ("substring", "end_pos"): "Integer offset where the slice stops, exclusive; the rest of the text when omitted.",
+    ("subtract", "minuend"): "The number to subtract from.",
+    ("subtract", "subtrahend"): "The number taken away; required, despite the docs.",
 }
 
 PIPE_SUMMARIES = {
@@ -125,6 +161,7 @@ def write_functions(es: Path, out: Path, commit: str) -> int:
             lines += [
                 "[[functions.parameters]]",
                 f"name = {toml_str(param.group(1))}",
+                f"docs = {toml_str(PARAM_SUMMARIES[(name, param.group(1))])}",
                 f"types = {json.dumps(types)}",
                 f"required = {str(required).lower()}",
                 "",

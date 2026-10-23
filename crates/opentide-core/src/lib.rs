@@ -341,6 +341,14 @@ pub mod codes {
     pub const EQL_FUNCTION_ARITY: &str = "eql_function_arity";
     pub const EQL_CASE_SENSITIVE: &str = "eql_case_sensitive";
     pub const EQL_LITERAL_WILDCARD: &str = "eql_literal_wildcard";
+    pub const EQL_NESTED_COMMENT: &str = "eql_nested_comment";
+    pub const EQL_EXPRESSION_DEPTH: &str = "eql_expression_depth";
+    pub const EQL_ARGUMENT_TYPE: &str = "eql_argument_type";
+    pub const EQL_FIELD_COMPARISON: &str = "eql_field_comparison";
+    pub const EQL_RUNS_IGNORED: &str = "eql_runs_ignored";
+    pub const EQL_UNTIL_TERM: &str = "eql_until_term";
+    pub const EQL_REGEX: &str = "eql_regex";
+    pub const EQL_MAXSPAN_MISSING: &str = "eql_maxspan_missing";
     pub const KUERY_PARSE_ERROR: &str = "kuery_parse_error";
     pub const KUERY_LUCENE_SYNTAX: &str = "kuery_lucene_syntax";
     pub const KUERY_ESCAPE: &str = "kuery_escape";
