@@ -19,6 +19,8 @@ eql = [
   "eql_function_arity",
   "eql_unsupported",
   "eql_maxspan_unit",
+  "eql_argument_type",
+  "eql_field_comparison",
 ]
 kuery = []
 lucene = []
