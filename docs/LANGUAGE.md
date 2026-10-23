@@ -144,6 +144,10 @@ Language id `eql` (`.eql`). Keywords are lowercase and reserved. Elastic Securit
 | eql.term-option | `term_option` | `term_option__valid`, `term_option__invalid` | `keyword` |
 | eql.time-unit | `time_unit` | `time_unit__valid`, `time_unit__invalid` | `constant` |
 
+Elasticsearch's lexer nests `/* */` comments; the grammar ends a comment at the first `*/`. The engine blanks the inner `/` and `*` of a comment Elasticsearch nests before parsing (byte offsets unchanged), so diagnostics, highlighting, and hover follow Elasticsearch, and it warns `eql_nested_comment`. The vendored grammar used on its own does not nest, so there is no `comment` corpus fixture for nesting.
+
+Checks beyond the grammar: `eql_argument_type` (literal types the Verifier rejects: errors for function arguments, warnings for `:`/`in~`/`regex` and arithmetic operands), `eql_field_comparison` (both sides of a comparison read fields), `eql_expression_depth` (over 250 levels: rejected by 8.19 and 9.3+, a warning), `eql_runs_ignored` (decimal `runs`), `eql_until_term` (`runs` or `![` on `until`), `eql_regex` (Lucene `RegExp` pitfalls), and the hint `eql_maxspan_missing`. `opentide_eql::sequences` gives each sequence's `maxspan` in milliseconds for rule-level scheduling checks.
+
 ## Kibana KQL (kuery)
 
 Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Language Elastic rules call `language: kuery`, not Microsoft KQL. `or`, `and`, and `not` are case-insensitive keywords; everything else is a literal.
