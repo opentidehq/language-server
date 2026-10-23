@@ -10,6 +10,7 @@ members = [
     "crates/opentide-eql",
     "crates/opentide-kuery",
     "crates/opentide-lucene",
+    "crates/opentide-ecs",
     "crates/opentide-tide",
     "crates/opentide-analysis",
     "crates/opentide-lsp",
@@ -34,6 +35,7 @@ opentide-esql = { path = "crates/opentide-esql" }
 opentide-eql = { path = "crates/opentide-eql" }
 opentide-kuery = { path = "crates/opentide-kuery" }
 opentide-lucene = { path = "crates/opentide-lucene" }
+opentide-ecs = { path = "crates/opentide-ecs" }
 opentide-tide = { path = "crates/opentide-tide" }
 opentide-analysis = { path = "crates/opentide-analysis" }
 serde = { version = "1", features = ["derive"] }

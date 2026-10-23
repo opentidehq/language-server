@@ -341,6 +341,7 @@ name = "opentide-analysis"
 version = "0.1.0"
 dependencies = [
  "opentide-core",
+ "opentide-ecs",
  "opentide-eql",
  "opentide-esql",
  "opentide-highlight",
@@ -361,6 +362,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "opentide-ecs"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

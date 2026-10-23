@@ -7,6 +7,8 @@ use opentide_highlight::{
 use opentide_kql::Profile;
 use opentide_tide::{IndexedObject, TideAnalyzeResult};
 
+mod ecs;
+
 /// Host-supplied workspace snapshot. The analysis crate never calls `std::fs`.
 pub trait WorkspaceHost {
     fn document(&self, uri: &str) -> Option<String>;
@@ -209,10 +211,14 @@ fn query_hover(
     match language {
         LanguageId::Kql => opentide_kql::hover(text, position, defender_profile(field_path)),
         LanguageId::Spl => opentide_spl::hover(text, position),
-        LanguageId::Esql => opentide_esql::hover(text, position),
-        LanguageId::Eql => opentide_eql::hover(text, position),
-        LanguageId::Kuery => opentide_kuery::hover(text, position),
-        LanguageId::Lucene => opentide_lucene::hover(text, position),
+        LanguageId::Esql => opentide_esql::hover(text, position)
+            .or_else(|| ecs::hover(text, offset_at_position(text, position))),
+        LanguageId::Eql => opentide_eql::hover(text, position)
+            .or_else(|| ecs::hover(text, offset_at_position(text, position))),
+        LanguageId::Kuery => opentide_kuery::hover(text, position)
+            .or_else(|| ecs::hover(text, offset_at_position(text, position))),
+        LanguageId::Lucene => opentide_lucene::hover(text, position)
+            .or_else(|| ecs::hover(text, offset_at_position(text, position))),
         LanguageId::TideYaml => None,
     }
 }
@@ -244,10 +250,16 @@ fn query_completions(
     match language {
         LanguageId::Kql => opentide_kql::completions(text, offset, defender_profile(field_path)),
         LanguageId::Spl => opentide_spl::completions(text, offset),
-        LanguageId::Esql => opentide_esql::completions(text, offset),
-        LanguageId::Eql => opentide_eql::completions(text, offset),
-        LanguageId::Kuery => opentide_kuery::completions(text, offset),
-        LanguageId::Lucene => opentide_lucene::completions(text, offset),
+        LanguageId::Esql | LanguageId::Eql | LanguageId::Kuery | LanguageId::Lucene => {
+            let mut items = match language {
+                LanguageId::Esql => opentide_esql::completions(text, offset),
+                LanguageId::Eql => opentide_eql::completions(text, offset),
+                LanguageId::Kuery => opentide_kuery::completions(text, offset),
+                _ => opentide_lucene::completions(text, offset),
+            };
+            ecs::complete(language, text, offset, &mut items);
+            items
+        }
         LanguageId::TideYaml => Vec::new(),
     }
 }

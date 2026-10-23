@@ -24,7 +24,7 @@ The **CLI never speaks JSON-RPC**. `--stdio` / `--listen` is the editor protocol
 
 ## Hard rules
 
-- I/O-free engine crates (`opentide-kql`, `opentide-spl`, `opentide-esql`, `opentide-eql`, `opentide-kuery`, `opentide-lucene`, `opentide-tide`, `opentide-analysis`). No `std::fs`.
+- I/O-free engine crates (`opentide-kql`, `opentide-spl`, `opentide-esql`, `opentide-eql`, `opentide-kuery`, `opentide-lucene`, `opentide-ecs`, `opentide-tide`, `opentide-analysis`). No `std::fs`.
 - HighlightSpec capture rename is a **major**.
 - Never fake CrowdStrike validation.
 - Control commands (`.show` / `.create`) → `kql_control_command_unsupported`.
@@ -45,6 +45,7 @@ The **CLI never speaks JSON-RPC**. `--stdio` / `--listen` is the editor protocol
 | `opentide-eql` | EQL catalog, sequence/sample/pipe rules, `eql_*` diagnostics |
 | `opentide-kuery` | Kibana KQL checks, Lucene-syntax-in-kuery warnings |
 | `opentide-lucene` | Lucene `query_string` checks, kuery-syntax-in-Lucene warnings |
+| `opentide-ecs` | Elastic Common Schema field catalog (completion, hover; never a closed list) |
 | `opentide-tide` | Schemas, vocabs, UUID graph, YAML injection remap |
 | `opentide-analysis` | `WorkspaceHost` orchestrator |
 | `opentide-lsp` | stdio LSP + CLI |

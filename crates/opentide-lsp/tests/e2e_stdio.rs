@@ -675,4 +675,22 @@ configurations:
         .cloned()
         .unwrap_or_default();
     assert!(data.len() >= 10, "semantic tokens for .esql: {tokens}");
+
+    // ECS completion replaces the dotted prefix already typed.
+    let text = "host.name:x and process.pa";
+    published_codes(&mut lsp, "file:///tmp/c.kuery", "plaintext", text);
+    let items = lsp.request(
+        "textDocument/completion",
+        json!({
+            "textDocument": { "uri": "file:///tmp/c.kuery" },
+            "position": { "line": 0, "character": text.len() }
+        }),
+    );
+    let item = items["result"]
+        .as_array()
+        .and_then(|a| a.iter().find(|i| i["label"] == "process.parent.name"))
+        .cloned()
+        .unwrap_or_else(|| panic!("ECS field completion: {items}"));
+    assert_eq!(item["textEdit"]["range"]["start"]["character"], 16, "{item}");
+    assert_eq!(item["textEdit"]["newText"], "process.parent.name");
 }

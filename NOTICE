@@ -1,0 +1,11 @@
+opentide language server
+Licensed under the EUPL-1.2 (see LICENSE).
+
+The binary embeds the following third-party data:
+
+Elastic Common Schema (catalogs/ecs/fields.json, generated from
+elastic/ecs v9.5.0 by scripts/sync_ecs_fields.py)
+Copyright 2018-2021 Elasticsearch B.V.
+Licensed under the Apache License, Version 2.0 (catalogs/ecs/LICENSE.txt,
+catalogs/ecs/NOTICE). The field list is reformatted; allowed-value
+descriptions are cut to their first sentence.
