@@ -149,6 +149,8 @@ fn kql_named_rules_in_grammar_json_are_known() {
         "hint_name",
         "parse_column",
         "mv_expand_item",
+        "mv_option",
+        "series_aggregate",
         "star",
     ]
     .into_iter()

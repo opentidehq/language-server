@@ -727,7 +727,7 @@
             "named": false
           },
           {
-            "type": "column_item",
+            "type": "series_aggregate",
             "named": true
           }
         ]
@@ -766,9 +766,19 @@
           }
         ]
       },
+      "range": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "function_call",
+            "named": true
+          }
+        ]
+      },
       "step": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "expression",
@@ -792,7 +802,7 @@
       "required": false,
       "types": [
         {
-          "type": "hint_option",
+          "type": "mv_option",
           "named": true
         }
       ]
@@ -899,7 +909,7 @@
       "required": false,
       "types": [
         {
-          "type": "operator_option",
+          "type": "mv_option",
           "named": true
         }
       ]
@@ -962,10 +972,60 @@
       "required": false,
       "types": [
         {
-          "type": "operator_option",
+          "type": "mv_option",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "mv_option",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "bagexpansion",
+            "named": false
+          },
+          {
+            "type": "hint_name",
+            "named": true
+          },
+          {
+            "type": "kind",
+            "named": false
+          },
+          {
+            "type": "with_itemindex",
+            "named": false
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -992,32 +1052,12 @@
         "required": true,
         "types": [
           {
-            "type": "bagexpansion",
-            "named": false
-          },
-          {
-            "type": "flags",
-            "named": false
-          },
-          {
             "type": "hint_name",
             "named": true
           },
           {
-            "type": "isfuzzy",
-            "named": false
-          },
-          {
-            "type": "kind",
-            "named": false
-          },
-          {
-            "type": "with_itemindex",
-            "named": false
-          },
-          {
-            "type": "withsource",
-            "named": false
+            "type": "identifier",
+            "named": true
           }
         ]
       },
@@ -1455,6 +1495,32 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "series_aggregate",
+    "named": true,
+    "fields": {
+      "default": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "expression",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "column_item",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2178,6 +2244,10 @@
     "named": false
   },
   {
+    "type": "default",
+    "named": false
+  },
+  {
     "type": "desc",
     "named": false
   },
@@ -2227,10 +2297,6 @@
   },
   {
     "type": "first",
-    "named": false
-  },
-  {
-    "type": "flags",
     "named": false
   },
   {
@@ -2327,10 +2393,6 @@
   },
   {
     "type": "in~",
-    "named": false
-  },
-  {
-    "type": "isfuzzy",
     "named": false
   },
   {
@@ -2563,10 +2625,6 @@
   },
   {
     "type": "with_itemindex",
-    "named": false
-  },
-  {
-    "type": "withsource",
     "named": false
   },
   {

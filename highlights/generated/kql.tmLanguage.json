@@ -29,7 +29,7 @@
     },
     {
       "comment": "capture:keyword",
-      "match": "(?i)(?<![A-Za-z0-9_])(?:and|as|asc|by|consume|datatable|desc|distinct|evaluate|extend|externaldata|facet|filter|find|first|fork|from|getschema|graph\\-mark\\-components|graph\\-match|graph\\-shortest\\-paths|graph\\-to\\-table|invoke|join|kind|last|let|limit|lookup|make\\-graph|make\\-series|mv\\-apply|mv\\-expand|mvexpand|nulls|on|order|parse|parse\\-kv|parse\\-where|partition|print|project|project\\-away|project\\-keep|project\\-rename|project\\-reorder|range|reduce|render|sample|sample\\-distinct|scan|search|serialize|sort|step|summarize|take|to|top|top\\-hitters|top\\-nested|typeof|union|where|with)(?![A-Za-z0-9_])",
+      "match": "(?i)(?<![A-Za-z0-9_])(?:and|as|asc|by|consume|datatable|default|desc|distinct|evaluate|extend|externaldata|facet|filter|find|first|fork|from|getschema|graph\\-mark\\-components|graph\\-match|graph\\-shortest\\-paths|graph\\-to\\-table|invoke|join|kind|last|let|limit|lookup|make\\-graph|make\\-series|mv\\-apply|mv\\-expand|mvexpand|nulls|on|order|parse|parse\\-kv|parse\\-where|partition|print|project|project\\-away|project\\-keep|project\\-rename|project\\-reorder|range|reduce|render|sample|sample\\-distinct|scan|search|serialize|sort|step|summarize|take|to|top|top\\-hitters|top\\-nested|typeof|union|where|with)(?![A-Za-z0-9_])",
       "name": "keyword.control.opentide"
     },
     {

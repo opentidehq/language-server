@@ -22,7 +22,7 @@ Tide YAML already has its oracle: `tide_corpus.rs` runs the opentide CLI's Pydan
 
 Each query runs through `opentide-lsp analyze` and through the reference.
 
-**Verdicts.** Ours rejects a query when it reports `kql_parse_error` or `kql_unknown_operator` (`spl_parse_error` or `spl_unknown_command` for SPL). The reference rejects it when it reports an error. A query where they differ must be listed by path in `testdata/oracles/exceptions.toml`. A `.broken.` fixture the reference accepts always fails: its injected fault breaks nothing.
+**Verdicts.** Ours rejects a query when it reports `kql_parse_error` or `kql_unknown_operator` (`spl_parse_error` or `spl_unknown_command` for SPL). The reference rejects it when it reports an error. A query where they differ must be listed by path in `testdata/oracles/exceptions.toml`. A `.broken.` fixture the reference accepts always fails: its injected fault breaks nothing. A probe in `testdata/oracles/<lang>/` is a valid detection form, so any error-severity diagnostic from ours on it fails too (an unknown table or function there is a false positive).
 
 **Names.** KQL: `catalogs/kql/core/functions.toml` and `evaluate-plugins.toml` against the functions, aggregates and plugins in Kusto.Language's `GlobalState.Default`, plus any name ours flags `kql_unknown_function` that Kusto.Language knows. SPL: `catalogs/spl/commands.toml` against the `*-command` stanzas and aliases in `searchbnf.conf`, plus any name ours flags `spl_unknown_command` that Splunk knows. Every disagreeing name must be listed.
 

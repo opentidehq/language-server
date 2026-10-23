@@ -18,7 +18,8 @@
 # ---------------------------------------------------------------------------
 
 # Probes in testdata/oracles/kql/ are one form each, taken from real Sentinel
-# and Defender rules. All of them parse; a probe listed here is a regression.
+# and Defender rules. Ours must accept each with no error-severity diagnostic;
+# that check cannot be excepted.
 
 # Corpus fixtures labelled invalid that Kusto.Language accepts.
 
@@ -87,7 +88,8 @@ names = [
 # ---------------------------------------------------------------------------
 
 # Probes in testdata/oracles/spl/ are one form each, taken from ESCU
-# detections. All of them parse; a probe listed here is a regression.
+# detections. Ours must accept each with no error-severity diagnostic; that
+# check cannot be excepted.
 
 # Corpus fixtures labelled invalid that Splunk's parser accepts. Each is kept
 # on purpose: the form is always an authoring mistake in a detection.

@@ -6506,7 +6506,7 @@ required = true
 # - _GetWatchlist
 # - workspace
 
-# Added from Learn for the Kusto.Language oracle (testdata/oracles/exceptions.toml).
+# Added from Learn for the KQL oracle (testdata/oracles/exceptions.toml).
 [[functions]]
 name = "around"
 signature = "around(value, center, delta)"

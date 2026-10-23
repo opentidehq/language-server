@@ -549,7 +549,7 @@ name = "external_artifacts"
 docs = "A property bag of name and URL pairs for artifacts that are accessible from cloud storage."
 required = false
 
-# Added from Learn for the Kusto.Language oracle. Plugins that call external HTTP or AI services are am_no.
+# Added from Learn for the KQL oracle. Plugins that call external HTTP or AI services are am_no.
 [[plugins]]
 name = "active_users_count"
 signature = "active_users_count(IdColumn, TimelineColumn, Start, End, LookbackWindow, Period, ActivePeriodsCount, Bin, [dim1, dim2, ...])"

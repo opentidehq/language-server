@@ -73,6 +73,10 @@ class Query:
     text: str
     broken: bool
 
+    @property
+    def probe(self) -> bool:
+        return self.id.startswith("testdata/oracles/")
+
 
 def corpus(language: str) -> list[Query]:
     files = sorted(
@@ -276,6 +280,8 @@ class Splunk:
                 status, body = self.request("GET", "/services/server/info")
                 if status == 200:
                     return body["entry"][0]["content"]
+                if status == 401:
+                    sys.exit(f"Splunk at {self.url} rejected SPLUNK_USERNAME/SPLUNK_PASSWORD")
             except (urllib.error.URLError, OSError):
                 pass
             if time.monotonic() > deadline:
@@ -476,6 +482,12 @@ def compare(
             continue
         if query.broken and not theirs:
             errors.append(f"{query.id}: {oracle} accepts this .broken. fixture; move its fault out of comments and strings")
+        if query.probe:
+            # A probe is a valid detection form: no error from ours at all, not
+            # only no syntax error (unknown table, unknown function, ...).
+            for d in diagnostics[query.id]:
+                if d["severity"] == "error" and d["code"] not in REJECT[language]:
+                    errors.append(f"{query.id}: ours reports {d['code']} on a probe: {d['message']}")
         ident = known.paths.get(query.id)
         if bool(ours_errors) == bool(theirs):
             if ident:

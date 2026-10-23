@@ -116,22 +116,21 @@ module.exports = grammar({
         "]",
       ),
 
-    // `kind=inner`, `isfuzzy=true`, `hint.strategy=shuffle`. The names are a
-    // fixed set so `mv-expand a = b` stays a named column.
+    // `kind=inner`, `isfuzzy=true`, `hint.strategy=shuffle`. Where options
+    // precede a table or column (join, union, lookup, parse), `name =` can only
+    // be an option, so any name is accepted and columns keep names like `flags`.
     operator_option: ($) =>
       seq(
-        field(
-          "name",
-          choice(
-            "kind",
-            "isfuzzy",
-            "withsource",
-            "bagexpansion",
-            "with_itemindex",
-            "flags",
-            $.hint_name,
-          ),
-        ),
+        field("name", choice($.identifier, $.hint_name)),
+        "=",
+        field("value", choice($.identifier, $.boolean, $.number, $.string)),
+      ),
+
+    // mv-expand, mv-apply and make-series items can be `Name = ...`, so their options are
+    // a fixed set of names.
+    mv_option: ($) =>
+      seq(
+        field("name", choice("kind", "bagexpansion", "with_itemindex", $.hint_name)),
         "=",
         field("value", choice($.identifier, $.boolean, $.number, $.string)),
       ),
@@ -271,7 +270,7 @@ module.exports = grammar({
     mv_expand_operator: ($) =>
       seq(
         choice("mv-expand", "mvexpand"),
-        repeat($.operator_option),
+        repeat($.mv_option),
         field("columns", commaSep1($.mv_expand_item)),
         optional(seq("limit", field("limit", $.expression))),
       ),
@@ -285,7 +284,7 @@ module.exports = grammar({
     mv_apply_operator: ($) =>
       seq(
         "mv-apply",
-        repeat($.operator_option),
+        repeat($.mv_option),
         field("columns", commaSep1($.mv_expand_item)),
         optional(seq("limit", field("limit", $.expression))),
         "on",
@@ -297,16 +296,26 @@ module.exports = grammar({
     make_series_operator: ($) =>
       seq(
         "make-series",
-        repeat($.hint_option),
-        field("aggregates", commaSep1($.column_item)),
+        repeat($.mv_option),
+        field("aggregates", commaSep1($.series_aggregate)),
         "on",
         field("axis", $.expression),
-        optional(seq("from", field("from", $.expression))),
-        optional(seq("to", field("to", $.expression))),
-        "step",
-        field("step", $.expression),
+        choice(
+          seq(
+            optional(seq("from", field("from", $.expression))),
+            optional(seq("to", field("to", $.expression))),
+            "step",
+            field("step", $.expression),
+          ),
+          // `on T in range(start, stop, step)`
+          seq("in", field("range", $.function_call)),
+        ),
         optional(seq("by", field("by", commaSep1($.column_item)))),
       ),
+
+    // `Name = agg(...) default = 0`
+    series_aggregate: ($) =>
+      seq($.column_item, optional(seq("default", "=", field("default", $.expression)))),
 
     evaluate_operator: ($) =>
       seq("evaluate", repeat($.hint_option), field("plugin", $.function_call)),

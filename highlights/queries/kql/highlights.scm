@@ -69,6 +69,8 @@
 (sort_item "first" @keyword)
 (sort_item "last" @keyword)
 (operator_option name: _ @keyword)
+(mv_option name: _ @keyword)
+(series_aggregate "default" @keyword)
 (hint_option name: (hint_name) @keyword)
 (materialize_expression "materialize" @function.builtin)
 (toscalar_expression "toscalar" @function.builtin)
