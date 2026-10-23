@@ -24,7 +24,7 @@ OPENTIDE_VERDICTS_IN="$work/queries" OPENTIDE_VERDICTS_OUT="$work/engine" \
 raw() { curl -fsSL "https://raw.githubusercontent.com/$1/$2/$3" -o "$4"; }
 
 # Node oracles share one sandbox, installed without install scripts.
-(cd "$work/node" && npm init -y >/dev/null && npm pkg set type=commonjs &&
+(cd "$work/node" && npm init -y >/dev/null &&
   npm install --no-save --ignore-scripts --no-audit --no-fund \
     "@elastic/esql@$esql_version" antlr-ng@1.0.10 antlr4@4.13.2 peggy@5.1.1 >/dev/null)
 
@@ -36,6 +36,7 @@ node "$here/esql.cjs" "$work/node" "$work/queries/esql" > "$work/oracle/esql.tsv
 mkdir -p "$work/node/eql"
 raw elastic/elasticsearch "$es_commit" x-pack/plugin/eql/src/main/antlr/EqlBase.g4 "$work/node/eql/EqlBase.g4"
 (cd "$work/node/eql" && ../node_modules/.bin/antlr-ng -Dlanguage=JavaScript -o gen EqlBase.g4 >/dev/null)
+echo '{"type":"module"}' > "$work/node/eql/gen/package.json"
 node "$here/eql.mjs" "$work/node/eql/gen" "$work/node/node_modules/antlr4" "$work/queries/eql" > "$work/oracle/eql.tsv"
 
 # Kibana KQL

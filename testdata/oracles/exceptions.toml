@@ -29,6 +29,10 @@ lucene = []
 file = "^corpus__unknown_command__valid"
 reason = "An unknown command parses on purpose so esql_unknown_command can name it; Elasticsearch rejects it."
 
+[[esql]]
+file = "^corpus__(completion_command__valid\\.endpoint|metadata__valid\\.bracketed)"
+reason = "8.19-only forms (`COMPLETION ... WITH endpoint`, `FROM x [METADATA ...]`): the engine accepts them with a version warning; @elastic/esql follows Elasticsearch main, which removed them."
+
 [[eql]]
 file = "^corpus__(sample|subquery|term_option)__invalid"
 reason = "Elasticsearch's LogicalPlanBuilder rejects these after the grammar accepts them (sample without join keys, missing events without maxspan, unknown term option), as a ParsingException; the engine reports them as eql_parse_error too."
