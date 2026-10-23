@@ -377,6 +377,7 @@ name = "opentide-eql"
 version = "0.1.0"
 dependencies = [
  "opentide-core",
+ "opentide-ecs",
  "opentide-highlight",
  "opentide-syntax",
  "serde",

@@ -1358,6 +1358,17 @@ mod tests {
             .collect()
     }
 
+    #[test]
+    fn cidr_match_on_a_non_ip_ecs_field_is_a_hint() {
+        let found = with_severity(r#"network where cidrMatch(host.name, "10.0.0.0/8")"#);
+        assert_eq!(
+            found,
+            vec![(codes::EQL_ARGUMENT_TYPE.to_string(), Severity::Hint)]
+        );
+        assert!(with_severity(r#"network where cidrMatch(source.ip, "10.0.0.0/8")"#).is_empty());
+        assert!(with_severity(r#"network where cidrMatch(my.custom, "10.0.0.0/8")"#).is_empty());
+    }
+
     fn with_severity(src: &str) -> Vec<(String, Severity)> {
         analyze(src)
             .diagnostics

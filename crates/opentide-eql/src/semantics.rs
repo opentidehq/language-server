@@ -286,6 +286,22 @@ fn check_value(
             return;
         }
     }
+    if want == Want::Ip && node.kind() == "field" {
+        let name = text(node, source).trim_start_matches('?').replace('`', "");
+        if let Some(field) = opentide_ecs::field(&name).filter(|f| f.type_name != "ip") {
+            out.push(diag(
+                Severity::Hint,
+                codes::EQL_ARGUMENT_TYPE,
+                format!(
+                    "{what} must be an ip field; ECS {} maps `{name}` as `{}`",
+                    opentide_ecs::version(),
+                    field.type_name
+                ),
+                range,
+            ));
+            return;
+        }
+    }
     let found = ty(node, source);
     if !want.accepts(found) {
         let hint = match (want, found) {
