@@ -170,6 +170,16 @@ Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Lan
 
 Language id `lucene` (`.lucene`). Elastic's `query_string` syntax: `AND`, `OR`, and `NOT` are operators only in upper case, so lowercase `and`/`or` are terms (`lucene_lowercase_operator`).
 
+Engine checks below the grammar (Elastic dialect unless noted):
+
+- `lucene_regexp`: the body of `/regexp/` is Lucene's own regular-expression grammar. A body Lucene's `RegExp` rejects (`\b`, `\n`, an unclosed `"` or `<`, `(a|)`) is an error; so is one whose determinization exceeds `max_determinized_states` (10000) on both Elasticsearch 8.19 (Lucene 9) and 9.x (Lucene 10). When only one stack rejects it, it is a warning naming that stack. `(?:`, `(?i)`, `^`, and `$` are literal text in Lucene (warning), and a body over the default `index.max_regex_length` (1000) is a warning. On an index whose `query_string` is lenient (the default when `index.query.default_field` is `*`), Elasticsearch turns a rejected regexp into a clause that matches nothing instead of failing the search; either way the clause never matches.
+- `lucene_fuzzy`: Elasticsearch reads `term~N` as a fuzziness and accepts only `0`, `1`, `2`, `AUTO`, or a bare `~` (error otherwise, including `~3` and `~0.5`, which Lucene alone would clamp or read as a similarity). Phrase slop (`"a b"~5`) is not checked.
+- `lucene_range_operator` (warning): `f:> 10` searches `f` for `>`; the value must follow the operator (`f:>10`).
+- `lucene_unescaped_slash` (warning): `a/b/c` or `path:/var/log` reads `/b/` or `/var/` as a regexp. An unclosed `/` is a `lucene_parse_error` that says so.
+- `lucene_bare_term` (hint; warning for Carbon Black): `f:v w` searches `w` in every field.
+- `lucene_looks_like_kuery` (warning): two different kinds of KQL syntax (lower-case operators, `f >= 10`, a leading `not`, text only KQL parses) suggest `language: kuery`.
+- Carbon Black Cloud (`configurations.carbon_black_cloud.query`): newlines count as spaces (deploy joins lines), `_exists_`, `f:>v`, and `f\*:` are `lucene_elasticsearch_only` warnings, regexp and fuzzy problems are warnings (the Solr version is not known), and upper-case letters in a regexp get a hint because Carbon Black matches lower-cased tokens. There is no Carbon Black field catalogue yet.
+
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |
 | lucene.boolean-query | `boolean_query` | `boolean_query__valid`, `boolean_query__invalid` | `keyword` |

@@ -104,7 +104,9 @@ module.exports = grammar({
 
     boost: (_) => token(seq("^", /[0-9]+(\.[0-9]+)?/)),
 
-    fuzzy: (_) => token(seq("~", optional(/[0-9]+(\.[0-9]+)?/))),
+    // Lucene's FUZZY_SLOP: `~` and any run of term characters. Elasticsearch
+    // reads it as a fuzziness (`0`, `1`, `2`, `AUTO`); the engine checks it.
+    fuzzy: (_) => token(seq("~", repeat(TERM_CHAR))),
 
     bare_operator: (_) => token(seq(choice("+", "-", "!"), WS)),
 

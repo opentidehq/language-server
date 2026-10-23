@@ -349,6 +349,16 @@ pub mod codes {
     pub const LUCENE_MIXED_OPERATORS: &str = "lucene_mixed_operators";
     pub const LUCENE_ESCAPE: &str = "lucene_escape";
     pub const LUCENE_KUERY_SYNTAX: &str = "lucene_kuery_syntax";
+    pub const LUCENE_REGEXP: &str = "lucene_regexp";
+    pub const LUCENE_FUZZY: &str = "lucene_fuzzy";
+    pub const LUCENE_RANGE_OPERATOR: &str = "lucene_range_operator";
+    pub const LUCENE_UNESCAPED_SLASH: &str = "lucene_unescaped_slash";
+    pub const LUCENE_BARE_TERM: &str = "lucene_bare_term";
+    pub const LUCENE_LOOKS_LIKE_KUERY: &str = "lucene_looks_like_kuery";
+    pub const LUCENE_ELASTICSEARCH_ONLY: &str = "lucene_elasticsearch_only";
+    pub const KUERY_QUESTION_MARK: &str = "kuery_question_mark";
+    pub const KUERY_FREE_TEXT: &str = "kuery_free_text";
+    pub const KUERY_LOOKS_LIKE_LUCENE: &str = "kuery_looks_like_lucene";
     pub const CROWDSTRIKE_UNSUPPORTED: &str = "crowdstrike_unsupported";
     pub const FILENAME_SLUG: &str = "filename_slug";
     pub const MISSING_AUTHOR: &str = "missing_author";
