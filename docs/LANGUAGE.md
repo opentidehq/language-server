@@ -62,6 +62,8 @@ Authored text is tokenized as written. An implicit leading `| search` is a Splun
 
 Language id `esql` (`.esql`). Commands and keywords are case-insensitive. The catalog in `catalogs/esql/` records each command's and function's `applies_to` lifecycle from the pinned Elasticsearch docs. `esql_unavailable` is an error for snapshot-only commands and information for anything an 8.19 cluster lacks or that is still in technical preview.
 
+Each catalog row also lists the release lines (8.19, 9.0 … 9.6) whose own grammar and definitions accept it, and the engine keeps the same sets for forms that are not names (`RENAME new = old`, `LIKE (…)`, `::failures`, `??`, the `m` unit, subqueries, `where(` with no space). `opentide_esql::analyze` checks against every supported line: information when an older line lacks a form, a warning when the newest line does too (the 8.19-only `FROM x [METADATA …]` and `COMPLETION … WITH endpoint`, functions removed after a release). `analyze_for(source, Some(target))` checks one declared line (`StackTarget::parse("9.5")`, `"serverless"`) and warns when it lacks a form. `::type` names no release accepts are `esql_unknown_type` errors. Block comments nest as in Elasticsearch (`src/scanner.c`). `opentide_esql::output_columns` returns the query's column names when `KEEP` or `STATS` fixes them, and `None` when they depend on the index.
+
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |
 | esql.change-point | `change_point_command` | `change_point_command__valid`, `change_point_command__invalid` | `keyword` |
@@ -82,6 +84,7 @@ Language id `esql` (`.esql`). Commands and keywords are case-insensitive. The ca
 | esql.grok | `grok_command` | `grok_command__valid`, `grok_command__invalid` | `keyword` |
 | esql.highlight | `highlight_command` | `highlight_command__valid`, `highlight_command__invalid` | `keyword` |
 | esql.in-expression | `in_expression` | `in_expression__valid`, `in_expression__invalid` | `keyword` |
+| esql.in-tuple | `in_tuple` | `in_tuple__valid`, `in_tuple__invalid` | `punctuation.bracket` |
 | esql.inline-cast | `inline_cast` | `inline_cast__valid`, `inline_cast__invalid` | `operator`, `type` |
 | esql.inline-stats | `inline_stats_command` | `inline_stats_command__valid`, `inline_stats_command__invalid` | `keyword` |
 | esql.ip-location | `ip_location_command` | `ip_location_command__valid`, `ip_location_command__invalid` | `keyword` |

@@ -46,14 +46,15 @@ module.exports = grammar({
 
   extras: ($) => [/\s/, $.comment],
 
+  // Comments come from src/scanner.c: Elasticsearch nests `/* */`, which a
+  // regular expression cannot express.
+  externals: ($) => [$.comment],
+
   conflicts: ($) => [[$.enrich_policy, $._index_name]],
 
   rules: {
     source_file: ($) =>
       seq(repeat($.set_command), optional($.query)),
-
-    comment: (_) =>
-      token(choice(seq("//", /[^\r\n]*/), seq("/*", /[^*]*\*+([^/*][^*]*\*+)*/, "/"))),
 
     set_command: ($) =>
       seq(
@@ -120,7 +121,16 @@ module.exports = grammar({
       ),
 
     metadata: ($) =>
-      seq(kw("metadata"), commaSep1(field("field", alias($._unquoted_source, $.metadata_field)))),
+      choice(
+        seq(kw("metadata"), commaSep1(field("field", alias($._unquoted_source, $.metadata_field)))),
+        // `FROM idx [METADATA _id]`: 8.19 only; 9.0 removed the brackets.
+        seq(
+          field("bracket", "["),
+          kw("metadata"),
+          commaSep1(field("field", alias($._unquoted_source, $.metadata_field))),
+          "]",
+        ),
+      ),
 
     row_command: ($) => seq(kw("row"), $._fields),
 
@@ -311,7 +321,13 @@ module.exports = grammar({
         kw("completion"),
         optional(seq(field("target", $.qualified_name), "=")),
         field("prompt", $._primary_expression),
-        optional($._named_parameters),
+        optional(
+          choice(
+            $._named_parameters,
+            // `WITH endpoint`: 8.19 and 9.1; 9.2 and later take `WITH {"inference_id": …}`.
+            seq(kw("with"), field("inference_id", choice($.identifier, $.quoted_identifier, $.parameter))),
+          ),
+        ),
       ),
 
     rerank_command: ($) =>
@@ -431,15 +447,29 @@ module.exports = grammar({
     in_expression: ($) =>
       prec(
         PREC.predicate,
-        seq(
-          field("left", $._value_expression),
-          optional(field("negated", kw("not"))),
-          kw("in"),
-          "(",
-          commaSep1(field("value", $._value_expression)),
-          ")",
+        choice(
+          seq(
+            field("left", $._value_expression),
+            optional(field("negated", kw("not"))),
+            kw("in"),
+            choice(
+              seq("(", commaSep1(field("value", $._value_expression)), ")"),
+              // `x IN (FROM …)`: 9.5 and later.
+              field("subquery", $.source_subquery),
+            ),
+          ),
+          // `(a, b) IN (FROM …)`: 9.6 and later.
+          seq(
+            field("left", $.in_tuple),
+            optional(field("negated", kw("not"))),
+            kw("in"),
+            field("subquery", $.source_subquery),
+          ),
         ),
       ),
+
+    in_tuple: ($) =>
+      seq("(", $._value_expression, repeat1(seq(",", $._value_expression)), ")"),
 
     is_null_expression: ($) =>
       prec(

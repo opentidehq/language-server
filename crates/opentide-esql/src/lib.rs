@@ -5,10 +5,27 @@
 //! (`catalogs/esql/`). Names the catalog does not know are diagnostics, not
 //! parse errors: Kibana 9.4 and 9.5 drop an unknown command from a
 //! non-aggregating rule and run the rest, so the editor has to say so.
+//!
+//! # Stack versions
+//!
+//! [`analyze`] checks a query against every stack elastic-1.0 supports
+//! (Kibana 8.19 and 9.x). [`analyze_for`] takes an optional [`StackTarget`]
+//! (`"9.5"`, `"serverless"`: the tenant `version` key proposed in
+//! opentidehq/specifications#59) and checks against that stack only.
+//!
+//! # Output columns
+//!
+//! [`output_columns`] returns the column names a query produces when they can
+//! be known without the index mappings.
 
 pub mod catalog;
+mod columns;
+mod gates;
+pub mod version;
 
-pub use catalog::{Catalog, CommandRow, FunctionRow, Lifecycle, StackVersion};
+pub use catalog::{Catalog, CommandRow, FunctionRow, Lifecycle, StackVersion, TypeRow};
+pub use columns::output_columns;
+pub use version::{Availability, RELEASES, StackTarget};
 
 use opentide_core::{
     ByteSpan, CompletionItem, Diagnostic, LanguageId, ParameterInformation, Position, Range,
@@ -38,7 +55,20 @@ const METADATA_FIELDS: &[(&str, &str)] = &[
     ("_tsid", "Time series id, for time series indices."),
 ];
 
+/// Analyze against every supported stack (8.19 and 9.x). Same as
+/// `analyze_for(source, None)`.
 pub fn analyze(source: &str) -> AnalyzeResult {
+    analyze_for(source, None)
+}
+
+/// Analyze for one stack.
+///
+/// With `None`, a name or form that some supported stack lacks is
+/// information (a warning when the newest stack lacks it too: a removed
+/// form). With `Some(target)`, a name or form that target lacks is a warning;
+/// what other stacks lack is not reported. Snapshot-only names are an error
+/// either way.
+pub fn analyze_for(source: &str, target: Option<StackTarget>) -> AnalyzeResult {
     let spec = HighlightSpec::load().expect("highlight spec");
     let catalog = Catalog::cached();
     let Some(tree) = ts_parse(LanguageId::Esql, source) else {
@@ -60,23 +90,41 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             range(source, node_span(err)),
         ));
     }
+    let to_range = |span: ByteSpan| range(source, span);
     walk(root, &mut |node| {
+        for gate in gates::syntax_gates(node, source) {
+            diagnostics.extend(gate.diagnostic(target, to_range));
+        }
+        if let Some((spacing, span)) = gates::command_spacing(node, source) {
+            let word = node.child(0).map(|k| text(k, source)).unwrap_or_default();
+            match gates::spacing_gate(word, spacing, span, to_range(span)) {
+                Ok(gate) => diagnostics.extend(gate.diagnostic(target, to_range)),
+                Err(d) => diagnostics.push(*d),
+            }
+        }
         if node.kind() == "unknown_command" {
             diagnostics.push(unknown_command(node, source, catalog));
         } else if let Some(name) = command_name(node, source) {
             if let Some(row) = catalog.command(&name) {
                 if let Some(d) = availability(
+                    target,
                     &display_name(&name),
                     "command",
                     row.snapshot_only,
                     &Lifecycle::parse(&row.stack),
-                    range(source, keyword_span(node)),
+                    row.availability(),
+                    keyword_span(node),
+                    &to_range,
                 ) {
                     diagnostics.push(d);
                 }
             }
         } else if node.kind() == "function_call" {
-            if let Some(d) = function_diagnostic(node, source, catalog) {
+            if let Some(d) = function_diagnostic(target, node, source, catalog) {
+                diagnostics.push(d);
+            }
+        } else if node.kind() == "inline_cast" {
+            if let Some(d) = cast_diagnostic(target, node, source, catalog) {
                 diagnostics.push(d);
             }
         } else if node.kind() == "qualified_name" {
@@ -195,7 +243,7 @@ fn range(source: &str, span: ByteSpan) -> Range {
     span_to_range(source, span)
 }
 
-fn text<'a>(node: Node, source: &'a str) -> &'a str {
+pub(crate) fn text<'a>(node: Node, source: &'a str) -> &'a str {
     source.get(node.start_byte()..node.end_byte()).unwrap_or("")
 }
 
@@ -230,7 +278,7 @@ fn display_name(name: &str) -> String {
 }
 
 /// The command's leading keywords (`LOOKUP JOIN`, `INLINE STATS`).
-fn keyword_span(node: Node) -> ByteSpan {
+pub(crate) fn keyword_span(node: Node) -> ByteSpan {
     let start = node.start_byte();
     let mut end = start;
     let mut cursor = node.walk();
@@ -273,20 +321,37 @@ fn unknown_command(node: Node, source: &str, catalog: &Catalog) -> Diagnostic {
     d
 }
 
-fn function_diagnostic(node: Node, source: &str, catalog: &Catalog) -> Option<Diagnostic> {
+fn function_diagnostic(
+    target: Option<StackTarget>,
+    node: Node,
+    source: &str,
+    catalog: &Catalog,
+) -> Option<Diagnostic> {
     let name_node = node.child_by_field_name("name")?;
     if name_node.kind() == "parameter" {
         return None;
     }
     let name = text(name_node, source);
     let span = node_span(name_node);
+    let lower = name.to_ascii_lowercase();
+    if lower != "first" && lower != "last" && EXPRESSION_KEYWORDS.contains(&lower.as_str()) {
+        // `in(x)`: the expression lexer reads the name as a keyword.
+        return Some(Diagnostic::error(
+            codes::ESQL_PARSE_ERROR,
+            format!("`{name}` is an ES|QL keyword and cannot name a function"),
+            range(source, span),
+        ));
+    }
     match catalog.function(name) {
         Some(row) => availability(
+            target,
             &format!("{}()", name.to_ascii_uppercase()),
             "function",
             row.snapshot_only,
             &Lifecycle::parse(&row.stack),
-            range(source, span),
+            row.availability(),
+            span,
+            &|s| range(source, s),
         ),
         None => {
             let mut d = Diagnostic::error(
@@ -302,15 +367,75 @@ fn function_diagnostic(node: Node, source: &str, catalog: &Catalog) -> Option<Di
     }
 }
 
-/// Snapshot-only names fail on every release; names first documented at 9.2
-/// or later are missing on the 8.19 floor; preview names may change.
+/// `::type`: a name no release can cast to is an error (Elasticsearch fails
+/// to parse it: "Unknown data type" or "Unsupported conversion"); a name only
+/// some releases know is a version gate.
+fn cast_diagnostic(
+    target: Option<StackTarget>,
+    node: Node,
+    source: &str,
+    catalog: &Catalog,
+) -> Option<Diagnostic> {
+    let type_node = node.child_by_field_name("type")?;
+    let name = text(type_node, source);
+    if name.starts_with('?') || name.starts_with('`') {
+        return None;
+    }
+    let span = node_span(type_node);
+    match catalog.cast_type(name) {
+        Some(row) => {
+            let mut gate = gates_for_type(row, span);
+            if !row.function.is_empty() {
+                gate.note = Some(format!(
+                    "the cast calls `{}()`",
+                    row.function.to_ascii_uppercase()
+                ));
+            }
+            gate.diagnostic(target, |s| range(source, s))
+        }
+        None => {
+            let mut d = Diagnostic::error(
+                codes::ESQL_UNKNOWN_TYPE,
+                format!(
+                    "`{name}` is not an ES|QL type Elasticsearch can cast to; use a type such as `keyword`, `long`, `double`, `ip`, or `datetime`"
+                ),
+                range(source, span),
+            );
+            if let Some(s) = catalog.suggest_type(name) {
+                d = d.with_suggestion(s);
+            }
+            Some(d)
+        }
+    }
+}
+
+fn gates_for_type(row: &TypeRow, span: ByteSpan) -> gates::Gate {
+    gates::Gate {
+        subject: format!("cast type `::{}`", row.name),
+        available: row.availability(),
+        note: None,
+        suggestion: None,
+        floor_severity: None,
+        span,
+    }
+}
+
+/// Snapshot-only names fail on every release. Otherwise the catalog's
+/// release lines decide (see [`gates::Gate::diagnostic`]); a row without
+/// them falls back to the docs lifecycle (first documented at 9.2 or later:
+/// missing on 8.19). Preview names may change.
+#[allow(clippy::too_many_arguments)]
 fn availability(
+    target: Option<StackTarget>,
     name: &str,
     what: &str,
     snapshot_only: bool,
     lifecycle: &Lifecycle,
-    range: Range,
+    available: Option<Availability>,
+    span: ByteSpan,
+    to_range: &dyn Fn(ByteSpan) -> Range,
 ) -> Option<Diagnostic> {
+    let range = to_range(span);
     if snapshot_only {
         return Some(Diagnostic::error(
             codes::ESQL_UNAVAILABLE,
@@ -320,7 +445,28 @@ fn availability(
             range,
         ));
     }
-    if let Some(first) = lifecycle.after_floor() {
+    let described = lifecycle.describe();
+    if let Some(available) = available {
+        let gate = gates::Gate {
+            subject: format!("{what} `{name}`"),
+            available,
+            note: (!described.is_empty()).then(|| described.clone()),
+            suggestion: None,
+            floor_severity: None,
+            span,
+        };
+        if let Some(d) = gate.diagnostic(target, to_range) {
+            return Some(d);
+        }
+        let ga_on_target = match (target, lifecycle.ga) {
+            (Some(StackTarget::Serverless), _) => true,
+            (Some(StackTarget::Version(v)), Some(ga)) => v >= ga,
+            _ => false,
+        };
+        if ga_on_target {
+            return None;
+        }
+    } else if let Some(first) = lifecycle.after_floor().filter(|_| target.is_none()) {
         let mut d = Diagnostic::warning(
             codes::ESQL_UNAVAILABLE,
             format!(
@@ -466,6 +612,7 @@ fn command_hover(row: &CommandRow) -> String {
         md.push_str(&format!("\n\n{}", row.docs));
     }
     md.push_str(&lifecycle_line(row.snapshot_only, &row.stack));
+    md.push_str(&releases_line(row.snapshot_only, row.availability()));
     if let Some(alias) = &row.alias_of {
         md.push_str(&format!("\n\nSame as `{}`.", display_name(alias)));
     }
@@ -500,6 +647,7 @@ fn function_hover(row: &FunctionRow) -> String {
         md.push_str(&format!("\n\n**Returns** _{}_", row.returns.join(" | ")));
     }
     md.push_str(&lifecycle_line(row.snapshot_only, &row.stack));
+    md.push_str(&releases_line(row.snapshot_only, row.availability()));
     if let Some(license) = &row.license {
         md.push_str(&format!("\n\nLicence: {license}."));
     }
@@ -527,6 +675,16 @@ fn lifecycle_line(snapshot_only: bool, stack: &str) -> String {
         String::new()
     } else {
         format!("\n\nAvailability: {described}.")
+    }
+}
+
+/// "Releases: 8.19 and 9.1 to 9.6." when some supported line lacks the name.
+fn releases_line(snapshot_only: bool, available: Option<Availability>) -> String {
+    match available {
+        Some(a) if !snapshot_only && !a.is_all() && !a.is_empty() => {
+            format!("\n\nReleases: {}.", version::join_versions(&a.versions()))
+        }
+        _ => String::new(),
     }
 }
 
@@ -884,6 +1042,272 @@ mod tests {
             !items.iter().any(|i| i.label == "COUNT"),
             "aggregations only in STATS"
         );
+    }
+
+    fn find<'a>(diags: &'a [Diagnostic], code: &str, needle: &str) -> Option<&'a Diagnostic> {
+        diags
+            .iter()
+            .find(|d| d.code == code && d.message.contains(needle))
+    }
+
+    fn at(version: &str) -> Option<StackTarget> {
+        StackTarget::parse(version)
+    }
+
+    #[test]
+    fn presence_matrix_drives_name_availability() {
+        let r = analyze("FROM logs-* METADATA _id | FORK (WHERE a == 1) (WHERE b == 2)");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "FORK").expect("fork");
+        assert_eq!(d.severity, Severity::Information);
+        assert!(
+            d.message.contains("8.19 and 9.0 reject it"),
+            "{}",
+            d.message
+        );
+        let r = analyze("ROW a = COPY_SIGN(1, -2)");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "COPY_SIGN").expect("copy_sign");
+        assert_eq!(d.severity, Severity::Information);
+        // Removed after 9.3: a warning, never an unknown-function error.
+        let r = analyze("FROM a METADATA _id | WHERE MULTI_MATCH(\"x\", b, c)");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "MULTI_MATCH").expect("multi_match");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(d.message.contains("9.1 to 9.3"), "{}", d.message);
+        assert!(
+            !r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::ESQL_UNKNOWN_FUNCTION)
+        );
+        assert!(
+            codes_of("ROW a = ABS(-1)").is_empty(),
+            "abs is in the math module"
+        );
+    }
+
+    #[test]
+    fn declared_target_reports_only_that_stack() {
+        let q = "FROM logs-* METADATA _id | INLINE STATS c = COUNT(*) BY host.name";
+        let on = |v: &str| analyze_for(q, at(v)).diagnostics;
+        let d = on("8.19");
+        let d = find(&d, codes::ESQL_UNAVAILABLE, "INLINE STATS").expect("8.19 lacks it");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(
+            d.message.contains("Elasticsearch 8.19 rejects it"),
+            "{}",
+            d.message
+        );
+        assert!(on("9.3").is_empty(), "{:?}", on("9.3"));
+        assert!(on("9.12").is_empty());
+        assert!(on("serverless").is_empty());
+        // 9.0 is the only line without `RENAME new = old`.
+        let q = "ROW a = 1 | RENAME b = a";
+        assert!(analyze_for(q, at("8.19")).diagnostics.is_empty());
+        let d = analyze_for(q, at("9.0")).diagnostics;
+        assert!(find(&d, codes::ESQL_UNAVAILABLE, "RENAME new = old").is_some());
+        // Snapshot-only stays an error for every target.
+        let d = analyze_for("FROM a METADATA _id | FILLNULL 0 ON b", at("9.6")).diagnostics;
+        assert!(d.iter().any(|d| d.severity == Severity::Error));
+    }
+
+    #[test]
+    fn syntax_gates_name_the_versions() {
+        let cases: &[(&str, &str, &str)] = &[
+            (
+                "ROW a = 1 | RENAME b = a",
+                "RENAME new = old",
+                "9.0 rejects it",
+            ),
+            (
+                "ROW a = \"x\" | WHERE a LIKE (\"x\", \"y\")",
+                "LIKE (…)",
+                "9.0 rejects it",
+            ),
+            (
+                "ROW a = \"x\" | WHERE a RLIKE (\"x\", \"y\")",
+                "RLIKE (…)",
+                "needs Elasticsearch 9.2",
+            ),
+            (
+                "FROM logs-*::failures METADATA _id",
+                "::failures",
+                "9.0 rejects it",
+            ),
+            (
+                "FROM c:logs-*::data METADATA _id",
+                "cluster:index::selector",
+                "needs Elasticsearch 9.4",
+            ),
+            ("ROW a = 1 | WHERE a == ??b", "??", "9.0 rejects it"),
+            (
+                "ROW a = NOW() - 5 m",
+                "minute unit `m`",
+                "needs Elasticsearch 9.3",
+            ),
+            (
+                "ROW a = NOW() - 5M",
+                "minute unit `m`",
+                "needs Elasticsearch 9.3",
+            ),
+            (
+                "FROM a, (FROM b) METADATA _id",
+                "subquery in `FROM`",
+                "needs Elasticsearch 9.4",
+            ),
+            (
+                "FROM a METADATA _id | WHERE b IN (FROM c | KEEP d)",
+                "IN (subquery)",
+                "needs Elasticsearch 9.5",
+            ),
+            (
+                "FROM a | STATS c = COUNT(*) WHERE b IN (FROM c | KEEP d)",
+                "aggregate filter",
+                "needs Elasticsearch 9.6",
+            ),
+            (
+                "FROM a METADATA _id | WHERE (b, e) IN (FROM c | KEEP d, f)",
+                "tuple",
+                "needs Elasticsearch 9.6",
+            ),
+            (
+                "ROW a = 1 | LIMIT 1 BY a",
+                "LIMIT … BY",
+                "needs Elasticsearch 9.4",
+            ),
+            (
+                "ROW a = \"x\" | GROK a \"%{WORD:b}\", \"%{WORD:c}\"",
+                "several patterns",
+                "needs Elasticsearch 9.3",
+            ),
+        ];
+        for (q, subject, versions) in cases {
+            let r = analyze(q);
+            let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, subject)
+                .unwrap_or_else(|| panic!("{q}: {:?}", r.diagnostics));
+            assert!(d.message.contains(versions), "{q}: {}", d.message);
+            assert_eq!(d.severity, Severity::Information, "{q}");
+        }
+        let r = analyze("ROW a = NOW() - 5 min");
+        assert!(r.diagnostics.is_empty(), "{:?}", r.diagnostics);
+    }
+
+    #[test]
+    fn old_forms_warn_with_the_versions() {
+        let r = analyze("FROM logs-* [METADATA _id] | LIMIT 1");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "[METADATA").expect("brackets");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(
+            d.message.contains("only Elasticsearch 8.19 accepts it"),
+            "{}",
+            d.message
+        );
+        assert_eq!(d.suggestion.as_deref(), Some("METADATA _id"));
+        assert!(
+            !r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::ESQL_PARSE_ERROR)
+        );
+        let r = analyze("FROM a METADATA _id | COMPLETION c = p WITH my_endpoint");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "WITH endpoint").expect("with id");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(d.message.contains("8.19 and 9.1"), "{}", d.message);
+        assert!(
+            d.message.contains("\"inference_id\": \"my_endpoint\""),
+            "{}",
+            d.message
+        );
+        assert!(
+            analyze_for(
+                "FROM a METADATA _id | COMPLETION c = p WITH {\"inference_id\": \"e\"}",
+                at("9.3")
+            )
+            .diagnostics
+            .is_empty()
+        );
+    }
+
+    #[test]
+    fn command_name_spacing_follows_the_lexer() {
+        let r = analyze("FROM a METADATA _id | where(b == 1)");
+        let d = find(&r.diagnostics, codes::ESQL_UNAVAILABLE, "`where(`").expect("where(");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(
+            d.message.contains("needs Elasticsearch 9.6"),
+            "{}",
+            d.message
+        );
+        assert_eq!(d.suggestion.as_deref(), Some("where ("));
+        assert!(
+            analyze_for("FROM a METADATA _id | where(b == 1)", at("9.6"))
+                .diagnostics
+                .is_empty()
+        );
+        assert!(
+            analyze_for("FROM a METADATA _id | EVAL(x = 1)", at("9.5"))
+                .diagnostics
+                .iter()
+                .any(|d| d.message.contains("`EVAL(`"))
+        );
+        assert!(codes_of("FROM a METADATA _id | where (b == 1)").is_empty());
+        let r = analyze("FROM a METADATA _id | KEEP\"b\"");
+        assert!(r.diagnostics.iter().any(|d| d.severity == Severity::Error));
+    }
+
+    #[test]
+    fn cast_types_are_checked() {
+        let r = analyze("ROW a = 1 | EVAL b = a::strng");
+        let d = r
+            .diagnostics
+            .iter()
+            .find(|d| d.code == codes::ESQL_UNKNOWN_TYPE)
+            .expect("unknown type");
+        assert_eq!(d.severity, Severity::Error);
+        assert_eq!(d.suggestion.as_deref(), Some("string"));
+        assert!(
+            codes_of("ROW a = 1 | EVAL b = a::STRING, c = a::long, d = a::datetime").is_empty()
+        );
+        let r = analyze("ROW a = 1 | EVAL b = a::text");
+        assert!(
+            r.diagnostics
+                .iter()
+                .any(|d| d.code == codes::ESQL_UNKNOWN_TYPE)
+        );
+        let r = analyze("ROW a = 1 | EVAL b = a::aggregate_metric_double");
+        let d = find(
+            &r.diagnostics,
+            codes::ESQL_UNAVAILABLE,
+            "aggregate_metric_double",
+        )
+        .expect("gate");
+        assert_eq!(d.severity, Severity::Information);
+    }
+
+    #[test]
+    fn nested_block_comments_follow_elasticsearch() {
+        assert!(codes_of("FROM a /* x /* y */ z */ METADATA _id | LIMIT 1").is_empty());
+        assert!(codes_of("FROM a METADATA _id /* x /* y */ | LIMIT 1").is_empty());
+        assert!(
+            codes_of("FROM a METADATA _id /* x */ */ | LIMIT 1")
+                .contains(&codes::ESQL_PARSE_ERROR.to_string())
+        );
+        assert!(
+            codes_of("FROM a METADATA _id /* x /* y | LIMIT 1")
+                .contains(&codes::ESQL_PARSE_ERROR.to_string())
+        );
+        assert!(codes_of("ROW a = 4 /* c */ / 2, b = 4/2 // end").is_empty());
+    }
+
+    #[test]
+    fn keywords_cannot_name_functions() {
+        let c = codes_of("ROW a = 1 | EVAL b = in(a)");
+        assert!(c.contains(&codes::ESQL_PARSE_ERROR.to_string()), "{c:?}");
+    }
+
+    #[test]
+    fn hover_shows_the_catalog_summary() {
+        let src = "ROW a = TO_LOWER(\"X\")";
+        let h = hover(src, Position::new(0, 10)).expect("function hover");
+        assert!(h.contains("Lower-cases a string."), "{h}");
+        let h = hover("ROW a = COPY_SIGN(1, 2)", Position::new(0, 10)).expect("hover");
+        assert!(h.contains("Releases: 9.1 to 9.6."), "{h}");
     }
 
     #[test]

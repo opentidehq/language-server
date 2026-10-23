@@ -45,11 +45,11 @@ Slow-query warnings (`kql_where_not_first`, `kql_unscoped_search`, `spl_wildcard
 
 | Path | Contents |
 | --- | --- |
-| `catalogs/esql/` | commands, functions, operators with `applies_to` lifecycle |
+| `catalogs/esql/` | commands, functions, operators, cast types with `applies_to` lifecycle and per-release `versions` |
 | `catalogs/eql/` | functions (arity, case-insensitive `~` support), pipes |
 | `catalogs/ecs/` | Elastic Common Schema fields: type, level, short description, allowed values (`scripts/sync_ecs_fields.py`, Apache-2.0, `NOTICE`) |
 
-`scripts/sync_esql_catalog.py` and `scripts/sync_eql_catalog.py` regenerate them from a pinned `elastic/elasticsearch` docs commit. Elastic's docs are not EUPL-compatible, so the catalogs keep facts only (names, signatures, arity, versions) and the summaries are written in the scripts. Do not paste Elastic prose into a catalog. The 9.x docs do not list 8.x versions, so a feature first documented at `FIRST_AFTER_FLOOR` (9.2) or later is treated as missing on 8.19, the oldest supported stack (`Lifecycle::after_floor`). That is `esql_unavailable` information, not an error.
+`scripts/sync_esql_catalog.py` and `scripts/sync_eql_catalog.py` regenerate them from a pinned `elastic/elasticsearch` docs commit. Elastic's docs are not EUPL-compatible, so the catalogs keep facts only (names, signatures, arity, versions) and the summaries are written in the scripts. Do not paste Elastic prose into a catalog. The 9.x docs do not list 8.19 or 9.0, so `sync_esql_catalog.py --branches` also reads each release branch (8.19, 9.0 … 9.6) and writes `versions`, the lines that accept each command, function, and cast type (`types.toml`). `esql_unavailable` uses those lists: information when an older supported line lacks a name, a warning when the newest does too, an error only for snapshot-only names. `Lifecycle::after_floor` (first documented at 9.2 or later is missing on 8.19) is the fallback for a row without `versions`.
 
 ECS is never a closed list: elastic-1.0 says field names MUST NOT be checked against one. `opentide-ecs` feeds completion and hover (wired in `opentide-analysis/src/ecs.rs`), and a hint only where a known field's type makes the query suspicious. An unknown field is never a diagnostic.
 
