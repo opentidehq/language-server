@@ -652,6 +652,35 @@ pub(crate) fn block_advisories(
         }
     }
 
+    // For `esql`, deploy checks `suppression.group_by` against the query's
+    // pre-flight columns ([elastic-1.0] Elasticsearch checks). Compared only
+    // when the columns are statically certain.
+    if block.get("type").and_then(|v| v.as_str()) == Some("esql") {
+        let group_by: Vec<&str> = block
+            .get("suppression")
+            .and_then(|s| s.get("group_by"))
+            .and_then(|g| g.as_sequence())
+            .map(|s| s.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+        let columns = block
+            .get("query")
+            .and_then(|q| q.as_str())
+            .filter(|_| !group_by.is_empty())
+            .and_then(opentide_esql::output_columns);
+        if let Some(columns) = columns {
+            for field in group_by.iter().filter(|f| !columns.iter().any(|c| c == *f)) {
+                out.push(warn(
+                    codes::ESQL_GROUP_BY_COLUMN,
+                    format!(
+                        "suppression.group_by `{field}` is not an output column of the ES|QL query ({}); deploy rejects it",
+                        columns.join(", ")
+                    ),
+                    &["suppression", "group_by"],
+                ));
+            }
+        }
+    }
+
     let risk = block.get("risk");
     let score = risk
         .and_then(|r| r.as_i64())
@@ -772,6 +801,23 @@ mod tests {
             d.field_path.as_deref().unwrap().join("."),
             "configurations.elastic.scheduling.lookback"
         );
+    }
+
+    #[test]
+    fn esql_group_by_must_be_an_output_column() {
+        let rule = |group_by: &str| {
+            format!(
+                "name: r\nconfigurations:\n  elastic:\n    type: esql\n    query: |\n      FROM logs-* | STATS c = COUNT(*) BY host.name\n    suppression:\n      group_by: [{group_by}]\n"
+            )
+        };
+        assert!(advisory_codes(&rule("host.name"), &[]).is_empty());
+        assert_eq!(
+            advisory_codes(&rule("user.name"), &[]),
+            vec![codes::ESQL_GROUP_BY_COLUMN]
+        );
+        // Unknown columns (no KEEP or STATS) are never guessed.
+        let open = rule("user.name").replace(" | STATS c = COUNT(*) BY host.name", " METADATA _id");
+        assert!(advisory_codes(&open, &[]).is_empty());
     }
 
     #[test]

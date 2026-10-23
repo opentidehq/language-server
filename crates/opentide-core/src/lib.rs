@@ -371,6 +371,7 @@ pub mod codes {
     pub const DEFENDER_OUTPUT_COLUMNS: &str = "defender_output_columns";
     /// `::type` names no Elasticsearch release can cast to.
     pub const ESQL_UNKNOWN_TYPE: &str = "esql_unknown_type";
+    pub const ESQL_GROUP_BY_COLUMN: &str = "esql_group_by_column";
 }
 
 #[derive(Debug, Error)]
