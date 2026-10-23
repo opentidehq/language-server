@@ -148,6 +148,13 @@ Language id `eql` (`.eql`). Keywords are lowercase and reserved. Elastic Securit
 
 Language id `kuery` (`.kuery`, alias `kibana-kql`). This is the Kibana Query Language Elastic rules call `language: kuery`, not Microsoft KQL. `or`, `and`, and `not` are case-insensitive keywords; everything else is a literal.
 
+`or`, `and`, and `not` are keywords only with whitespace after them: at the very end of the query or before `)` or `}` they are value text, as in Kibana (`f:a or`, `f:(not)`), while `f:a or ` (trailing space) fails. Engine checks below the grammar:
+
+- `kuery_parse_error` messages name the problem (no implicit `and` in `a:1 b:2`, an unclosed `(` or quote, a missing value or operand). They are not Kibana's PEG messages word for word: tree-sitter recovers at a different point than Kibana's parser.
+- `kuery_question_mark` (hint): `?` is a literal in KQL, not a single-character wildcard. URL query strings (`/path?x=1`) are skipped.
+- `kuery_free_text` (hint): a value with no field searches every field; after `f:a and b` the hint suggests `f:(a and b)`.
+- `kuery_looks_like_lucene` (warning): two different kinds of Lucene syntax (ranges, `_exists_`, prefixes, `&&`, regexps, fuzzy or boost, text only Lucene parses) suggest `language: lucene`.
+
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |
 | kuery.and-list | `and_list` | `and_list__valid`, `and_list__invalid` | `keyword` |

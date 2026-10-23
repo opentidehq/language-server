@@ -26,7 +26,10 @@ pub struct AnalyzeResult {
 
 pub fn analyze(source: &str) -> AnalyzeResult {
     let spec = HighlightSpec::load().expect("highlight spec");
-    let Some(tree) = ts_parse(LanguageId::Kuery, source) else {
+    // Kibana reads `or`, `and`, and `not` as keywords only with whitespace
+    // after them; at the end of the query or before `)` they are value text.
+    let masked = mask_trailing_keywords(source);
+    let Some(tree) = ts_parse(LanguageId::Kuery, &masked) else {
         return AnalyzeResult {
             diagnostics: vec![Diagnostic::error(
                 codes::KUERY_PARSE_ERROR,
@@ -45,15 +48,16 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             range(source, node_span(err)),
         ));
     }
-    // Kibana compiles the query with trailing whitespace stripped.
-    let effective = source.trim_end();
     walk(root, &mut |node| match node.kind() {
         "unquoted_literal" => {
-            if let Some(d) = embedded_not(node, source, effective) {
+            if let Some(d) = embedded_not(node, source) {
                 diagnostics.push(d);
             }
             diagnostics.extend(lucene_syntax(node, source));
             diagnostics.extend(unquoted_escapes(node, source));
+            if let Some(d) = question_mark(node, source) {
+                diagnostics.push(d);
+            }
         }
         "or" | "and" | "not" => {
             if let Some(d) = keyword_spacing(node, source) {
@@ -65,42 +69,196 @@ pub fn analyze(source: &str) -> AnalyzeResult {
                 diagnostics.push(d);
             }
         }
+        "value_expression" => {
+            if let Some(d) = free_text(node, source) {
+                diagnostics.push(d);
+            }
+        }
         "quoted_string" => diagnostics.extend(quoted_string(node, source)),
         _ => {}
     });
-    let tokens = highlight(&spec, source);
+    if let Some(d) = looks_like_lucene(root, source, &diagnostics) {
+        diagnostics.push(d);
+    }
+    let tokens = highlight(&spec, &masked, source);
     AnalyzeResult {
         diagnostics,
         tokens,
     }
 }
 
-fn parse_error_message(err: Node, source: &str) -> String {
-    if err.is_missing() {
-        return format!("KQL syntax error: missing `{}`", err.kind());
+fn is_word_char(c: char) -> bool {
+    !is_kql_space(c) && !matches!(c, '\\' | '(' | ')' | ':' | '<' | '>' | '"' | '{' | '}')
+}
+
+/// A copy of `source` (same byte offsets) in which an `or`, `and`, or `not`
+/// that ends the query or sits before `)` or `}` is replaced by a plain word,
+/// because Kibana reads it as part of the value (`f:a or`, `f:(not)`). With
+/// whitespace after it, it is a keyword again, and `f:a or ` fails, as
+/// Kibana's own syntax-error tests expect.
+fn mask_trailing_keywords(source: &str) -> String {
+    let end = source.len();
+    let bytes = source.as_bytes();
+    let mut masked: Option<Vec<u8>> = None;
+    let mut i = 0;
+    while i < end {
+        let c = source[i..].chars().next().unwrap_or(' ');
+        if c == '"' {
+            // Skip a quoted string.
+            i += 1;
+            while i < end && bytes[i] != b'"' {
+                i += if bytes[i] == b'\\' { 2 } else { 1 };
+            }
+            i += 1;
+            continue;
+        }
+        if !is_word_char(c) && c != '\\' {
+            i += c.len_utf8();
+            continue;
+        }
+        // One word token: word characters and backslash escapes.
+        let start = i;
+        while i < end {
+            let c = source[i..].chars().next().unwrap_or(' ');
+            if c == '\\' {
+                i += 1 + source[i + 1..].chars().next().map_or(0, char::len_utf8);
+            } else if is_word_char(c) {
+                i += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        let word = &source[start..i.min(end)];
+        let next = source[i.min(end)..end].chars().next();
+        let keyword = ["or", "and", "not"]
+            .iter()
+            .any(|k| word.eq_ignore_ascii_case(k));
+        if keyword && matches!(next, None | Some(')') | Some('}')) {
+            let m = masked.get_or_insert_with(|| bytes.to_vec());
+            for b in &mut m[start + 1..i] {
+                *b = b'_';
+            }
+        }
     }
-    match text(err, source).split_whitespace().next() {
-        Some(first) => format!("KQL syntax error near `{first}`"),
+    match masked {
+        Some(m) => String::from_utf8(m).unwrap_or_else(|_| source.to_string()),
+        None => source.to_string(),
+    }
+}
+
+/// A syntax error in words: what is missing or which rule was broken.
+/// (Kibana's own text, `Expected AND, OR, or end of input but ":" found.`,
+/// comes from its PEG parser's furthest failure; tree-sitter recovers at a
+/// different point, so its lookahead set rarely matches that text.)
+fn parse_error_message(err: Node, source: &str) -> String {
+    let before = source[..err.start_byte()].trim_end();
+    if err.is_missing() {
+        return match err.kind() {
+            ")" => "KQL syntax error: a `(` is never closed".into(),
+            "}" => "KQL syntax error: a nested query `field:{` is never closed".into(),
+            _ => missing_after(before),
+        };
+    }
+    if let Some(at) = unclosed_quote(source) {
+        if at <= err.end_byte() {
+            return "KQL syntax error: a quoted string is never closed".into();
+        }
+    }
+    let t = text(err, source);
+    // `a:1 b:2`: KQL has no implicit `and`, so `1 b` is one value and the
+    // second `:` is out of place.
+    if let Some((value, op)) = implicit_and(source, err.start_byte(), err.end_byte()) {
+        return format!(
+            "KQL syntax error: KQL has no implicit `and`; `{value}` is read as one value, so the `{op}` after it is unexpected. Join the clauses with `and`"
+        );
+    }
+    if t.trim().is_empty() || err.start_byte() >= source.trim_end().len() {
+        return missing_after(before);
+    }
+    match t.split_whitespace().next() {
+        Some(word) => format!("KQL syntax error near `{word}`"),
         None => "KQL syntax error".into(),
     }
+}
+
+/// A value with whitespace in it followed by `:`, `<`, or `>` near the
+/// error: two clauses with no `and` between them.
+fn implicit_and(source: &str, start: usize, end: usize) -> Option<(String, char)> {
+    // Back up to the start of the clause the error is in.
+    let from = source[..start]
+        .rfind(['(', ')', ':', '<', '>', '"'])
+        .map_or(0, |i| i + 1);
+    let to = (end + 1).min(source.len());
+    let region = source.get(from..to)?;
+    let mut segment = String::new();
+    let mut in_quotes = false;
+    for c in region.chars() {
+        match c {
+            '"' => {
+                in_quotes = !in_quotes;
+                segment.clear();
+            }
+            _ if in_quotes => {}
+            ':' | '<' | '>' => {
+                let value = segment.trim();
+                if value.contains(char::is_whitespace) {
+                    return Some((value.to_string(), c));
+                }
+                segment.clear();
+            }
+            '(' | ')' | '=' => segment.clear(),
+            _ => segment.push(c),
+        }
+    }
+    None
+}
+
+/// What the query lacks when it ends after `before`.
+fn missing_after(before: &str) -> String {
+    let last = before.split_whitespace().next_back().unwrap_or("");
+    let lower = last.to_ascii_lowercase();
+    if last.ends_with([':', '<', '>', '=']) {
+        format!("KQL syntax error: a value is missing after `{last}`")
+    } else if matches!(lower.as_str(), "or" | "and" | "not") {
+        format!("KQL syntax error: a query is missing after `{last}`")
+    } else {
+        "KQL syntax error: the query ends too early".into()
+    }
+}
+
+/// Byte offset of an opening `"` with no closing quote.
+fn unclosed_quote(source: &str) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut open: Option<usize> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\\' => i += 1,
+            b'"' => open = if open.is_some() { None } else { Some(i) },
+            _ => {}
+        }
+        i += 1;
+    }
+    open
 }
 
 /// Kibana's `UnquotedCharacter` stops at `!Keyword`, and `Keyword` includes
 /// `'not'i Space` with no space required before it. `cannot run` therefore
 /// ends the value at `can`, and the query fails.
-fn embedded_not(node: Node, source: &str, effective: &str) -> Option<Diagnostic> {
+fn embedded_not(node: Node, source: &str) -> Option<Diagnostic> {
     static NOT_SPACE: OnceLock<Regex> = OnceLock::new();
     let re = NOT_SPACE.get_or_init(|| Regex::new(r"(?i)not[ \t\r\n\u{00A0}]").expect("regex"));
     let start = node.start_byte();
     // The literal plus the whitespace Kibana reads after it, when more follows.
     let mut end = node.end_byte();
-    let rest = effective.get(end..).unwrap_or("");
+    // Kibana parses the text as given; a trailing `not ` fails too.
+    let rest = source.get(end..).unwrap_or("");
     let ws = rest.len()
         - rest
             .trim_start_matches([' ', '\t', '\r', '\n', '\u{00A0}'])
             .len();
-    if ws > 0 && end + ws < effective.len() {
-        end += ws.min(1);
+    if ws > 0 {
+        end += rest.chars().next().map_or(0, char::len_utf8);
     }
     let window = source.get(start..end)?;
     for m in re.find_iter(window) {
@@ -283,6 +441,125 @@ fn quoted_string(node: Node, source: &str) -> Vec<Diagnostic> {
     out
 }
 
+/// `?` is not a wildcard in KQL: `jo?n` searches the text `jo?n`.
+fn question_mark(node: Node, source: &str) -> Option<Diagnostic> {
+    let t = text(node, source);
+    let i = t.find('?')?;
+    // A URL query string (`/path?x=1`, `/api/secrets?limit*`) is a real
+    // question mark: a path before it and none after it.
+    let (path, query) = t.split_at(i);
+    if t.contains('=') || t.contains("://") || (path.contains('/') && !query.contains('/')) {
+        return None;
+    }
+    let at = node.start_byte() + i;
+    let mut d = Diagnostic::warning(
+        codes::KUERY_QUESTION_MARK,
+        "`?` is a literal character in KQL, not a single-character wildcard; use `*` to match any characters",
+        range(source, ByteSpan::new(at, at + 1)),
+    );
+    d.severity = Severity::Hint;
+    Some(d)
+}
+
+/// A value with no field. Kibana searches it in every field
+/// (`index.query.default_field`), and after `f:a and` it is easy to read
+/// `b` as part of `f`.
+fn free_text(node: Node, source: &str) -> Option<Diagnostic> {
+    let value = text(node, source);
+    if value.trim() == "*" {
+        return None;
+    }
+    // Inside a nested query the field context is the nested field.
+    let mut p = node.parent();
+    while let Some(n) = p {
+        if n.kind() == "nested_query" {
+            return None;
+        }
+        p = n.parent();
+    }
+    let sibling_field = node.parent().and_then(|parent| {
+        if !matches!(parent.kind(), "and_query" | "or_query") {
+            return None;
+        }
+        let left = parent.child_by_field_name("left")?;
+        (left.kind() == "field_value_expression" && left.end_byte() <= node.start_byte())
+            .then_some(left)
+    });
+    let message = match sibling_field {
+        Some(left) => {
+            let field = left
+                .child_by_field_name("field")
+                .map(|f| text(f, source))
+                .unwrap_or("");
+            let op = node
+                .parent()
+                .and_then(|p| p.child(1))
+                .map(|o| text(o, source).to_ascii_lowercase())
+                .unwrap_or_else(|| "and".into());
+            let first = left
+                .child_by_field_name("value")
+                .map(|v| text(v, source))
+                .unwrap_or("");
+            format!(
+                "`{value}` has no field, so Kibana searches it in every field, not in `{field}`; to search `{field}` write `{field}:({first} {op} {value})`"
+            )
+        }
+        None => format!(
+            "`{value}` has no field, so Kibana searches it in every field (`index.query.default_field`); name the field (`field:{value}`)"
+        ),
+    };
+    let mut d = Diagnostic::warning(
+        codes::KUERY_FREE_TEXT,
+        message,
+        range(source, node_span(node)),
+    );
+    d.severity = Severity::Hint;
+    Some(d)
+}
+
+/// KQL text that reads like Lucene. One sign can be a coincidence; two
+/// different kinds of Lucene syntax are a rule written for `language: lucene`.
+fn looks_like_lucene(root: Node, source: &str, found: &[Diagnostic]) -> Option<Diagnostic> {
+    let mut signals: Vec<&str> = Vec::new();
+    for d in found
+        .iter()
+        .filter(|d| d.code == codes::KUERY_LUCENE_SYNTAX)
+    {
+        let kind = if d.message.contains("TO b") {
+            "ranges"
+        } else if d.message.contains("_exists_") {
+            "`_exists_`"
+        } else if d.message.starts_with("`+`") {
+            "`+`/`-` prefixes"
+        } else if d.message.starts_with("`&&`") {
+            "`&&`/`||`"
+        } else if d.message.contains("/regex/") {
+            "a regular expression"
+        } else {
+            "fuzzy or boost suffixes"
+        };
+        if !signals.contains(&kind) {
+            signals.push(kind);
+        }
+    }
+    // Kibana rejects the text, and the Lucene grammar accepts it.
+    if root.has_error()
+        && ts_parse(LanguageId::Lucene, source).is_some_and(|t| !t.root_node().has_error())
+    {
+        signals.push("text only Lucene parses");
+    }
+    (signals.len() >= 2).then(|| {
+        Diagnostic::warning(
+            codes::KUERY_LOOKS_LIKE_LUCENE,
+            format!(
+                "this query reads like Lucene ({}); if it is an Elastic rule, set `language: lucene`",
+                signals.join(", ")
+            ),
+            range(source, ByteSpan::new(0, source.len().max(1).min(source.len().max(1)))),
+        )
+    })
+}
+
 fn fuzzy_or_boost(word: &str) -> bool {
     // `PROGRA~1` and paths are 8.3 short names, not fuzzy terms.
     if word.contains(['\\', '.', '/']) {
@@ -323,10 +600,10 @@ fn text<'a>(node: Node, source: &'a str) -> &'a str {
     source.get(node.start_byte()..node.end_byte()).unwrap_or("")
 }
 
-fn highlight(spec: &HighlightSpec, source: &str) -> Vec<HighlightToken> {
+fn highlight(spec: &HighlightSpec, parsed: &str, source: &str) -> Vec<HighlightToken> {
     let Ok(spans) = opentide_syntax::query_captures(
         LanguageId::Kuery,
-        source,
+        parsed,
         opentide_highlight::KUERY_HIGHLIGHTS_SCM,
     ) else {
         return Vec::new();
@@ -337,7 +614,7 @@ fn highlight(spec: &HighlightSpec, source: &str) -> Vec<HighlightToken> {
 
 /// Field names a query mentions, for completion and for Tide checks.
 pub fn fields(source: &str) -> Vec<String> {
-    let Some(tree) = ts_parse(LanguageId::Kuery, source) else {
+    let Some(tree) = ts_parse(LanguageId::Kuery, &mask_trailing_keywords(source)) else {
         return Vec::new();
     };
     let mut names = std::collections::BTreeSet::new();
@@ -494,6 +771,100 @@ mod tests {
     #[test]
     fn keywords_are_case_insensitive() {
         assert!(codes_of("a:1 AND b:2 Or NOT c:3").is_empty());
+    }
+
+    fn find(src: &str, code: &str) -> Option<Diagnostic> {
+        analyze(src)
+            .diagnostics
+            .into_iter()
+            .find(|d| d.code == code)
+    }
+
+    #[test]
+    fn trailing_keywords_are_values() {
+        // Kibana reads a keyword with no whitespace after it as value text.
+        for src in [
+            "process.name:cmd.exe or",
+            "tags:(a and)",
+            "host.os.type:(not)",
+            "host.os.type:(windows or)",
+            "a:(b or) or c:(d and)",
+            "f:{a:1 and}",
+            "not",
+        ] {
+            let r = analyze(src);
+            assert!(
+                r.diagnostics.iter().all(|d| d.severity != Severity::Error),
+                "{src}: {:?}",
+                r.diagnostics
+            );
+        }
+        // With whitespace after it, it is a keyword again, and the query fails.
+        for src in ["response:200 or ", "response:(200 or )", "tags:(a and )"] {
+            assert!(
+                codes_of(src).contains(&codes::KUERY_PARSE_ERROR.to_string()),
+                "{src}"
+            );
+        }
+        let r = analyze("process.name:cmd.exe or");
+        assert!(r.tokens.iter().all(|t| t.capture != "keyword"));
+    }
+
+    #[test]
+    fn parse_errors_say_what_is_wrong() {
+        let message = |src: &str| {
+            find(src, codes::KUERY_PARSE_ERROR)
+                .unwrap_or_else(|| panic!("{src}"))
+                .message
+        };
+        assert!(message("a:1 b:2").contains("no implicit `and`"));
+        assert!(message("message:\"failed login").contains("never closed"));
+        assert!(message("(a:1 or b:2").contains("`(` is never closed"));
+        assert!(message("process.name:").contains("missing after `process.name:`"));
+        assert!(message("a:1 or ").contains("missing after `or`"));
+        // `not ` at the very end fails in Kibana as well.
+        assert!(codes_of("message:cannot ").contains(&codes::KUERY_PARSE_ERROR.to_string()));
+    }
+
+    #[test]
+    fn hints_for_kql_literals() {
+        let d = find("user.name:jo?n", codes::KUERY_QUESTION_MARK).expect("?");
+        assert_eq!(d.severity, Severity::Hint);
+        assert!(find("url.original:/a?b=1", codes::KUERY_QUESTION_MARK).is_none());
+        assert!(find("uri:/api/v1/secrets?limit*", codes::KUERY_QUESTION_MARK).is_none());
+        assert!(find("path:*/GitHub?Copilot/*", codes::KUERY_QUESTION_MARK).is_some());
+        assert!(find("user.name:\"jo?n\"", codes::KUERY_QUESTION_MARK).is_none());
+        let d = find("powershell", codes::KUERY_FREE_TEXT).expect("free text");
+        assert_eq!(d.severity, Severity::Hint);
+        let d = find(
+            "process.name:cmd.exe and powershell.exe",
+            codes::KUERY_FREE_TEXT,
+        )
+        .expect("free text after a field");
+        assert!(
+            d.message
+                .contains("process.name:(cmd.exe and powershell.exe)"),
+            "{}",
+            d.message
+        );
+        assert!(find("*", codes::KUERY_FREE_TEXT).is_none());
+        assert!(find("a:1 and b:2", codes::KUERY_FREE_TEXT).is_none());
+        assert!(find("user:{ name:x }", codes::KUERY_FREE_TEXT).is_none());
+    }
+
+    #[test]
+    fn lucene_text_in_a_kuery_rule() {
+        let d = find(
+            "_exists_:host.name AND bytes:[100 TO 200]",
+            codes::KUERY_LOOKS_LIKE_LUCENE,
+        )
+        .expect("two signals");
+        assert_eq!(d.severity, Severity::Warning);
+        assert!(d.message.contains("language: lucene"));
+        // One signal alone is not enough.
+        assert!(find("bytes:[100 TO 200]", codes::KUERY_LOOKS_LIKE_LUCENE).is_none());
+        // Implicit AND is a KQL error that Lucene accepts.
+        assert!(find("a:1 b:2 AND _exists_:c", codes::KUERY_LOOKS_LIKE_LUCENE).is_some());
     }
 
     #[test]
