@@ -9,7 +9,7 @@
 //! unnamed expression Kibana may re-print) makes it unknown again, and the
 //! function returns `None` rather than guess.
 
-use crate::text;
+use crate::{string_value, text};
 use opentide_core::LanguageId;
 use opentide_syntax::parse as ts_parse;
 use tree_sitter::Node;
@@ -462,32 +462,6 @@ fn keep(command: Node, source: &str, input: Option<&[String]>) -> Option<Columns
         }
     }
     Some(Some(out))
-}
-
-/// The value of an ES|QL string literal (`"…"` with escapes, or `"""…"""`).
-fn string_value(t: &str) -> Option<String> {
-    if let Some(body) = t.strip_prefix("\"\"\"") {
-        // The body may end with up to two extra quotes before the closing three.
-        return body.strip_suffix("\"\"\"").map(str::to_string);
-    }
-    let body = t.strip_prefix('"')?.strip_suffix('"')?;
-    let mut out = String::new();
-    let mut chars = body.chars();
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            out.push(c);
-            continue;
-        }
-        match chars.next()? {
-            't' => out.push('\t'),
-            'n' => out.push('\n'),
-            'r' => out.push('\r'),
-            '"' => out.push('"'),
-            '\\' => out.push('\\'),
-            _ => return None,
-        }
-    }
-    Some(out)
 }
 
 /// Output keys of a dissect pattern in pattern order: `%{key}`, `%{+key}`,

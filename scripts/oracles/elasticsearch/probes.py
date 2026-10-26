@@ -10,7 +10,8 @@ and one column per release line (8.19, 9.0, ...): `OK` or `ERR`, and for
 Lucene `<strict>/<lenient>` (`ERR/OK`). An empty cell was not recorded.
 
 The script asks the server (ES_URL) for its version, runs every probe, and
-fails when a verdict differs from the recorded one for that line. With
+fails when a verdict differs from the recorded one for that line, when a
+probe or the line has no recorded verdict, or when a recorded probe is gone. With
 `--update` it writes the column for that line instead. `--show` prints every
 probe's verdict and Elasticsearch's message.
 """
@@ -64,6 +65,9 @@ def main() -> int:
     line = ".".join(body["version"]["number"].split(".")[:2])
 
     header, rows = read_expected()
+    if not args.update and line not in header:
+        print(f"expected.tsv records no verdicts for {line}; run with --update to add them", file=sys.stderr)
+        return 1
     seen: set[str] = set()
     failures = 0
     for path in sorted(PROBES.glob("*/*")):
@@ -88,7 +92,10 @@ def main() -> int:
         recorded = rows.get(rel, {}).get(line)
         if args.update:
             rows.setdefault(rel, {})[line] = verdict
-        elif recorded and recorded != verdict:
+        elif recorded is None:
+            failures += 1
+            print(f"{rel}: no verdict recorded for {line} | Elasticsearch says {verdict}")
+        elif recorded != verdict:
             failures += 1
             print(f"{rel}: Elasticsearch {line} says {verdict}, expected.tsv says {recorded} | {cells[2]}")
     if args.update:
@@ -97,6 +104,9 @@ def main() -> int:
         write_expected(header + [line], rows)
         print(f"recorded {len(seen)} verdicts for {line}", file=sys.stderr)
         return 0
+    for stale in sorted(set(rows) - seen):
+        failures += 1
+        print(f"{stale}: recorded in expected.tsv but the probe file is gone")
     print(f"{line}: {len(seen)} probes, {failures} differ from expected.tsv", file=sys.stderr)
     return 1 if failures else 0
 

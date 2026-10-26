@@ -5,7 +5,7 @@
 
 mod markdown;
 
-use opentide_core::{ByteSpan, LanguageId, Range, span_to_range};
+use opentide_core::{ByteSpan, LanguageId, LineIndex, Range};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -500,12 +500,13 @@ pub fn tokens_from_spans(
     source: &str,
     spans: &[(ByteSpan, &str)],
 ) -> Result<Vec<HighlightToken>, HighlightError> {
+    let lines = LineIndex::new(source);
     let mut out = Vec::with_capacity(spans.len());
     for (span, capture) in spans {
         let token_type = spec.token_index(capture)?;
         out.push(HighlightToken {
             span: *span,
-            range: span_to_range(source, *span),
+            range: lines.range(*span),
             capture: (*capture).to_string(),
             token_type,
         });

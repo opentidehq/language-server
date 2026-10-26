@@ -9,7 +9,7 @@
 
 use opentide_core::{
     ByteSpan, CompletionItem, Diagnostic, LanguageId, Position, Range, Severity, codes,
-    span_to_range,
+    position_to_offset, span_to_range,
 };
 use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_syntax::{first_error, node_span, parse as ts_parse};
@@ -48,12 +48,12 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             range(source, node_span(err)),
         ));
     }
-    walk(root, &mut |node| match node.kind() {
+    opentide_syntax::walk_with_ancestors(root, |node, ancestors| match node.kind() {
         "unquoted_literal" => {
             if let Some(d) = embedded_not(node, source) {
                 diagnostics.push(d);
             }
-            diagnostics.extend(lucene_syntax(node, source));
+            diagnostics.extend(lucene_syntax(node, ancestors, source));
             diagnostics.extend(unquoted_escapes(node, source));
             if let Some(d) = question_mark(node, source) {
                 diagnostics.push(d);
@@ -75,7 +75,7 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             }
         }
         "value_expression" => {
-            if let Some(d) = free_text(node, source) {
+            if let Some(d) = free_text(node, ancestors, source) {
                 diagnostics.push(d);
             }
         }
@@ -310,9 +310,9 @@ fn embedded_not(node: Node, source: &str) -> Option<Diagnostic> {
 /// something else. Ranges, `_exists_`, and prefix operators are warnings;
 /// regex and fuzzy/boost shapes are hints, because paths and 8.3 names look
 /// alike.
-fn lucene_syntax(node: Node, source: &str) -> Vec<Diagnostic> {
+fn lucene_syntax(node: Node, ancestors: &[Node], source: &str) -> Vec<Diagnostic> {
     let literal = text(node, source);
-    let in_field = node.parent().is_some_and(|p| p.kind() == "field");
+    let in_field = ancestors.last().is_some_and(|p| p.kind() == "field");
     let span = node_span(node);
     let diagnostic = |severity: Severity, message: &str| {
         let mut d = Diagnostic::warning(codes::KUERY_LUCENE_SYNTAX, message, range(source, span));
@@ -492,20 +492,17 @@ fn question_mark(node: Node, source: &str) -> Option<Diagnostic> {
 /// A value with no field. Kibana searches it in every field
 /// (`index.query.default_field`), and after `f:a and` it is easy to read
 /// `b` as part of `f`.
-fn free_text(node: Node, source: &str) -> Option<Diagnostic> {
+fn free_text(node: Node, ancestors: &[Node], source: &str) -> Option<Diagnostic> {
     let value = text(node, source);
     if value.trim() == "*" {
         return None;
     }
     // Inside a nested query the field context is the nested field.
-    let mut p = node.parent();
-    while let Some(n) = p {
-        if n.kind() == "nested_query" {
-            return None;
-        }
-        p = n.parent();
+    if ancestors.iter().any(|n| n.kind() == "nested_query") {
+        return None;
     }
-    let sibling_field = node.parent().and_then(|parent| {
+    let parent = ancestors.last().copied();
+    let sibling_field = parent.and_then(|parent| {
         if !matches!(parent.kind(), "and_query" | "or_query") {
             return None;
         }
@@ -519,8 +516,7 @@ fn free_text(node: Node, source: &str) -> Option<Diagnostic> {
                 .child_by_field_name("field")
                 .map(|f| text(f, source))
                 .unwrap_or("");
-            let op = node
-                .parent()
+            let op = parent
                 .and_then(|p| p.child(1))
                 .map(|o| text(o, source).to_ascii_lowercase())
                 .unwrap_or_else(|| "and".into());
@@ -583,7 +579,7 @@ fn looks_like_lucene(root: Node, source: &str, found: &[Diagnostic]) -> Option<D
                 "this query reads like Lucene ({}); if it is an Elastic rule, set `language: lucene`",
                 signals.join(", ")
             ),
-            range(source, ByteSpan::new(0, source.len().max(1).min(source.len().max(1)))),
+            range(source, ByteSpan::new(0, source.len())),
         )
     })
 }
@@ -612,11 +608,23 @@ fn fuzzy_or_boost(word: &str) -> bool {
     tail('~') || tail('^')
 }
 
+/// Pre-order walk. Iterative: a query thousands of levels deep (a long
+/// `OR` chain) must not overflow the stack, notably in WASM.
 fn walk<'t>(node: Node<'t>, f: &mut impl FnMut(Node<'t>)) {
-    f(node);
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk(child, f);
+    loop {
+        f(cursor.node());
+        if cursor.goto_first_child() {
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+        }
     }
 }
 
@@ -701,23 +709,6 @@ pub fn completions(source: &str, offset: usize) -> Vec<CompletionItem> {
             .map(|f| CompletionItem::new(f, "property")),
     );
     items
-}
-
-fn position_to_offset(source: &str, position: Position) -> usize {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    for (idx, ch) in source.char_indices() {
-        if line == position.line && col >= position.character {
-            return idx;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += ch.len_utf16() as u32;
-        }
-    }
-    source.len()
 }
 
 #[cfg(test)]

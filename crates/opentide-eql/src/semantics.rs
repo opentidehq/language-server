@@ -7,6 +7,7 @@
 //! `null`, as Elasticsearch's `TypeResolutions.isType` does.
 
 use opentide_core::{ByteSpan, Diagnostic, Range, Severity, codes, span_to_range};
+use std::collections::HashMap;
 use tree_sitter::Node;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -466,32 +467,44 @@ pub(crate) fn check_conditions(node: Node, source: &str, out: &mut Vec<Diagnosti
     }
 }
 
-/// Whether `node` is a condition Elasticsearch translates to a query on its
-/// own: reached from the event filter through `and`, `or`, `not`, and
-/// parentheses only. Comparisons elsewhere (function arguments) run as
-/// scripts, which may compare fields. An `and`/`or` with a `true`/`false`
-/// operand is folded away first, so those paths are skipped.
-fn translated_as_query(node: Node) -> bool {
-    let mut current = node;
-    while let Some(parent) = current.parent() {
+/// Whether a node under `ancestors` is a condition Elasticsearch translates
+/// to a query on its own: reached from the event filter through `and`, `or`,
+/// `not`, and parentheses only. Comparisons elsewhere (function arguments)
+/// run as scripts, which may compare fields. An `and`/`or` with a
+/// `true`/`false` operand is folded away first, so those paths are skipped.
+///
+/// `cache` maps an ancestor's id to the answer for its children, so a long
+/// `or` chain is not rescanned for every comparison in it.
+fn translated_as_query(ancestors: &[Node], cache: &mut HashMap<usize, bool>) -> bool {
+    let mut passed = Vec::new();
+    let mut result = false;
+    for &parent in ancestors.iter().rev() {
+        if let Some(&known) = cache.get(&parent.id()) {
+            result = known;
+            break;
+        }
+        passed.push(parent.id());
         match parent.kind() {
-            "parenthesized_expression" | "not_expression" => {}
+            "parenthesized_expression" | "not_expression" => continue,
             "and_expression" | "or_expression" => {
                 let has_literal = ["left", "right"].iter().any(|f| {
                     parent
                         .child_by_field_name(f)
                         .is_some_and(|n| strip_parens(n).kind() == "boolean")
                 });
-                if has_literal {
-                    return false;
+                if !has_literal {
+                    continue;
                 }
             }
-            "event_query" | "subquery" => return true,
-            _ => return false,
+            "event_query" | "subquery" => result = true,
+            _ => {}
         }
-        current = parent;
+        break;
     }
-    false
+    for id in passed {
+        cache.insert(id, result);
+    }
+    result
 }
 
 fn strip_parens(mut node: Node) -> Node {
@@ -544,9 +557,15 @@ fn field_comparison(
 /// Comparisons whose both sides read fields. `==`, `!=`, `<`, `<=`, `>`,
 /// `>=`, and `in~` fail when translated to a query; an `in` list must hold
 /// constants wherever it appears.
-pub(crate) fn check_field_comparisons(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
+pub(crate) fn check_field_comparisons(
+    node: Node,
+    ancestors: &[Node],
+    translated: &mut HashMap<usize, bool>,
+    source: &str,
+    out: &mut Vec<Diagnostic>,
+) {
     match node.kind() {
-        "comparison" if translated_as_query(node) => {
+        "comparison" if translated_as_query(ancestors, translated) => {
             let (Some(left), Some(right)) = (
                 node.child_by_field_name("left"),
                 node.child_by_field_name("right"),
@@ -594,7 +613,7 @@ pub(crate) fn check_field_comparisons(node: Node, source: &str, out: &mut Vec<Di
                         }
                     }
                 }
-                "in~" if translated_as_query(node) => {
+                "in~" if translated_as_query(ancestors, translated) => {
                     let Some(subject) = node.child_by_field_name("subject") else {
                         return;
                     };

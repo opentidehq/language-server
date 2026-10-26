@@ -169,20 +169,7 @@ pub fn semantic_tokens(language: LanguageId, text: &str) -> SemanticTokens {
 }
 
 fn offset_at_position(text: &str, position: Position) -> usize {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    for (idx, ch) in text.char_indices() {
-        if line == position.line && col >= position.character {
-            return idx;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += 1;
-        }
-    }
-    text.len()
+    opentide_core::position_to_offset(text, position)
 }
 
 fn position_at_offset(text: &str, offset: usize) -> Position {

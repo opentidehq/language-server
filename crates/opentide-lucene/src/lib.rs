@@ -13,7 +13,7 @@ pub mod regexp;
 
 use opentide_core::{
     ByteSpan, CompletionItem, Diagnostic, LanguageId, Position, Range, Severity, codes,
-    span_to_range,
+    position_to_offset, span_to_range,
 };
 use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_syntax::{first_error, node_span, parse as ts_parse};
@@ -69,11 +69,11 @@ pub fn analyze_dialect(source: &str, dialect: Dialect) -> AnalyzeResult {
         diagnostics.push(Diagnostic::error(
             codes::LUCENE_PARSE_ERROR,
             parse_error_message(err, text),
-            range(source, node_span(err)),
+            range(text, node_span(err)),
         ));
     }
     let elastic = dialect == Dialect::Elastic;
-    walk(root, &mut |node| match node.kind() {
+    opentide_syntax::walk_with_ancestors(root, |node, ancestors| match node.kind() {
         "boolean_query" => {
             lowercase_operators(node, text, &mut diagnostics);
             mixed_operators(node, text, &mut diagnostics);
@@ -90,12 +90,21 @@ pub fn analyze_dialect(source: &str, dialect: Dialect) -> AnalyzeResult {
         "field_query" => range_operator(node, text, dialect, &mut diagnostics),
         "range_query" => range_whitespace(node, text, &mut diagnostics),
         "term" | "wildcard_term" | "phrase" | "range_term" => escapes(node, text, &mut diagnostics),
-        "fuzzy" => fuzziness(node, text, dialect, &mut diagnostics),
-        "regexp" => regexp_body(node, text, dialect, &mut diagnostics),
+        "fuzzy" => fuzziness(node, ancestors, text, dialect, &mut diagnostics),
+        "regexp" => regexp_body(node, ancestors, text, dialect, &mut diagnostics),
         _ => {}
     });
     if elastic && let Some(d) = looks_like_kuery(root, text, &diagnostics) {
         diagnostics.push(d);
+    }
+    // The checks ran on the joined text, where every newline is a space:
+    // move their ranges back onto the source's lines (same byte offsets).
+    if !std::ptr::eq(text, source) {
+        for d in &mut diagnostics {
+            let start = position_to_offset(text, d.range.start);
+            let end = position_to_offset(text, d.range.end);
+            d.range = range(source, ByteSpan::new(start, end));
+        }
     }
     let tokens = highlight(&spec, source);
     AnalyzeResult {
@@ -444,9 +453,15 @@ fn elasticsearch_field_syntax(node: Node, source: &str, out: &mut Vec<Diagnostic
 /// `term~N`. Elasticsearch reads `N` as a fuzziness: `0`, `1`, `2`, or
 /// `AUTO`; anything else fails the query. Lucene itself clamps `~3` to 2
 /// and reads `~0.5` as a similarity, which is what Carbon Black's Solr does.
-fn fuzziness(node: Node, source: &str, dialect: Dialect, out: &mut Vec<Diagnostic>) {
+fn fuzziness(
+    node: Node,
+    ancestors: &[Node],
+    source: &str,
+    dialect: Dialect,
+    out: &mut Vec<Diagnostic>,
+) {
     // Phrase slop (`"a b"~3`) is a proximity, not an edit distance.
-    if node.parent().is_none_or(|p| p.kind() != "term_query") {
+    if ancestors.last().is_none_or(|p| p.kind() != "term_query") {
         return;
     }
     let slop = &text(node, source)[1..];
@@ -521,9 +536,11 @@ enum JavaFloat {
     Unknown,
 }
 
-/// The decimal forms Java's `Float.parseFloat` accepts: an optional sign,
-/// `NaN`, `Infinity`, or digits with an optional fraction and exponent, and
-/// an optional `f`/`d` suffix.
+/// The decimal forms Java's `Float.parseFloat` accepts of an upper-cased
+/// string, as `Fuzziness.fromString` passes it: an optional sign, digits with
+/// an optional fraction and exponent, and an optional `F`/`D` suffix. Java's
+/// `NaN` and `Infinity` are case-sensitive, so their upper-cased forms fail
+/// (Elasticsearch 9.5.5: "fuzziness cannot be [NaN]").
 fn java_float(s: &str) -> JavaFloat {
     let unsigned = s.strip_prefix(['+', '-']).unwrap_or(s);
     if unsigned.starts_with("0X") {
@@ -531,11 +548,6 @@ fn java_float(s: &str) -> JavaFloat {
     }
     let negative = s.starts_with('-');
     let signed = |v: f32| JavaFloat::Value(if negative { -v } else { v });
-    match unsigned {
-        "NAN" => return JavaFloat::Value(f32::NAN),
-        "INFINITY" => return signed(f32::INFINITY),
-        _ => {}
-    }
     let body = unsigned.strip_suffix(['F', 'D']).unwrap_or(unsigned);
     let (mantissa, exponent) = match body.split_once('E') {
         Some((m, e)) => (m, Some(e)),
@@ -558,21 +570,20 @@ fn java_float(s: &str) -> JavaFloat {
     }
 }
 
-/// Whether `node` sits under a `field:` clause.
-fn has_field(node: Node) -> bool {
-    let mut current = node.parent();
-    while let Some(n) = current {
-        if n.kind() == "field_query" {
-            return true;
-        }
-        current = n.parent();
-    }
-    false
+/// Whether a node with these ancestors sits under a `field:` clause.
+fn has_field(ancestors: &[Node]) -> bool {
+    ancestors.iter().any(|n| n.kind() == "field_query")
 }
 
 /// The body of `/.../`, checked as Lucene's `RegExp` the way Elasticsearch
 /// compiles it.
-fn regexp_body(node: Node, source: &str, dialect: Dialect, out: &mut Vec<Diagnostic>) {
+fn regexp_body(
+    node: Node,
+    ancestors: &[Node],
+    source: &str,
+    dialect: Dialect,
+    out: &mut Vec<Diagnostic>,
+) {
     let t = text(node, source);
     if t.len() < 2 {
         return;
@@ -597,7 +608,7 @@ fn regexp_body(node: Node, source: &str, dialect: Dialect, out: &mut Vec<Diagnos
         // Without a field, `query_string` searches every field (`*`), which
         // Elasticsearch runs leniently: the term matches nothing instead of
         // failing the query.
-        let fielded = has_field(node);
+        let fielded = has_field(ancestors);
         let message = if fielded {
             problem.message
         } else {
@@ -743,16 +754,28 @@ fn looks_like_kuery(root: Node, source: &str, found: &[Diagnostic]) -> Option<Di
                 "this query reads like Kibana KQL ({}); if it is an Elastic rule, set `language: kuery`",
                 signals.join(", ")
             ),
-            range(source, ByteSpan::new(0, source.len().clamp(1, source.len().max(1)))),
+            range(source, ByteSpan::new(0, source.len())),
         )
     })
 }
 
+/// Pre-order walk. Iterative: a query thousands of levels deep (a long
+/// `OR` chain) must not overflow the stack, notably in WASM.
 fn walk<'t>(node: Node<'t>, f: &mut impl FnMut(Node<'t>)) {
-    f(node);
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk(child, f);
+    loop {
+        f(cursor.node());
+        if cursor.goto_first_child() {
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+        }
     }
 }
 
@@ -850,23 +873,6 @@ pub fn completions(source: &str, offset: usize) -> Vec<CompletionItem> {
             .map(|f| CompletionItem::new(f, "property")),
     );
     items
-}
-
-fn position_to_offset(source: &str, position: Position) -> usize {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    for (idx, ch) in source.char_indices() {
-        if line == position.line && col >= position.character {
-            return idx;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += ch.len_utf16() as u32;
-        }
-    }
-    source.len()
 }
 
 #[cfg(test)]
@@ -973,6 +979,13 @@ mod tests {
 
     #[test]
     fn fuzziness_follows_elasticsearch() {
+        // Elasticsearch 9.5.5 rejects every NaN and Infinity spelling.
+        for q in ["a:b~nan", "a:b~NaN", "a:b~Infinity", "a:b~-INFINITY"] {
+            assert!(
+                codes_of(q).contains(&codes::LUCENE_FUZZY.to_string()),
+                "{q}"
+            );
+        }
         for ok in [
             "f:foo~",
             "f:foo~0",
@@ -1085,6 +1098,17 @@ mod tests {
                 .iter()
                 .any(|(c, s)| c == codes::LUCENE_REGEXP && *s == Severity::Hint)
         );
+        // Diagnostics stay on the source line they belong to.
+        let found = analyze_dialect(
+            "process_name:cmd.exe\n  AND\n  _exists_:x",
+            Dialect::CarbonBlack,
+        )
+        .diagnostics;
+        let d = found
+            .iter()
+            .find(|d| d.code == codes::LUCENE_ELASTICSEARCH_ONLY)
+            .expect("_exists_ warning");
+        assert_eq!((d.range.start.line, d.range.start.character), (2, 2));
         // No Elastic language advice for Carbon Black.
         assert!(
             cb("a:1 and b >= 2")

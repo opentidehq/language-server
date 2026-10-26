@@ -29,7 +29,7 @@ pub use version::{Availability, RELEASES, StackTarget};
 
 use opentide_core::{
     ByteSpan, CompletionItem, Diagnostic, LanguageId, ParameterInformation, Position, Range,
-    Severity, SignatureHelp, SignatureInformation, codes, span_to_range,
+    Severity, SignatureHelp, SignatureInformation, codes, position_to_offset, span_to_range,
 };
 use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_syntax::{first_error, node_span, parse as ts_parse};
@@ -243,7 +243,7 @@ fn string_escape(node: Node, source: &str) -> Option<Diagnostic> {
                         ),
                         range(source, ByteSpan::new(at, at + 2)),
                     )
-                    .with_suggestion(format!("\"\"\"{}\"\"\"", &t[1..t.len().saturating_sub(1)])),
+                    .with_suggestion(double_invalid_escapes(t)),
                 );
             }
             i += 2;
@@ -254,9 +254,28 @@ fn string_escape(node: Node, source: &str) -> Option<Diagnostic> {
     None
 }
 
+/// `t` with each backslash that starts an invalid escape doubled, so
+/// `"C:\Users\n\Bob"` becomes `"C:\\Users\n\\Bob"`: the valid escapes keep
+/// their meaning and every other backslash becomes a literal one.
+fn double_invalid_escapes(t: &str) -> String {
+    let mut out = String::with_capacity(t.len() + 4);
+    let mut chars = t.chars().peekable();
+    while let Some(c) = chars.next() {
+        out.push(c);
+        if c != '\\' {
+            continue;
+        }
+        match chars.peek() {
+            Some('t' | 'n' | 'r' | '"' | '\\') => out.push(chars.next().unwrap_or_default()),
+            _ => out.push('\\'),
+        }
+    }
+    out
+}
+
 /// The value of an ES|QL string literal: `"…"` with `\t \n \r \" \\`, or a
 /// raw `"""…"""`. `None` when an escape is invalid (reported elsewhere).
-fn string_value(raw: &str) -> Option<String> {
+pub(crate) fn string_value(raw: &str) -> Option<String> {
     if let Some(body) = raw.strip_prefix("\"\"\"") {
         return body.strip_suffix("\"\"\"").map(str::to_string);
     }
@@ -403,11 +422,23 @@ fn parse_error_message(err: Node, source: &str) -> String {
     }
 }
 
+/// Pre-order walk. Iterative: a query thousands of levels deep (a long
+/// `OR` chain) must not overflow the stack, notably in WASM.
 fn walk<'t>(node: Node<'t>, f: &mut impl FnMut(Node<'t>)) {
-    f(node);
     let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        walk(child, f);
+    loop {
+        f(cursor.node());
+        if cursor.goto_first_child() {
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+        }
     }
 }
 
@@ -594,8 +625,10 @@ fn gates_for_type(row: &TypeRow, span: ByteSpan) -> gates::Gate {
 
 /// Snapshot-only names fail on every release. Otherwise the catalog's
 /// release lines decide (see [`gates::Gate::diagnostic`]); a row without
-/// them falls back to the docs lifecycle (first documented at 9.2 or later:
-/// missing on 8.19). Preview names may change.
+/// them falls back to the docs lifecycle: a declared target older than the
+/// first documented release is a warning, and with no target, first
+/// documented at 9.2 or later is information (missing on 8.19). Preview
+/// names may change.
 #[allow(clippy::too_many_arguments)]
 fn availability(
     target: Option<StackTarget>,
@@ -638,7 +671,19 @@ fn availability(
         if ga_on_target {
             return None;
         }
-    } else if let Some(first) = lifecycle.after_floor().filter(|_| target.is_none()) {
+    } else if let Some(target) = target {
+        // A declared target older than the first documented release lacks it.
+        if let Some(first) = lifecycle.first().filter(|v| !target.at_least(*v)) {
+            return Some(Diagnostic::warning(
+                codes::ESQL_UNAVAILABLE,
+                format!(
+                    "{what} `{name}` needs Elasticsearch {first} or later ({}); the declared stack {target} lacks it",
+                    lifecycle.describe()
+                ),
+                range,
+            ));
+        }
+    } else if let Some(first) = lifecycle.after_floor() {
         let mut d = Diagnostic::warning(
             codes::ESQL_UNAVAILABLE,
             format!(
@@ -1051,25 +1096,41 @@ fn innermost_call(before: &str) -> Option<(String, u32)> {
     (!name.is_empty()).then_some((name, commas))
 }
 
-fn position_to_offset(source: &str, position: Position) -> usize {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    for (idx, ch) in source.char_indices() {
-        if line == position.line && col >= position.character {
-            return idx;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += ch.len_utf16() as u32;
-        }
-    }
-    source.len()
-}
-
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn lifecycle_fallback_checks_a_declared_target() {
+        let ga = Lifecycle::parse("ga 9.3");
+        let to_range = |span: ByteSpan| span_to_range("x", span);
+        let check = |target| {
+            availability(
+                target,
+                "f",
+                "function",
+                false,
+                &ga,
+                None,
+                ByteSpan::new(0, 1),
+                &to_range,
+            )
+            .map(|d| d.severity)
+        };
+        assert_eq!(check(StackTarget::parse("8.19")), Some(Severity::Warning));
+        assert_eq!(check(StackTarget::parse("9.2")), Some(Severity::Warning));
+        assert_eq!(check(StackTarget::parse("9.3")), None);
+        assert_eq!(check(StackTarget::parse("serverless")), None);
+        assert_eq!(check(None), Some(Severity::Information));
+    }
+
+    #[test]
+    fn escape_fix_keeps_valid_escapes() {
+        assert_eq!(
+            double_invalid_escapes(r#""C:\Users\n\Bob""#),
+            r#""C:\\Users\n\\Bob""#
+        );
+        assert_eq!(double_invalid_escapes(r#""a\\b\*\"q""#), r#""a\\b\\*\"q""#);
+    }
+
     use super::*;
 
     #[test]

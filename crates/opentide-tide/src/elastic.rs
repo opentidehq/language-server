@@ -253,14 +253,56 @@ fn scalar_injection(
     let start = line_start + colon + 1 + lead;
     let raw_end = line_start + line.trim_end_matches(['\n', '\r']).len();
     let raw = source.get(start..raw_end)?;
-    let (inner, host_map) = match raw.chars().next()? {
-        '\'' => unquote(raw, start, '\''),
-        '"' => unquote(raw, start, '"'),
+    let (mut inner, mut host_map) = match raw.chars().next()? {
+        // A quoted scalar that does not close on its line continues on the
+        // next; it is left unanalysed rather than checked in part.
+        '\'' => unquote(raw, start, '\'')?,
+        '"' => unquote(raw, start, '"')?,
         _ => {
             let body = raw.split(" #").next().unwrap_or(raw).trim_end();
             (body.to_string(), (start..start + body.len()).collect())
         }
     };
+    // A plain scalar continues on more-indented lines; YAML folds each line
+    // break into a space (and keeps a blank line as a newline).
+    if !raw.starts_with(['\'', '"']) {
+        let indent = line.len() - line.trim_start().len();
+        let key_indent = if line.trim_start().starts_with("- ") {
+            indent + 2
+        } else {
+            indent
+        };
+        let mut offset = line_start + line.len();
+        let mut blank = 0;
+        for next in &lines[i + 1..] {
+            let content = next.trim_end_matches(['\n', '\r']);
+            let trimmed = content.trim_start();
+            if trimmed.is_empty() {
+                blank += 1;
+                offset += next.len();
+                continue;
+            }
+            let next_indent = content.len() - trimmed.len();
+            if next_indent <= key_indent || trimmed.starts_with('#') {
+                break;
+            }
+            let body = trimmed.split(" #").next().unwrap_or(trimmed).trim_end();
+            let body_start = offset + next_indent;
+            let separator = if blank > 0 {
+                "\n".repeat(blank)
+            } else {
+                " ".into()
+            };
+            for c in separator.chars() {
+                push_char(&mut inner, &mut host_map, c, body_start.saturating_sub(1));
+            }
+            for (k, c) in body.char_indices() {
+                push_char(&mut inner, &mut host_map, c, body_start + k);
+            }
+            blank = 0;
+            offset += next.len();
+        }
+    }
     if inner.trim().is_empty() {
         return None;
     }
@@ -277,8 +319,10 @@ fn scalar_injection(
     })
 }
 
-/// Strip YAML quotes. Single quotes escape `'` as `''`; double quotes use `\`.
-fn unquote(raw: &str, start: usize, quote: char) -> (String, Vec<usize>) {
+/// Strip YAML quotes. Single quotes escape `'` as `''`; double quotes use
+/// YAML's `\` escapes. `None` when the scalar does not close on this line or
+/// uses an escape YAML rejects.
+fn unquote(raw: &str, start: usize, quote: char) -> Option<(String, Vec<usize>)> {
     let mut inner = String::new();
     let mut map = Vec::new();
     let mut chars = raw.char_indices().skip(1).peekable();
@@ -289,22 +333,45 @@ fn unquote(raw: &str, start: usize, quote: char) -> (String, Vec<usize>) {
                 push_char(&mut inner, &mut map, '\'', start + i);
                 continue;
             }
-            break;
+            return Some((inner, map));
         }
         if quote == '"' && c == '\\' {
-            if let Some((j, e)) = chars.next() {
-                let decoded = match e {
-                    'n' => '\n',
-                    't' => '\t',
-                    other => other,
-                };
-                push_char(&mut inner, &mut map, decoded, start + j);
-            }
+            let (j, e) = chars.next()?;
+            let hex = |n: usize, chars: &mut std::iter::Peekable<_>| -> Option<char> {
+                let digits: String = (0..n)
+                    .map(|_| chars.next().map(|(_, d): (usize, char)| d))
+                    .collect::<Option<_>>()?;
+                char::from_u32(u32::from_str_radix(&digits, 16).ok()?)
+            };
+            let decoded = match e {
+                '0' => '\0',
+                'a' => '\u{7}',
+                'b' => '\u{8}',
+                't' | '\t' => '\t',
+                'n' => '\n',
+                'v' => '\u{b}',
+                'f' => '\u{c}',
+                'r' => '\r',
+                'e' => '\u{1b}',
+                ' ' => ' ',
+                '"' => '"',
+                '/' => '/',
+                '\\' => '\\',
+                'N' => '\u{85}',
+                '_' => '\u{a0}',
+                'L' => '\u{2028}',
+                'P' => '\u{2029}',
+                'x' => hex(2, &mut chars)?,
+                'u' => hex(4, &mut chars)?,
+                'U' => hex(8, &mut chars)?,
+                _ => return None,
+            };
+            push_char(&mut inner, &mut map, decoded, start + j - 1);
             continue;
         }
         push_char(&mut inner, &mut map, c, start + i);
     }
-    (inner, map)
+    None
 }
 
 fn push_char(inner: &mut String, map: &mut Vec<usize>, c: char, host: usize) {
@@ -849,6 +916,39 @@ mod tests {
 
     fn block(extra: &str) -> String {
         format!("name: r\nconfigurations:\n  elastic:\n    type: query\n    query: x\n{extra}")
+    }
+
+    #[test]
+    fn flow_scalars_fold_and_decode_like_yaml() {
+        let inner = |query: &str| -> Vec<String> {
+            let src = format!(
+                "name: r\nconfigurations:\n  elastic:\n    type: query\n    language: kuery\n    query: {query}\n    status: STAGING\n"
+            );
+            elastic_injections(&src)
+                .into_iter()
+                .map(|q| {
+                    // Every byte of the inner text maps back into the host.
+                    assert_eq!(q.host_map.len(), q.inner.len());
+                    assert!(q.host_map.iter().all(|&b| b < src.len()));
+                    q.inner
+                })
+                .collect()
+        };
+        // A plain scalar continued on more-indented lines is one query.
+        assert_eq!(
+            inner("process.name:cmd.exe and\n      host.name:x # note"),
+            vec!["process.name:cmd.exe and host.name:x"]
+        );
+        // YAML double-quoted escapes.
+        assert_eq!(
+            inner(r#""a\rb \x41\u0042 \"q\" \\""#),
+            vec!["a\rb AB \"q\" \\"]
+        );
+        assert_eq!(inner("'it''s'"), vec!["it's"]);
+        // An escape YAML rejects, or a quote that does not close on its
+        // line, is not analysed in part.
+        assert!(inner(r#""a\qb""#).is_empty());
+        assert!(inner("\"a and\n      b\"").is_empty());
     }
 
     #[test]

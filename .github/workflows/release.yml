@@ -79,6 +79,7 @@ jobs:
           cp target/wasm32-wasip1/release/opentide-lsp.wasm "dist/opentide-lsp-wasm32-wasip1.wasm"
           wasm-bindgen --target web --out-dir pkg target/wasm32-unknown-unknown/release/opentide_wasm.wasm
           cp LICENSE NOTICE pkg/
+          cp -r licenses pkg/licenses
           (cd pkg && zip -r "../dist/opentide-wasm-web-${VERSION}.zip" .)
       - uses: actions/upload-artifact@v4
         with:
@@ -141,23 +142,28 @@ jobs:
       - name: license scan (no oracle references)
         run: bash scripts/license-scan.sh dist
       # The binaries embed third-party code and data: ship the notices with
-      # them. NOTICE covers ECS, Lucene, and dk.brics; cargo-about lists every
-      # Rust crate and fails on a licence about.toml does not accept.
+      # them. NOTICE covers ECS, Lucene, dk.brics, and the wasi-libc the WASM
+      # builds link (texts in licenses/wasi-libc, shipped as WASI-LIBC-LICENSES.txt); cargo-about lists every Rust
+      # crate in the workspace, the browser build's included, and fails on a
+      # licence about.toml does not accept.
       - uses: dtolnay/rust-toolchain@stable
       - name: licences and notices
         run: |
           set -euo pipefail
           cargo install --locked cargo-about --version 0.8.4
-          cargo about generate -m crates/opentide-lsp/Cargo.toml about.hbs -o dist/THIRD-PARTY-LICENSES.html
+          cargo about generate --workspace about.hbs -o dist/THIRD-PARTY-LICENSES.html
           cp LICENSE dist/LICENSE
           cp NOTICE dist/NOTICE
+          for f in licenses/wasi-libc/*; do
+            printf '==> %s <==\n\n' "$f"; cat "$f"; printf '\n'
+          done > dist/WASI-LIBC-LICENSES.txt
       - name: attach GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -n "$(find dist -name 'highlights-*.zip' -print -quit)"
-          test -s dist/THIRD-PARTY-LICENSES.html && test -s dist/NOTICE
+          test -s dist/THIRD-PARTY-LICENSES.html && test -s dist/NOTICE && test -s dist/WASI-LIBC-LICENSES.txt
           gh release create "${GITHUB_REF_NAME}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${GITHUB_REF_NAME}" \

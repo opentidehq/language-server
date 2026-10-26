@@ -54,19 +54,51 @@ pub fn has_error(tree: &Tree) -> bool {
 /// visible node, so the smallest visible node that still reports the error
 /// stands in for it.
 pub fn first_error(node: Node<'_>) -> Option<Node<'_>> {
-    if node.is_error() || node.is_missing() {
-        return Some(node);
-    }
-    if !node.has_error() {
+    if !node.has_error() && !node.is_missing() {
         return None;
     }
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        if child.has_error() || child.is_missing() {
-            return first_error(child).or(Some(child));
+    // Down the first erroneous child at each level; iterative, so a deeply
+    // nested broken query cannot exhaust the stack.
+    let mut node = node;
+    loop {
+        if node.is_error() || node.is_missing() {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        let next = node
+            .children(&mut cursor)
+            .find(|child| child.has_error() || child.is_missing());
+        match next {
+            Some(child) => node = child,
+            None => return Some(node),
         }
     }
-    Some(node)
+}
+
+/// Pre-order walk that hands each node its ancestors, root first. Iterative,
+/// so a query thousands of levels deep cannot exhaust the stack. Checks that
+/// look upward read `ancestors` instead of calling [`Node::parent`], which
+/// re-descends from the root on every call.
+pub fn walk_with_ancestors<'t>(root: Node<'t>, mut f: impl FnMut(Node<'t>, &[Node<'t>])) {
+    let mut cursor = root.walk();
+    let mut ancestors: Vec<Node<'t>> = Vec::new();
+    loop {
+        let node = cursor.node();
+        f(node, &ancestors);
+        if cursor.goto_first_child() {
+            ancestors.push(node);
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+            ancestors.pop();
+        }
+    }
 }
 
 /// Byte span of a node, never empty so editors can show it.

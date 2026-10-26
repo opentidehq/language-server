@@ -15,7 +15,7 @@ mod semantics;
 
 use opentide_core::{
     ByteSpan, CompletionItem, Diagnostic, LanguageId, ParameterInformation, Position, Range,
-    Severity, SignatureHelp, SignatureInformation, codes, span_to_range,
+    Severity, SignatureHelp, SignatureInformation, codes, position_to_offset, span_to_range,
 };
 use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_syntax::{first_error, node_span, parse as ts_parse};
@@ -263,8 +263,9 @@ pub fn analyze(source: &str) -> AnalyzeResult {
             range(source, span),
         ));
     }
-    walk(root, &mut |node| {
-        check_node(node, source, catalog, &mut out)
+    let mut translated = std::collections::HashMap::new();
+    opentide_syntax::walk_with_ancestors(root, |node, ancestors| {
+        check_node(node, ancestors, &mut translated, source, catalog, &mut out)
     });
     check_pipes(root, source, catalog, &mut out);
     let tokens = highlight(&spec, source, &prepared.text);
@@ -312,7 +313,14 @@ fn parse_error_message(err: Node, source: &str) -> String {
     }
 }
 
-fn check_node(node: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagnostic>) {
+fn check_node(
+    node: Node,
+    ancestors: &[Node],
+    translated: &mut std::collections::HashMap<usize, bool>,
+    source: &str,
+    catalog: &Catalog,
+    out: &mut Vec<Diagnostic>,
+) {
     // Keyword tokens share their kind with the node (`sequence`, `join`).
     if !node.is_named() {
         return;
@@ -328,13 +336,13 @@ fn check_node(node: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagnos
         "event_category" => check_category_case(node, source, out),
         "comparison" => {
             check_literal_wildcard(node, source, out);
-            semantics::check_field_comparisons(node, source, out);
+            semantics::check_field_comparisons(node, ancestors, translated, source, out);
         }
         "predicate_expression" => {
             check_literal_wildcard(node, source, out);
             regex::check_regex(node, source, out);
             semantics::check_types(node, source, out);
-            semantics::check_field_comparisons(node, source, out);
+            semantics::check_field_comparisons(node, ancestors, translated, source, out);
         }
         "binary_expression" | "unary_expression" => semantics::check_types(node, source, out),
         "and_expression" | "or_expression" | "not_expression" | "event_query" => {
@@ -370,9 +378,10 @@ fn check_node(node: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagnos
             let missing = node
                 .child_by_field_name("open")
                 .is_some_and(|o| o.kind() == "missing_event_open");
-            let in_sequence = node
-                .parent()
-                .and_then(|p| p.parent())
+            let in_sequence = ancestors
+                .iter()
+                .rev()
+                .nth(1)
                 .is_some_and(|g| g.kind() == "sequence");
             if missing && !in_sequence {
                 out.push(Diagnostic::error(
@@ -931,7 +940,8 @@ fn check_pipes(root: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagno
             .collect();
         let positive_int = args.len() == 1
             && args[0].kind() == "number"
-            && text(args[0], source).parse::<u32>().is_ok();
+            // A Java `int`: Elasticsearch rejects `head 2147483648`.
+            && text(args[0], source).parse::<i32>().is_ok_and(|n| n >= 0);
         if !positive_int {
             out.push(Diagnostic::error(
                 codes::EQL_PARSE_ERROR,
@@ -1336,23 +1346,6 @@ fn innermost_call(before: &str) -> Option<(String, u32)> {
     (!name.is_empty()).then_some((name, commas))
 }
 
-fn position_to_offset(source: &str, position: Position) -> usize {
-    let mut line = 0u32;
-    let mut col = 0u32;
-    for (idx, ch) in source.char_indices() {
-        if line == position.line && col >= position.character {
-            return idx;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += ch.len_utf16() as u32;
-        }
-    }
-    source.len()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1466,6 +1459,12 @@ mod tests {
                 .contains(&codes::EQL_PARSE_ERROR.to_string())
         );
         assert!(codes_of("process where true | head 5").is_empty());
+        // A Java `int`: 2147483647 runs, 2147483648 fails (Elasticsearch 9.5.5).
+        assert!(codes_of("process where true | head 2147483647").is_empty());
+        assert!(
+            codes_of("process where true | head 2147483648")
+                .contains(&codes::EQL_PARSE_ERROR.to_string())
+        );
         assert!(
             codes_of("process where true | head").contains(&codes::EQL_PARSE_ERROR.to_string())
         );

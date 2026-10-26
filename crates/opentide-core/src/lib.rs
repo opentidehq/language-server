@@ -163,10 +163,82 @@ pub fn offset_to_position(source: &str, offset: usize) -> Position {
     }
 }
 
+/// Convert an LSP position (UTF-16 columns) to a UTF-8 byte offset, the
+/// inverse of [`offset_to_position`]. A column past the end of its line
+/// clamps to the line end; a line past the end of the text gives its length.
+pub fn position_to_offset(source: &str, position: Position) -> usize {
+    let mut line = 0u32;
+    let mut col = 0u32;
+    for (idx, ch) in source.char_indices() {
+        if line == position.line && (col >= position.character || ch == '\n') {
+            return idx;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += ch.len_utf16() as u32;
+        }
+    }
+    source.len()
+}
+
 pub fn span_to_range(source: &str, span: ByteSpan) -> Range {
     Range {
         start: offset_to_position(source, span.start),
         end: offset_to_position(source, span.end),
+    }
+}
+
+/// Line starts of a text, for many offset-to-position conversions: each is a
+/// binary search instead of [`offset_to_position`]'s scan from the start, so
+/// converting every token of a large query stays linear.
+pub struct LineIndex<'a> {
+    source: &'a str,
+    starts: Vec<usize>,
+    /// Lines that are pure ASCII, where a column is a byte distance.
+    ascii: Vec<bool>,
+}
+
+impl<'a> LineIndex<'a> {
+    pub fn new(source: &'a str) -> Self {
+        let mut starts = vec![0];
+        starts.extend(source.match_indices('\n').map(|(i, _)| i + 1));
+        let ascii = (0..starts.len())
+            .map(|line| {
+                let end = starts.get(line + 1).copied().unwrap_or(source.len());
+                source[starts[line]..end].is_ascii()
+            })
+            .collect();
+        Self {
+            source,
+            starts,
+            ascii,
+        }
+    }
+
+    /// Same result as [`offset_to_position`].
+    pub fn position(&self, offset: usize) -> Position {
+        let offset = offset.min(self.source.len());
+        let line = self.starts.partition_point(|&start| start <= offset) - 1;
+        let start = self.starts[line];
+        let character = if self.ascii[line] {
+            (offset - start) as u32
+        } else {
+            utf16_len(&self.source[start..offset])
+        };
+        Position {
+            line: line as u32,
+            character,
+        }
+    }
+
+    /// Same result as [`span_to_range`].
+    pub fn range(&self, span: ByteSpan) -> Range {
+        Range {
+            start: self.position(span.start),
+            end: self.position(span.end),
+        }
     }
 }
 
@@ -397,6 +469,22 @@ pub enum EngineError {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn line_index_matches_offset_to_position() {
+        let text = "ab\n\u{1F600}c\r\n\nd é";
+        let index = LineIndex::new(text);
+        for (offset, _) in text
+            .char_indices()
+            .chain([(text.len(), ' '), (text.len() + 5, ' ')])
+        {
+            assert_eq!(
+                index.position(offset),
+                offset_to_position(text, offset),
+                "{offset}"
+            );
+        }
+    }
+
     use super::*;
 
     #[test]
