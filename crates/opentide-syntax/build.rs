@@ -1,14 +1,17 @@
 //! Compiles the vendored tree-sitter parsers. The grammars, and the highlight queries
 //! `include_str!` reads through `OPENTIDE_ASSETS`, sit at the workspace root in a
-//! checkout, or in the `assets/` copy that `scripts/vendor-crate-assets.py` puts
-//! inside a published crate.
+//! checkout, or else in the `assets/` copy that `scripts/release.py vendor` puts
+//! inside a published crate. The checkout wins, so a copy left behind never shadows
+//! the real files.
 fn main() {
     let manifest = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let vendored = manifest.join("assets");
-    let root = if vendored.is_dir() {
-        vendored
+    let workspace = manifest.join("../..");
+    // A packaged crate builds under target/package/ or the registry, where ../.. has no
+    // catalogs/.
+    let root = if workspace.join("catalogs").is_dir() {
+        workspace
     } else {
-        manifest.join("../..")
+        manifest.join("assets")
     };
     println!("cargo:rustc-env=OPENTIDE_ASSETS={}", root.display());
     println!("cargo:rerun-if-changed=build.rs");

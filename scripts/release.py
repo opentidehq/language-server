@@ -6,12 +6,17 @@
     release.py bump X.Y.Z           set the workspace version and the internal pins
     release.py notes X.Y.Z          print the CHANGELOG.md section for a version
     release.py vendor [--clean]     copy each crate's shared assets into crates/*/assets
+    release.py publish              publish every crate to crates.io, dependencies first
 
 Crates embed catalogs, grammars, and highlight queries from the repository root.
 Cargo packages only what sits inside a crate, so `vendor` copies the files each
 crate reads (every `OPENTIDE_ASSETS` path in its sources, plus the directories in
 `[package.metadata.opentide] assets`) into `crates/<name>/assets/`, where build.rs
-looks first. Run `vendor --clean` afterwards, or later builds keep reading the copy.
+looks when the workspace root is not there. `vendor --clean` removes the copies.
+
+`publish` can be re-run: it skips each crate whose version crates.io already has, and
+waits out the rate limit crates.io puts on brand-new crates, so a first release that
+stops partway resumes where it stopped.
 """
 
 from __future__ import annotations
@@ -21,7 +26,10 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import tomllib
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -130,6 +138,82 @@ def vendor(clean: bool) -> None:
             print(f"{package['name']}: {len(assets)} asset paths")
 
 
+def publish_order(packages: list[dict]) -> list[dict]:
+    """Workspace crates with each one after the crates it depends on."""
+    names = {p["name"] for p in packages}
+    by_name = {p["name"]: p for p in packages}
+    ordered: list[dict] = []
+    seen: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in seen:
+            return
+        seen.add(name)
+        for dep in by_name[name]["dependencies"]:
+            if dep["name"] in names and dep.get("kind") != "dev":
+                visit(dep["name"])
+        ordered.append(by_name[name])
+
+    for package in packages:
+        visit(package["name"])
+    return ordered
+
+
+def index_path(name: str) -> str:
+    """The crate's file in the crates.io sparse index."""
+    n = name.lower()
+    if len(n) <= 2:
+        return f"{len(n)}/{n}"
+    if len(n) == 3:
+        return f"3/{n[0]}/{n}"
+    return f"{n[:2]}/{n[2:4]}/{n}"
+
+
+def on_crates_io(name: str, version: str) -> bool:
+    url = f"https://index.crates.io/{index_path(name)}"
+    request = urllib.request.Request(url, headers={"User-Agent": "opentide-lsp release.py"})
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            lines = response.read().decode().splitlines()
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return False
+        raise
+    return any(json.loads(line)["vers"] == version for line in lines if line.strip())
+
+
+# crates.io lets an account publish a few new crates at once, then one every ten minutes.
+RATE_LIMIT_WAIT = 11 * 60
+RATE_LIMIT_TRIES = 12
+
+
+def publish() -> None:
+    version = workspace_version()
+    for package in publish_order(publishable_crates()):
+        name = package["name"]
+        if on_crates_io(name, version):
+            print(f"{name} {version} is already on crates.io")
+            continue
+        for attempt in range(1, RATE_LIMIT_TRIES + 1):
+            result = subprocess.run(
+                ["cargo", "publish", "-p", name, "--allow-dirty"],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            sys.stdout.write(result.stdout)
+            sys.stderr.write(result.stderr)
+            if result.returncode == 0:
+                break
+            output = (result.stdout + result.stderr).lower()
+            if "429" not in output and "rate limit" not in output:
+                sys.exit(f"cargo publish -p {name} failed")
+            if attempt == RATE_LIMIT_TRIES:
+                sys.exit(f"{name}: still rate limited after {attempt} tries; re-run to resume")
+            print(f"{name}: rate limited, retrying in {RATE_LIMIT_WAIT // 60} minutes")
+            time.sleep(RATE_LIMIT_WAIT)
+
+
 def main(argv: list[str]) -> None:
     match argv:
         case ["version"]:
@@ -152,6 +236,8 @@ def main(argv: list[str]) -> None:
             vendor(clean=False)
         case ["vendor", "--clean"]:
             vendor(clean=True)
+        case ["publish"]:
+            publish()
         case _:
             sys.exit(__doc__)
 
