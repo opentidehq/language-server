@@ -74,9 +74,11 @@ BRANCH_CAST_GLOBS = [
 # 9.0-9.2 ship no inline_cast.json. These are the `::type` names their
 # EsqlDataTypeConverter maps to a conversion function, plus the aliases
 # DataType.fromNameOrAlias accepts (`bool`, `int`, `string`, `date`).
+# 9.0 has no `date` alias: a 9.0.8 server answers `null::date` with
+# "Unknown data type named [date]" (scripts/oracles/elasticsearch/esql_catalog.py).
 CASTS_WITHOUT_JSON = {
     "9.0": [
-        "bool", "boolean", "cartesian_point", "cartesian_shape", "date", "date_nanos",
+        "bool", "boolean", "cartesian_point", "cartesian_shape", "date_nanos",
         "date_period", "datetime", "double", "geo_point", "geo_shape", "int", "integer",
         "ip", "keyword", "long", "string", "time_duration", "unsigned_long", "version",
     ],
@@ -342,10 +344,21 @@ def branch_functions(branches: Path) -> dict[str, dict[str, dict]]:
     return found
 
 
+# Release lines where a live server accepts a function its branch's
+# definitions omit or mark snapshot-only (scripts/oracles/elasticsearch/
+# esql_catalog.py against the latest patch of each line): TO_TDIGEST is a
+# 9.3 preview, WITHOUT ships in 9.4 time-series queries.
+LIVE_FUNCTION_RELEASES = {
+    "to_tdigest": ["9.3"],
+    "without": ["9.4"],
+}
+
+
 def released_on(per_branch: dict[str, dict[str, dict]], name: str) -> list[str]:
+    live = LIVE_FUNCTION_RELEASES.get(name, [])
     return [
         b for b in BRANCHES
-        if name in per_branch[b] and not per_branch[b][name].get("snapshot_only")
+        if b in live or (name in per_branch[b] and not per_branch[b][name].get("snapshot_only"))
     ]
 
 

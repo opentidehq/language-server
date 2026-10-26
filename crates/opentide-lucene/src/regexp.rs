@@ -137,6 +137,90 @@ pub fn check(body: &str, stack: Stack) -> Verdict {
     complex.unwrap_or(Verdict::Ok)
 }
 
+/// One thing Elasticsearch would object to in a regexp body.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Problem {
+    /// `Error` when both 8.19 (Lucene 9.12) and 9.x (Lucene 10) reject it,
+    /// `Warning` when one does or when it depends on an index setting.
+    pub severity: opentide_core::Severity,
+    /// Character index into the body, when the problem has one position.
+    pub at: Option<usize>,
+    pub message: String,
+    /// A syntax error (as opposed to complexity or length).
+    pub syntax: bool,
+}
+
+/// What Elasticsearch makes of a Lucene `RegExp` body compiled with
+/// `ALL | DEPRECATED_COMPLEMENT`: the `query_string` `/…/` term, EQL `regex`,
+/// and ES|QL `RLIKE` all compile it this way.
+pub fn elasticsearch_problems(body: &str) -> Vec<Problem> {
+    use opentide_core::Severity;
+    let es9 = check(body, Stack::Es9);
+    let es8 = check(body, Stack::Es8);
+    // Lucene 9 and 10 read `[\x-y]` differently; everything else parses alike.
+    let invalid = match (&es8, &es9) {
+        (Verdict::Invalid { at, message }, Verdict::Invalid { .. }) => {
+            Some((Severity::Error, *at, message.clone()))
+        }
+        (Verdict::Invalid { at, message }, _) => Some((
+            Severity::Warning,
+            *at,
+            format!("{message} (Elasticsearch 8.19 rejects it, 9.x accepts it)"),
+        )),
+        (_, Verdict::Invalid { at, message }) => Some((
+            Severity::Warning,
+            *at,
+            format!("{message} (Elasticsearch 9.x rejects it, 8.19 accepts it)"),
+        )),
+        _ => None,
+    };
+    if let Some((severity, at, message)) = invalid {
+        return vec![Problem {
+            severity,
+            at: Some(at),
+            message: format!("invalid Lucene regular expression: {message}"),
+            syntax: true,
+        }];
+    }
+    let mut out = Vec::new();
+    let rejected9 = es9 == Verdict::TooComplex;
+    let rejected8 = matches!(es8, Verdict::TooComplex | Verdict::TooLarge);
+    let cause = if es8 == Verdict::TooLarge && !rejected9 {
+        "its matches can be longer than Lucene 9's 1000-state recursion limit"
+    } else {
+        "determinizing it needs more work than `max_determinized_states` (10000) allows; narrow bounded repeats such as `.{1,128}`"
+    };
+    match (rejected8, rejected9) {
+        (true, true) => out.push(Problem {
+            severity: Severity::Error,
+            at: None,
+            message: format!("Elasticsearch cannot compile this regular expression: {cause}"),
+            syntax: false,
+        }),
+        (true, false) | (false, true) => out.push(Problem {
+            severity: Severity::Warning,
+            at: None,
+            message: format!(
+                "Elasticsearch {} cannot compile this regular expression ({cause}); {} accepts it",
+                if rejected9 { "9.x" } else { "8.19" },
+                if rejected9 { "8.19" } else { "9.x" },
+            ),
+            syntax: false,
+        }),
+        (false, false) => {}
+    }
+    // Elasticsearch's default `index.max_regex_length`.
+    if body.encode_utf16().count() > 1000 {
+        out.push(Problem {
+            severity: Severity::Warning,
+            at: None,
+            message: "this regular expression is longer than Elasticsearch's default `index.max_regex_length` (1000), so the query fails unless the index raises it".into(),
+            syntax: false,
+        });
+    }
+    out
+}
+
 /// The compile verdict, or `None` when the construction is too large (or
 /// uses `<n-m>`) to evaluate here.
 fn too_complex(re: &Re, stack: Stack) -> Option<Verdict> {

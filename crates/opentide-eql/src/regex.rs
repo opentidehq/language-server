@@ -54,8 +54,6 @@ pub(crate) struct Findings {
     pub anchors: Vec<char>,
     /// Unescaped Lucene operators that are rarely meant: `@ # & ~`.
     pub operators: Vec<char>,
-    /// A `<` that does not open a `<n-m>` interval.
-    pub bad_interval: bool,
     /// A `(?` group, which Lucene reads as a literal `?`.
     pub inline_flag: bool,
 }
@@ -94,20 +92,6 @@ pub(crate) fn scan(pattern: &str) -> Findings {
             }
             c @ ('@' | '#' | '&' | '~') => {
                 note(&mut f.operators, c);
-                i += 1;
-            }
-            '<' => {
-                let rest: String = chars[i + 1..].iter().take_while(|c| **c != '>').collect();
-                let closed = i + 1 + rest.chars().count() < chars.len();
-                let interval = closed
-                    && rest.split_once('-').is_some_and(|(a, b)| {
-                        !a.is_empty()
-                            && !b.is_empty()
-                            && a.chars().chain(b.chars()).all(|c| c.is_ascii_digit())
-                    });
-                if !interval {
-                    f.bad_interval = true;
-                }
                 i += 1;
             }
             _ => i += 1,
@@ -163,12 +147,14 @@ pub(crate) fn check_regex(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
                 range,
             ));
         }
-        if f.bad_interval {
-            out.push(Diagnostic::warning(
-                codes::EQL_REGEX,
-                "`<` starts a numeric interval `<n-m>` in EQL regex (Lucene syntax); escape it to match `<`, or the pattern fails to compile",
-                range,
-            ));
+        // What Elasticsearch's Lucene RegExp makes of it: syntax errors
+        // (`a<b`, `\\b`), patterns too complex to determinize, and the
+        // `index.max_regex_length` default. Checked against live clusters
+        // (testdata/oracles/elasticsearch/eql-misc).
+        for problem in opentide_lucene::regexp::elasticsearch_problems(&pattern) {
+            let mut d = Diagnostic::error(codes::EQL_REGEX, problem.message, range);
+            d.severity = problem.severity;
+            out.push(d);
         }
     }
 }
@@ -212,8 +198,6 @@ mod tests {
         assert_eq!(scan("a@b#c&d~e").operators, vec!['@', '#', '&', '~']);
         assert_eq!(scan(r"a\@b\^c[$^@]").operators, Vec::<char>::new());
         assert!(scan(r"a\@b\^c[$^@]").anchors.is_empty());
-        assert!(scan("a<b").bad_interval);
-        assert!(!scan("a<1-5>b").bad_interval);
         assert_eq!(scan("a>b"), Findings::default());
         assert_eq!(scan("\"@#\""), Findings::default());
         assert!(scan("(?i)abc").inline_flag);

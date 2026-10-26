@@ -135,6 +135,17 @@ pub fn analyze_for(source: &str, target: Option<StackTarget>) -> AnalyzeResult {
             if let Some(d) = string_escape(node, source) {
                 diagnostics.push(d);
             }
+        } else if node.kind() == "like_expression" {
+            diagnostics.extend(pattern_problems(node, source));
+        } else if node.kind() == "selector" {
+            let name = text(node, source);
+            if !matches!(name.to_ascii_lowercase().as_str(), "data" | "failures") {
+                diagnostics.push(Diagnostic::error(
+                    codes::ESQL_PARSE_ERROR,
+                    format!("unknown index selector `::{name}`; Elasticsearch knows `::data` and `::failures`"),
+                    range(source, node_span(node)),
+                ));
+            }
         } else if node.kind() == "qualified_interval" {
             let value = node.child_by_field_name("value").map(|v| text(v, source));
             if value.is_some_and(|v| !v.bytes().all(|b| b.is_ascii_digit())) {
@@ -146,6 +157,30 @@ pub fn analyze_for(source: &str, target: Option<StackTarget>) -> AnalyzeResult {
             }
         }
     });
+    // Elasticsearch caps expression depth: 400 until 8.19.16, 9.0-9.2,
+    // 9.3.4, and 9.4.2; 300 from 8.19.17, 9.3.5, 9.4.3, and 9.5.
+    let (depth, deepest) = expression_depth(root);
+    if depth > 300 {
+        let span = deepest.map_or_else(|| node_span(root), node_span);
+        let (severity, message) = if depth > 400 {
+            (
+                Severity::Error,
+                format!(
+                    "expressions nest {depth} deep; every Elasticsearch release rejects more than 400 (300 on recent patches). Split the condition"
+                ),
+            )
+        } else {
+            (
+                Severity::Warning,
+                format!(
+                    "expressions nest {depth} deep; Elasticsearch 8.19.17+, 9.3.5+, 9.4.3+, and 9.5 reject more than 300 (earlier releases allow 400)"
+                ),
+            )
+        };
+        let mut d = Diagnostic::error(codes::ESQL_EXPRESSION_DEPTH, message, range(source, span));
+        d.severity = severity;
+        diagnostics.push(d);
+    }
     // Kibana 9.4 and later add `METADATA _id` themselves (elastic-1.0
     // Advisories), so a declared 9.4+ or Serverless target skips the advisory.
     if !target.is_some_and(|t| t.at_least(StackVersion::new(9, 4))) {
@@ -217,6 +252,139 @@ fn string_escape(node: Node, source: &str) -> Option<Diagnostic> {
         i += 1;
     }
     None
+}
+
+/// The value of an ES|QL string literal: `"…"` with `\t \n \r \" \\`, or a
+/// raw `"""…"""`. `None` when an escape is invalid (reported elsewhere).
+fn string_value(raw: &str) -> Option<String> {
+    if let Some(body) = raw.strip_prefix("\"\"\"") {
+        return body.strip_suffix("\"\"\"").map(str::to_string);
+    }
+    let body = raw.strip_prefix('"')?.strip_suffix('"')?;
+    let mut out = String::with_capacity(body.len());
+    let mut chars = body.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        out.push(match chars.next()? {
+            't' => '\t',
+            'n' => '\n',
+            'r' => '\r',
+            '"' => '"',
+            '\\' => '\\',
+            _ => return None,
+        });
+    }
+    Some(out)
+}
+
+/// `LIKE` and `RLIKE` patterns Elasticsearch fails to compile, on every
+/// release (testdata/oracles/elasticsearch/esql-functions): a `LIKE` escape
+/// that is not `\*`, `\?`, or `\\`, and an `RLIKE` body Lucene's `RegExp`
+/// rejects or cannot determinize.
+fn pattern_problems(node: Node, source: &str) -> Vec<Diagnostic> {
+    let rlike = node
+        .child_by_field_name("operator")
+        .is_some_and(|o| text(o, source).eq_ignore_ascii_case("rlike"));
+    let mut out = Vec::new();
+    let mut cursor = node.walk();
+    for pattern in node.children_by_field_name("pattern", &mut cursor) {
+        if pattern.kind() != "string" {
+            continue;
+        }
+        let Some(value) = string_value(text(pattern, source)) else {
+            continue;
+        };
+        let at = range(source, node_span(pattern));
+        if rlike {
+            for problem in opentide_lucene::regexp::elasticsearch_problems(&value) {
+                let mut d = Diagnostic::error(
+                    codes::ESQL_PATTERN,
+                    format!("RLIKE: {}", problem.message),
+                    at,
+                );
+                d.severity = problem.severity;
+                out.push(d);
+            }
+            continue;
+        }
+        let mut chars = value.chars();
+        while let Some(c) = chars.next() {
+            if c != '\\' {
+                continue;
+            }
+            match chars.next() {
+                Some('*' | '?' | '\\') => {}
+                other => {
+                    let what =
+                        other.map_or("the end of the pattern".to_string(), |c| format!("`{c}`"));
+                    out.push(Diagnostic::error(
+                        codes::ESQL_PATTERN,
+                        format!(
+                            "LIKE escapes only `*`, `?`, and `\\`; a backslash before {what} fails. Write `\\\\` for a literal backslash"
+                        ),
+                        at,
+                    ));
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Nesting depth of expressions, counted the way Elasticsearch's parser
+/// limit sees a chain of `AND`/`OR` terms: each logical, comparison,
+/// arithmetic, predicate, cast, call, or parenthesized node adds one.
+fn expression_depth(root: Node) -> (usize, Option<Node>) {
+    const NESTING: &[&str] = &[
+        "not_expression",
+        "and_expression",
+        "or_expression",
+        "in_expression",
+        "is_null_expression",
+        "like_expression",
+        "match_expression",
+        "comparison",
+        "unary_expression",
+        "binary_expression",
+        "parenthesized_expression",
+        "inline_cast",
+        "function_call",
+    ];
+    // Iterative: a 10 000-term chain must not overflow the stack.
+    let mut cursor = root.walk();
+    let mut depth = 0usize;
+    let mut stack: Vec<bool> = Vec::new();
+    let (mut max, mut deepest) = (0usize, None);
+    loop {
+        let node = cursor.node();
+        let counts = NESTING.contains(&node.kind());
+        if counts {
+            depth += 1;
+            if depth > max {
+                max = depth;
+                deepest = Some(node);
+            }
+        }
+        stack.push(counts);
+        if cursor.goto_first_child() {
+            continue;
+        }
+        loop {
+            if stack.pop() == Some(true) {
+                depth -= 1;
+            }
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return (max, deepest);
+            }
+        }
+    }
 }
 
 fn parse_error_message(err: Node, source: &str) -> String {

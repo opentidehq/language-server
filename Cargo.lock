@@ -379,6 +379,7 @@ dependencies = [
  "opentide-core",
  "opentide-ecs",
  "opentide-highlight",
+ "opentide-lucene",
  "opentide-syntax",
  "serde",
  "toml",
@@ -391,6 +392,7 @@ version = "0.1.0"
 dependencies = [
  "opentide-core",
  "opentide-highlight",
+ "opentide-lucene",
  "opentide-syntax",
  "serde",
  "toml",

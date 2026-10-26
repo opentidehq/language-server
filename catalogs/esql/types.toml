@@ -38,7 +38,7 @@ versions = ["9.5", "9.6"]
 [[types]]
 name = "date"
 function = "to_datetime"
-versions = ["8.19", "9.0", "9.1", "9.2", "9.3", "9.4", "9.5", "9.6"]
+versions = ["8.19", "9.1", "9.2", "9.3", "9.4", "9.5", "9.6"]
 
 [[types]]
 name = "date_nanos"

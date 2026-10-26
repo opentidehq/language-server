@@ -93,8 +93,11 @@ fn parameters(name: &str) -> Option<(&'static [Want], bool)> {
     })
 }
 
-const OPERAND_STRING: (Want, Severity) = (Want::Str, Severity::Warning);
-const OPERAND_NUMBER: (Want, Severity) = (Want::Numeric, Severity::Warning);
+// Operator operands are verified like function arguments; every release from
+// 8.19 to 9.5 rejects a wrong literal type, mapped field or not
+// (testdata/oracles/elasticsearch/eql-argument-types).
+const OPERAND_STRING: (Want, Severity) = (Want::Str, Severity::Error);
+const OPERAND_NUMBER: (Want, Severity) = (Want::Numeric, Severity::Error);
 
 fn named_children<'t>(node: Node<'t>, field: &str) -> Vec<Node<'t>> {
     let mut cursor = node.walk();
@@ -269,13 +272,12 @@ fn check_value(
     if want == Want::StrConst {
         let (required, optional_only) = field_refs(node);
         if required || optional_only {
+            // Mapped, a field is not a constant; unmapped, an optional field
+            // makes Elasticsearch fail with a server error. Both fail.
             let (severity, tail) = if required {
                 (Severity::Error, "")
             } else {
-                (
-                    Severity::Warning,
-                    " (an optional field is a constant only while it is unmapped)",
-                )
+                (Severity::Error, " (an unmapped optional field fails too)")
             };
             out.push(diag(
                 severity,
@@ -398,8 +400,23 @@ pub(crate) fn check_types(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
                 .child_by_field_name("operator")
                 .map(|o| text(o, source))
                 .unwrap_or("");
-            // `in` checks exactness and list compatibility, not string types.
+            // `in` checks exactness and list compatibility, not string types:
+            // mixing string and number literals fails against any mapped
+            // field. An unmapped optional field (`?x`) is null and passes.
             if operator == "in" {
+                let values = named_children(node, "values");
+                let has = |t: fn(Ty) -> bool| values.iter().any(|v| t(ty(*v, source)));
+                let optional = node
+                    .child_by_field_name("subject")
+                    .is_some_and(|s| text(s, source).starts_with('?'));
+                if has(|t| t == Ty::Str) && has(|t| t.numeric()) && !optional {
+                    out.push(diag(
+                        Severity::Error,
+                        codes::EQL_ARGUMENT_TYPE,
+                        "an `in` list mixes strings and numbers; Elasticsearch requires every value to match the field's type".into(),
+                        span_to_range(source, ByteSpan::new(node.start_byte(), node.end_byte())),
+                    ));
+                }
                 return;
             }
             if let Some(subject) = node.child_by_field_name("subject") {
@@ -416,6 +433,36 @@ pub(crate) fn check_types(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
             }
         }
         _ => {}
+    }
+}
+
+/// `eql_not_boolean`: a string or number literal where EQL needs a boolean:
+/// the `where` condition, an operand of `and` / `or`, or of `not`.
+/// Elasticsearch rejects it on every release ("Condition expression needs to
+/// be boolean").
+pub(crate) fn check_conditions(node: Node, source: &str, out: &mut Vec<Diagnostic>) {
+    let fields: &[&str] = match node.kind() {
+        "and_expression" | "or_expression" => &["left", "right"],
+        "not_expression" => &["operand"],
+        _ => &["condition"],
+    };
+    for field in fields {
+        let Some(child) = node.child_by_field_name(field) else {
+            continue;
+        };
+        let literal = strip_parens(child);
+        if matches!(literal.kind(), "string" | "number") {
+            let t = ty(literal, source);
+            out.push(diag(
+                Severity::Error,
+                codes::EQL_NOT_BOOLEAN,
+                format!(
+                    "{} is not a condition: EQL needs a boolean here (a comparison, a predicate, `true` or `false`)",
+                    literal_desc(literal, source, t)
+                ),
+                span_to_range(source, ByteSpan::new(literal.start_byte(), literal.end_byte())),
+            ));
+        }
     }
 }
 

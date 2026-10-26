@@ -384,6 +384,9 @@ pub mod codes {
     /// `::type` names no Elasticsearch release can cast to.
     pub const ESQL_UNKNOWN_TYPE: &str = "esql_unknown_type";
     pub const ESQL_GROUP_BY_COLUMN: &str = "esql_group_by_column";
+    pub const EQL_NOT_BOOLEAN: &str = "eql_not_boolean";
+    pub const ESQL_PATTERN: &str = "esql_pattern";
+    pub const ESQL_EXPRESSION_DEPTH: &str = "esql_expression_depth";
 }
 
 #[derive(Debug, Error)]

@@ -17,7 +17,7 @@ use opentide_core::{
 };
 use opentide_highlight::{HighlightSpec, HighlightToken, tokens_from_spans};
 use opentide_syntax::{first_error, node_span, parse as ts_parse};
-use regexp::{Stack, Verdict};
+
 use tree_sitter::Node;
 
 const SYNTAX_DOCS: &str = "https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-query-string-query#query-string-syntax";
@@ -558,6 +558,18 @@ fn java_float(s: &str) -> JavaFloat {
     }
 }
 
+/// Whether `node` sits under a `field:` clause.
+fn has_field(node: Node) -> bool {
+    let mut current = node.parent();
+    while let Some(n) = current {
+        if n.kind() == "field_query" {
+            return true;
+        }
+        current = n.parent();
+    }
+    false
+}
+
 /// The body of `/.../`, checked as Lucene's `RegExp` the way Elasticsearch
 /// compiles it.
 fn regexp_body(node: Node, source: &str, dialect: Dialect, out: &mut Vec<Diagnostic>) {
@@ -576,72 +588,32 @@ fn regexp_body(node: Node, source: &str, dialect: Dialect, out: &mut Vec<Diagnos
             ByteSpan::new(start + b, start + b + width)
         }
     };
-    let es9 = regexp::check(body, Stack::Es9);
-    let es8 = regexp::check(body, Stack::Es8);
-    // Lucene 9 and 10 read `[\x-y]` differently; everything else parses alike.
-    let invalid = match (&es8, &es9) {
-        (Verdict::Invalid { at, message }, Verdict::Invalid { .. }) => {
-            Some((Severity::Error, *at, message.clone()))
+    for problem in regexp::elasticsearch_problems(body) {
+        // Carbon Black's Solr version is not known: syntax advice only.
+        if dialect == Dialect::CarbonBlack && !problem.syntax {
+            continue;
         }
-        (Verdict::Invalid { at, message }, _) => Some((
-            Severity::Warning,
-            *at,
-            format!("{message} (Elasticsearch 8.19 rejects it, 9.x accepts it)"),
-        )),
-        (_, Verdict::Invalid { at, message }) => Some((
-            Severity::Warning,
-            *at,
-            format!("{message} (Elasticsearch 9.x rejects it, 8.19 accepts it)"),
-        )),
-        _ => None,
-    };
-    if let Some((severity, at, message)) = invalid {
-        let mut d = Diagnostic::error(
-            codes::LUCENE_REGEXP,
-            format!("invalid Lucene regular expression: {message}"),
-            range(source, at_char(at)),
-        );
-        // Carbon Black's Solr version is not known; advise only.
+        let span = problem.at.map_or_else(|| node_span(node), at_char);
+        // Without a field, `query_string` searches every field (`*`), which
+        // Elasticsearch runs leniently: the term matches nothing instead of
+        // failing the query.
+        let fielded = has_field(node);
+        let message = if fielded {
+            problem.message
+        } else {
+            format!(
+                "{}; with no field, Elasticsearch searches every field leniently, so this term silently matches nothing",
+                problem.message
+            )
+        };
+        let mut d = Diagnostic::error(codes::LUCENE_REGEXP, message, range(source, span));
         d.severity = match dialect {
-            Dialect::Elastic => severity,
-            Dialect::CarbonBlack => Severity::Warning,
+            Dialect::Elastic if fielded => problem.severity,
+            Dialect::Elastic | Dialect::CarbonBlack => Severity::Warning,
         };
         out.push(d);
-        return;
-    }
-    if dialect == Dialect::Elastic {
-        let rejected9 = es9 == Verdict::TooComplex;
-        let rejected8 = matches!(es8, Verdict::TooComplex | Verdict::TooLarge);
-        let span = node_span(node);
-        let cause = if es8 == Verdict::TooLarge && !rejected9 {
-            "its matches can be longer than Lucene 9's 1000-state recursion limit"
-        } else {
-            "determinizing it needs more work than `max_determinized_states` (10000) allows; narrow bounded repeats such as `.{1,128}`"
-        };
-        match (rejected8, rejected9) {
-            (true, true) => out.push(Diagnostic::error(
-                codes::LUCENE_REGEXP,
-                format!("Elasticsearch cannot compile this regular expression: {cause}"),
-                range(source, span),
-            )),
-            (true, false) | (false, true) => out.push(Diagnostic::warning(
-                codes::LUCENE_REGEXP,
-                format!(
-                    "Elasticsearch {} cannot compile this regular expression ({cause}); {} accepts it",
-                    if rejected9 { "9.x" } else { "8.19" },
-                    if rejected9 { "8.19" } else { "9.x" },
-                ),
-                range(source, span),
-            )),
-            (false, false) => {}
-        }
-        // Elasticsearch's default `index.max_regex_length`.
-        if body.encode_utf16().count() > 1000 {
-            out.push(Diagnostic::warning(
-                codes::LUCENE_REGEXP,
-                "this regular expression is longer than Elasticsearch's default `index.max_regex_length` (1000), so the query fails unless the index raises it",
-                range(source, span),
-            ));
+        if problem.syntax {
+            return;
         }
     }
     regexp_pcre_habits(body, start, source, dialect, out);

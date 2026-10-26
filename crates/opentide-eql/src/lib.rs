@@ -257,7 +257,7 @@ pub fn analyze(source: &str) -> AnalyzeResult {
         out.push(Diagnostic::warning(
             codes::EQL_EXPRESSION_DEPTH,
             format!(
-                "expression nesting exceeds {} levels (parentheses plus chained `not`/`-`/`+`): Elasticsearch 8.19 and 9.3+ reject this query; 9.0 to 9.2 have no such limit",
+                "expression nesting exceeds {} levels (parentheses plus chained `not`/`-`/`+`): Elasticsearch 8.19.17+, 9.3.5+, 9.4.3+, and 9.5 reject this query; earlier patches and 9.0 to 9.2 accept it",
                 lexical::MAX_EXPRESSION_DEPTH
             ),
             range(source, span),
@@ -337,6 +337,9 @@ fn check_node(node: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagnos
             semantics::check_field_comparisons(node, source, out);
         }
         "binary_expression" | "unary_expression" => semantics::check_types(node, source, out),
+        "and_expression" | "or_expression" | "not_expression" | "event_query" => {
+            semantics::check_conditions(node, source, out)
+        }
         "function_call" => {
             if check_function(node, source, catalog, out) {
                 semantics::check_types(node, source, out);
@@ -363,6 +366,7 @@ fn check_node(node: Node, source: &str, catalog: &Catalog, out: &mut Vec<Diagnos
             ));
         }
         "subquery" => {
+            semantics::check_conditions(node, source, out);
             let missing = node
                 .child_by_field_name("open")
                 .is_some_and(|o| o.kind() == "missing_event_open");
@@ -1626,8 +1630,8 @@ mod tests {
                 with_severity(src)
             );
         }
-        // Operator operands: the same Verifier rule, reported as warnings
-        // because converted public rules lean on `EventID:4624`.
+        // Operator operands: the same Verifier rule. Live clusters 8.19-9.5
+        // reject every one, `EventID:4624` included.
         for src in [
             "process where process.name : 1",
             "process where process.name : (\"a\", true)",
@@ -1639,7 +1643,7 @@ mod tests {
         ] {
             assert_eq!(
                 with_severity(src),
-                vec![(codes::EQL_ARGUMENT_TYPE.to_string(), Severity::Warning)],
+                vec![(codes::EQL_ARGUMENT_TYPE.to_string(), Severity::Error)],
                 "{src}"
             );
         }

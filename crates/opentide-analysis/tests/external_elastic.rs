@@ -24,6 +24,15 @@ fn analyze(language: LanguageId, text: &str) -> Vec<Diagnostic> {
     }
 }
 
+/// Public queries that Elasticsearch itself rejects, with the error the
+/// engine must report. pySigma's EQL backend writes numbers as `field:4624`;
+/// `:` takes only strings, and every release rejects it on a keyword or
+/// numeric field (testdata/oracles/elasticsearch/eql-argument-types).
+const REJECTED: &[(&str, &str)] = &[(
+    "eql/win_security_access_token_abuse.eql",
+    "eql_argument_type",
+)];
+
 fn errors(diagnostics: &[Diagnostic]) -> Vec<&str> {
     diagnostics
         .iter()
@@ -49,10 +58,17 @@ fn public_elastic_queries_and_fault_twins() {
             }
             let text = fs::read_to_string(&path).unwrap();
             let found = analyze(language, &text);
-            assert!(
-                errors(&found).is_empty(),
-                "{id}/{name} is a public query and must not error: {found:?}"
-            );
+            let key = format!("{id}/{name}");
+            match REJECTED.iter().find(|(k, _)| *k == key) {
+                Some((_, code)) => assert!(
+                    errors(&found).iter().all(|c| c == code) && !errors(&found).is_empty(),
+                    "{key}: Elasticsearch rejects it; expected only {code} errors: {found:?}"
+                ),
+                None => assert!(
+                    errors(&found).is_empty(),
+                    "{key} is a public query and must not error: {found:?}"
+                ),
+            }
             let broken_name = name.replacen(&format!(".{id}"), &format!(".broken.{id}"), 1);
             let broken = fs::read_to_string(dir.join(&broken_name))
                 .unwrap_or_else(|_| panic!("missing {id}/{broken_name}"));

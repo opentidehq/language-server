@@ -8,6 +8,7 @@ description = "I/O-free ES|QL engine (parse, catalog, diagnostics) for Elastic S
 
 [dependencies]
 opentide-core.workspace = true
+opentide-lucene.workspace = true
 opentide-syntax.workspace = true
 opentide-highlight.workspace = true
 serde.workspace = true

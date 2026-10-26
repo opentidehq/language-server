@@ -81,6 +81,8 @@ Language id `esql` (`.esql`). Commands and keywords are case-insensitive. The ca
 
 Each catalog row also lists the release lines (8.19, 9.0 … 9.6) whose own grammar and definitions accept it, and the engine keeps the same sets for forms that are not names (`RENAME new = old`, `LIKE (…)`, `::failures`, `??`, the `m` unit, subqueries, `where(` with no space). `opentide_esql::analyze` checks against every supported line: information when an older line lacks a form, a warning when the newest line does too (the 8.19-only `FROM x [METADATA …]` and `COMPLETION … WITH endpoint`, functions removed after a release). `analyze_for(source, Some(target))` checks one declared line (`StackTarget::parse("9.5")`, `"serverless"`) and warns when it lacks a form. `::type` names no release accepts are `esql_unknown_type` errors. Block comments nest as in Elasticsearch (`src/scanner.c`). `opentide_esql::output_columns` returns the query's column names when `KEEP` or `STATS` fixes them, and `None` when they depend on the index.
 
+`esql_pattern` checks `LIKE` and `RLIKE` patterns: `LIKE` escapes only `\*`, `\?`, and `\\`, and an `RLIKE` pattern gets Lucene's `RegExp` checks (`lucene_regexp` below). `esql_expression_depth` is an error past 400 nested expressions, which every release rejects, and a warning from 301. A `::` selector other than `data` or `failures` is an `esql_parse_error`.
+
 | id | grammar rule | fixture ids | capture |
 | --- | --- | --- | --- |
 | esql.change-point | `change_point_command` | `change_point_command__valid`, `change_point_command__invalid` | `keyword` |
@@ -166,7 +168,7 @@ Language id `eql` (`.eql`). Keywords are lowercase and reserved. Elastic Securit
 
 Elasticsearch's lexer nests `/* */` comments; the grammar ends a comment at the first `*/`. The engine blanks the inner `/` and `*` of a comment Elasticsearch nests before parsing (byte offsets unchanged), so diagnostics, highlighting, and hover follow Elasticsearch, and it warns `eql_nested_comment`. The vendored grammar used on its own does not nest, so there is no `comment` corpus fixture for nesting.
 
-Checks beyond the grammar: `eql_argument_type` (literal types the Verifier rejects: errors for function arguments, warnings for `:`/`in~`/`regex` and arithmetic operands), `eql_field_comparison` (both sides of a comparison read fields), `eql_expression_depth` (over 250 levels: rejected by 8.19 and 9.3+, a warning), `eql_runs_ignored` (decimal `runs`), `eql_until_term` (`runs` or `![` on `until`), `eql_regex` (Lucene `RegExp` pitfalls), and the hint `eql_maxspan_missing`. `opentide_eql::sequences` gives each sequence's `maxspan` in milliseconds for rule-level scheduling checks.
+Checks beyond the grammar: `eql_argument_type` (literal types the Verifier rejects on every release: function arguments, `:`/`in~`/`regex` patterns and arithmetic operands, `cidrMatch` ranges, and an `in` list mixing strings and numbers), `eql_not_boolean` (a string or number literal as a condition), `eql_field_comparison` (both sides of a comparison read fields), `eql_expression_depth` (over 250 levels: rejected by 8.19.17+, 9.3.5+, 9.4.3+, and 9.5, a warning), `eql_runs_ignored` (decimal `runs`), `eql_until_term` (`runs` or `![` on `until`), `eql_regex` (Lucene `RegExp` pitfalls), and the hint `eql_maxspan_missing`. `opentide_eql::sequences` gives each sequence's `maxspan` in milliseconds for rule-level scheduling checks.
 
 ## Kibana KQL (kuery)
 
