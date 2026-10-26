@@ -15,7 +15,9 @@ What counts as "absent" on a release build:
   type [name]`;
 - a command: a `parsing_exception` at or before the command keyword (the
   grammar does not know it, the builder refuses it outside snapshot builds,
-  or a command the probe needs first is missing). Any other response,
+  or a command the probe needs first is missing), or 8.19's 500 for a
+  command missing from telemetry. A probe the lexer refuses after the
+  keyword defers to the command's next form, if it has one. Any other response,
   including errors about the fixture or about argument types, means the
   name exists.
 
@@ -163,7 +165,18 @@ def parse_error_at_or_before(status: int, body: dict, offset: int) -> bool:
 
 def command_absent(query: str, status: int, body: dict) -> bool:
     keyword_at = query.rfind("| ") + 2 if "| " in query else 0
+    # 8.19 parses `EXPLAIN [...]`, then fails every run with a 500: the
+    # command exists only in snapshot builds' telemetry.
+    if status == 500 and re.search(r"Command not mapped for telemetry", error_text(body)):
+        return True
     return parse_error_at_or_before(status, body, keyword_at)
+
+
+def lexer_refused(status: int, body: dict) -> bool:
+    """The lexer has no token for some part of this probe's form (8.19 lexes
+    `EXPLAIN (` with no rule for `(`), so the command's next form decides.
+    The last form falls back to the keyword-position rule."""
+    return status == 400 and "token recognition error" in error_text(body)
 
 
 def main() -> int:
@@ -203,10 +216,12 @@ def main() -> int:
             rows.append(("command", name, line in row.get("versions", []), False, "no probe"))
             continue
         present, detail = False, ""
-        for query in queries:
+        for i, query in enumerate(queries):
             status, body = ask(url, query, mapped)
             text = error_text(body) if status != 200 else "OK"
             detail = f"{query} => {text}"
+            if lexer_refused(status, body) and i + 1 < len(queries):
+                continue
             if not command_absent(query, status, body):
                 present = True
                 break

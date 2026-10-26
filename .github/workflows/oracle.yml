@@ -97,3 +97,29 @@ jobs:
         env:
           OPENTIDE_DETECTION_RULES: ${{ github.workspace }}/detection-rules
         run: bash scripts/ci-oracle.sh esql eql kuery lucene
+
+  elasticsearch:
+    # The oldest and newest recorded release lines. probes.py fails when a
+    # verdict in testdata/oracles/elasticsearch/expected.tsv no longer holds;
+    # esql_catalog.py fails when a catalogs/esql `versions` list is wrong.
+    name: Live Elasticsearch ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ["8.19.23", "9.5.5"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Start Elasticsearch
+        shell: bash  # with pipefail, so a failed start fails the step
+        run: bash scripts/oracles/elasticsearch/start.sh ${{ matrix.version }} | sed "s/^export //" >> "$GITHUB_ENV"
+      - name: Probes
+        run: python3 scripts/oracles/elasticsearch/probes.py
+      - name: ES|QL catalog versions
+        run: python3 scripts/oracles/elasticsearch/esql_catalog.py
+      - name: Stop Elasticsearch
+        if: always()
+        run: docker rm -f opentide-es-oracle-9200
