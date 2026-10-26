@@ -30,9 +30,22 @@ fn rule_files(root: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn analyze(language: LanguageId, query: &str) -> Vec<Diagnostic> {
+/// A rule's `metadata.min_stack_version` (`"9.5.0"`) as the stack its ES|QL
+/// must run on, so a rule built for 9.5 is not checked against 8.19.
+fn min_stack(doc: &toml::Table) -> Option<opentide_esql::StackTarget> {
+    let version = doc.get("metadata")?.get("min_stack_version")?.as_str()?;
+    let mut parts = version.split('.');
+    let major_minor = format!("{}.{}", parts.next()?, parts.next()?);
+    opentide_esql::StackTarget::parse(&major_minor)
+}
+
+fn analyze(
+    language: LanguageId,
+    query: &str,
+    stack: Option<opentide_esql::StackTarget>,
+) -> Vec<Diagnostic> {
     match language {
-        LanguageId::Esql => opentide_esql::analyze(query).diagnostics,
+        LanguageId::Esql => opentide_esql::analyze_for(query, stack).diagnostics,
         LanguageId::Eql => opentide_eql::analyze(query).diagnostics,
         LanguageId::Kuery => opentide_kuery::analyze(query).diagnostics,
         LanguageId::Lucene => opentide_lucene::analyze(query).diagnostics,
@@ -91,7 +104,7 @@ fn every_public_elastic_rule_is_free_of_engine_errors() {
             for (language, query) in queries {
                 *checked.entry(language.as_str()).or_default() += 1;
                 let query = query.trim();
-                for d in analyze(language, query) {
+                for d in analyze(language, query, min_stack(&doc)) {
                     if d.severity == Severity::Error {
                         errors.push(format!(
                             "{}: {} {}:{} {}",
@@ -122,7 +135,7 @@ fn every_public_elastic_rule_is_free_of_engine_errors() {
         for (language, query) in queries {
             *checked.entry(language.as_str()).or_default() += 1;
             let query = query.trim_end();
-            for d in analyze(language, query) {
+            for d in analyze(language, query, min_stack(&doc)) {
                 if show.contains(&d.code) {
                     let line = query.lines().nth(d.range.start.line as usize).unwrap_or("");
                     eprintln!(
