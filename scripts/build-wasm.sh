@@ -36,11 +36,13 @@ for target in "${targets[@]}"; do
     browser)
       rustup target add wasm32-unknown-unknown >/dev/null
       # wasi-libc's headers describe the libc linked below; tree-sitter's C
-      # needs __wasi__ to take its non-POSIX paths.
+      # needs __wasi__ to take its non-POSIX paths. libc.a is appended to
+      # RUSTFLAGS, not CARGO_TARGET_*_RUSTFLAGS: Cargo ignores the target
+      # variable whenever RUSTFLAGS is set (CI sets -Dwarnings).
       CC_wasm32_unknown_unknown="$WASI_SDK_PATH/bin/clang" \
       AR_wasm32_unknown_unknown="$WASI_SDK_PATH/bin/llvm-ar" \
       CFLAGS_wasm32_unknown_unknown="-isystem $sysroot/include/wasm32-wasip1 -D__wasi__" \
-      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS="-C link-arg=$sysroot/lib/wasm32-wasip1/libc.a" \
+      RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=$sysroot/lib/wasm32-wasip1/libc.a" \
         cargo build --release -p opentide-wasm --target wasm32-unknown-unknown
       wasm="$root/target/wasm32-unknown-unknown/release/opentide_wasm.wasm"
       node "$root/scripts/wasm-smoke.mjs" imports "$wasm"
