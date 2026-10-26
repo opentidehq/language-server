@@ -4,6 +4,7 @@
 Usage:
   python3 scripts/oracles/elasticsearch/run.py --language eql|esql|lucene DIR
       [--url URL] [--extra-mapping FILE] [--assume-unmapped] [--jobs N]
+      [--skip-larger BYTES] [--lucene-verdict both|strict|lenient]
 
 Reads every `*.eql`, `*.esql`, or `*.lucene` file in DIR and prints one line
 per file, sorted by name, in the format of `scripts/oracles/elastic/*.cjs`:
@@ -17,6 +18,8 @@ JSON as the request's `params`.
 Lucene lines carry a fourth column, `lenient:OK` or `lenient:ERR <reason>`:
 the verdict with `lenient: true`, which is how detection rules run. The
 second and third columns are the strict (`lenient: false`) verdict.
+`--lucene-verdict strict` or `lenient` prints that verdict alone, in three
+columns.
 
 The server is ES_URL (default http://127.0.0.1:9200); `start.sh` starts one.
 The script waits for cluster health yellow and creates the fixture indices
@@ -221,6 +224,7 @@ FIXTURE_PROBLEM = re.compile(
     r"|cannot find enrich policy"
     r"|unresolved enrich policy"
     r"|Inference endpoint not found"
+    r"|current license is non-compliant"  # CHANGE_POINT and others need more than basic
     r"|.*\bin lookup mode\b"
     r"|.*requires a lookup index"
     r"|.*\bTS\b.*time.series)",
@@ -306,9 +310,10 @@ def judge(status: int, body: dict, mapped: set[str], depends=None) -> Verdict:
         if error["caused_by"].get("type") == "verification_exception":
             verification = error["caused_by"]
     if verification is not None:
-        problems = problems_of(verification.get("reason", ""))
-        if not problems:
-            return Verdict(False, describe(error))
+        reason = verification.get("reason", "")
+        # 9.4 and later report a lone unknown index without the
+        # `Found 1 problem\nline L:C:` frame.
+        problems = problems_of(reason) or [(0, 0, reason.strip())]
         real = [p for p in problems if not fixture_problem(p[2], mapped)]
         if real and all(depends(p[2]) for p in real):
             return Verdict(True, "unverified: " + "; ".join(p[2] for p in real))
@@ -570,6 +575,12 @@ def main() -> int:
     parser.add_argument("--url", default=os.environ.get("ES_URL", "http://127.0.0.1:9200"))
     parser.add_argument("--extra-mapping", type=Path, help="JSON object {field: type} added to the ECS index")
     parser.add_argument("--assume-unmapped", action="store_true", help="retry with unmapped fields assumed (see above)")
+    parser.add_argument(
+        "--lucene-verdict",
+        choices=["both", "strict", "lenient"],
+        default="both",
+        help="Lucene: `both` adds the lenient fourth column; `strict` or `lenient` print three columns",
+    )
     parser.add_argument("--jobs", type=int, default=8)
     parser.add_argument(
         "--skip-larger",
@@ -588,14 +599,26 @@ def main() -> int:
     def one(path: Path) -> str:
         text = path.read_text(encoding="utf-8")
         if args.skip_larger and len(text.encode()) > args.skip_larger:
-            return f"{path.name}\tOK\tunverified: skipped, {len(text.encode())} bytes"
+            skipped = f"{path.name}\tOK\tunverified: skipped, {len(text.encode())} bytes"
+            return skipped + ("\tlenient:OK" if args.language == "lucene" else "")
         sidecar = path.with_name(path.name + ".params.json")
         if args.language == "esql" and sidecar.exists():
             return run_esql(url, path.name, text, mapped, args.assume_unmapped, json.loads(sidecar.read_text()))
         return run(url, path.name, text, mapped, args.assume_unmapped)
 
+    def shaped(path: Path) -> str:
+        line = one(path)
+        if args.language != "lucene" or args.lucene_verdict == "both":
+            return line
+        name, verdict, detail, lenient = line.split("\t", 3)
+        if args.lucene_verdict == "strict":
+            return f"{name}\t{verdict}\t{detail}"
+        lv, _, ld = lenient.removeprefix("lenient:").partition(" ")
+        note = detail if detail.startswith(("assumed", "unverified")) else ""
+        return f"{name}\t{lv}\t{ld or note}"
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        lines = pool.map(one, files)
+        lines = pool.map(shaped, files)
         for line in lines:
             print(line, flush=True)
     return 0
