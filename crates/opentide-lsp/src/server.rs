@@ -4,21 +4,27 @@
 use crate::jsonrpc::{self, Incoming};
 use anyhow::Result;
 use opentide_analysis::{
-    AnalyzeRequest, MemoryWorkspace, WorkspaceHost, analyze, compiled_kql, compiled_spl,
-    completions, hover, index_workspace, signature_help,
+    AnalyzeRequest, Catalog, DatasetKind, MemoryWorkspace, VISIBILITY_CONFIGURATION, WorkspaceHost,
+    analyze, codes, compiled_kql, compiled_spl, completions, declare_dataset, hover,
+    index_workspace, install_catalog, install_visibility, signature_help,
 };
 use opentide_core::{LanguageId, Position, Range, span_to_range};
 use opentide_highlight::encode_lsp_semantic_tokens;
-use opentide_tide::{install_deprecation_overlay, parse_deprecation_overlay};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::{BufReader, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 
+#[derive(Default)]
 struct Session {
     docs: HashMap<String, (LanguageId, String)>,
     root: Option<PathBuf>,
+    /// The editor's `visibility.toml` buffer while the file is open: it wins
+    /// over the file on disk.
+    visibility: Option<String>,
+    /// The client can watch files for the server (`didChangeWatchedFiles`).
+    watch_files: bool,
 }
 
 impl Session {
@@ -29,11 +35,17 @@ impl Session {
             .map(|(uri, (_, text))| (uri_to_path(uri), text.clone()))
             .collect();
         if let Some(root) = &self.root {
-            if let Ok(extra) = collect_objects(root) {
-                for (p, t) in extra {
-                    if !files.iter().any(|(e, _)| e == &p) {
-                        files.push((p, t));
-                    }
+            for (p, t) in collect_objects(root) {
+                if !files.iter().any(|(e, _)| e == &p) {
+                    files.push((p, t));
+                }
+            }
+            // Tenants, for the stack version Elastic queries are checked against.
+            let config = root.join(opentide_analysis::ELASTIC_CONFIGURATION);
+            let path = config.display().to_string();
+            if !files.iter().any(|(e, _)| e == &path) {
+                if let Ok(text) = std::fs::read_to_string(&config) {
+                    files.push((path, text));
                 }
             }
         }
@@ -44,13 +56,9 @@ impl Session {
         if let Some(id) = reported.and_then(LanguageId::parse) {
             return id;
         }
-        if uri.ends_with(".kql") {
-            LanguageId::Kql
-        } else if uri.ends_with(".spl") {
-            LanguageId::Spl
-        } else {
-            LanguageId::TideYaml
-        }
+        uri.rsplit_once('.')
+            .and_then(|(_, ext)| LanguageId::from_extension(ext))
+            .unwrap_or(LanguageId::TideYaml)
     }
 }
 
@@ -59,10 +67,7 @@ pub fn run_stdio() -> Result<()> {
     let stdout = std::io::stdout();
     let mut reader = BufReader::new(stdin.lock());
     let mut writer = stdout.lock();
-    let mut session = Session {
-        docs: HashMap::new(),
-        root: None,
-    };
+    let mut session = Session::default();
     loop {
         let Some(msg) = jsonrpc::read_message(&mut reader)? else {
             break;
@@ -80,10 +85,7 @@ pub fn run_listen(addr: &str) -> Result<()> {
     let (stream, _) = listener.accept()?;
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = stream;
-    let mut session = Session {
-        docs: HashMap::new(),
-        root: None,
-    };
+    let mut session = Session::default();
     loop {
         let Some(msg) = jsonrpc::read_message(&mut reader)? else {
             break;
@@ -107,11 +109,16 @@ fn dispatch(session: &mut Session, writer: &mut impl Write, msg: Incoming) -> Re
                 .map(uri_to_path)
             {
                 let root = PathBuf::from(root);
-                install_deprecation_overlay(load_catalog_deprecations(&root));
+                install_workspace_catalog(&root);
                 session.root = Some(root);
             } else {
-                install_deprecation_overlay(Vec::new());
+                install_workspace_catalog(Path::new(""));
             }
+            session.watch_files = params
+                .pointer("/capabilities/workspace/didChangeWatchedFiles/dynamicRegistration")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            reload_visibility(session);
             jsonrpc::write_message(
                 writer,
                 &jsonrpc::success(
@@ -145,7 +152,44 @@ fn dispatch(session: &mut Session, writer: &mut impl Write, msg: Incoming) -> Re
                 ),
             )?;
         }
-        "initialized" => {}
+        "initialized" => {
+            // Hear about visibility.toml edits made outside the editor.
+            if session.watch_files {
+                jsonrpc::write_message(
+                    writer,
+                    &json!({
+                        "jsonrpc": "2.0",
+                        "id": "opentide-watch-visibility",
+                        "method": "client/registerCapability",
+                        "params": { "registrations": [{
+                            "id": "opentide-visibility",
+                            "method": "workspace/didChangeWatchedFiles",
+                            "registerOptions": { "watchers": [
+                                { "globPattern": format!("**/{VISIBILITY_CONFIGURATION}") }
+                            ] }
+                        }] }
+                    }),
+                )?;
+            }
+        }
+        "workspace/didChangeWatchedFiles" => {
+            let touched = params
+                .get("changes")
+                .and_then(|v| v.as_array())
+                .is_some_and(|changes| {
+                    changes.iter().any(|c| {
+                        c.get("uri")
+                            .and_then(|u| u.as_str())
+                            .is_some_and(is_visibility)
+                    })
+                });
+            // While the file is open the editor's buffer is the truth.
+            if touched && session.visibility.is_none() {
+                reload_visibility(session);
+                republish_all(session, writer)?;
+            }
+        }
+        "textDocument/didSave" => {}
         "shutdown" => {
             jsonrpc::write_message(writer, &jsonrpc::success(id, Value::Null))?;
         }
@@ -157,7 +201,13 @@ fn dispatch(session: &mut Session, writer: &mut impl Write, msg: Incoming) -> Re
             handle_did_change(session, writer, &params)?;
         }
         "textDocument/didClose" => {
-            if let Some(uri) = params.pointer("/textDocument/uri").and_then(|v| v.as_str()) {
+            let uri = params.pointer("/textDocument/uri").and_then(|v| v.as_str());
+            if uri.is_some_and(is_visibility) {
+                // Back to the file on disk (unsaved edits are dropped).
+                session.visibility = None;
+                reload_visibility(session);
+                republish_all(session, writer)?;
+            } else if let Some(uri) = uri {
                 session.docs.remove(uri);
                 jsonrpc::write_message(
                     writer,
@@ -283,6 +333,8 @@ fn dispatch(session: &mut Session, writer: &mut impl Write, msg: Incoming) -> Re
             let text = session.host().document(path).unwrap_or_default();
             jsonrpc::write_message(writer, &jsonrpc::success(id, json!({ "text": text })))?;
         }
+        // A response to a request the server sent (`client/registerCapability`).
+        "" => {}
         _ => {
             if id.is_some() {
                 jsonrpc::write_message(
@@ -307,6 +359,10 @@ fn handle_did_open(session: &mut Session, writer: &mut impl Write, params: &Valu
     let lang = params
         .pointer("/textDocument/languageId")
         .and_then(|v| v.as_str());
+    if is_visibility(uri) {
+        session.visibility = Some(text.to_string());
+        return visibility_edited(session, writer);
+    }
     let language = session.language_for(uri, lang);
     session
         .docs
@@ -315,11 +371,64 @@ fn handle_did_open(session: &mut Session, writer: &mut impl Write, params: &Valu
     Ok(())
 }
 
+/// Whether `uri` is the workspace's `visibility.toml`.
+fn is_visibility(uri: &str) -> bool {
+    uri_to_path(uri)
+        .replace('\\', "/")
+        .ends_with(VISIBILITY_CONFIGURATION)
+}
+
+/// `visibility.toml` changed in the editor: its declared datasets apply at
+/// once, and every open document is checked again. A buffer that is not
+/// TOML yet (mid-edit) keeps the declarations in use.
+fn visibility_edited(session: &mut Session, writer: &mut impl Write) -> Result<()> {
+    if install_visibility(session.visibility.as_deref()).is_ok() {
+        republish_all(session, writer)?;
+    }
+    Ok(())
+}
+
+/// Read `visibility.toml` from the workspace (unless the editor has it open)
+/// and install the datasets it declares. A file that is not TOML is reported
+/// on stderr and declares nothing.
+fn reload_visibility(session: &mut Session) {
+    if session.visibility.is_some() {
+        return;
+    }
+    let text = session
+        .root
+        .as_ref()
+        .and_then(|root| std::fs::read_to_string(root.join(VISIBILITY_CONFIGURATION)).ok());
+    if let Err(err) = install_visibility(text.as_deref()) {
+        eprintln!("opentide-lsp: {err}; no datasets are declared");
+        let _ = install_visibility(None);
+    }
+}
+
+fn republish_all(session: &Session, writer: &mut impl Write) -> Result<()> {
+    let mut uris: Vec<&String> = session.docs.keys().collect();
+    uris.sort();
+    for uri in uris {
+        publish_diagnostics(session, writer, uri)?;
+    }
+    Ok(())
+}
+
 fn handle_did_change(session: &mut Session, writer: &mut impl Write, params: &Value) -> Result<()> {
     let uri = params
         .pointer("/textDocument/uri")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    if is_visibility(uri) {
+        let changes = params
+            .get("contentChanges")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let current = session.visibility.clone().unwrap_or_default();
+        session.visibility = Some(apply_content_changes(&current, &changes));
+        return visibility_edited(session, writer);
+    }
     let language = session
         .docs
         .get(uri)
@@ -448,10 +557,28 @@ fn handle_completion(session: &Session, params: &Value) -> Value {
     };
     let offset = position_to_offset(&text, pos);
     let host = session.host();
+    // A dotted field label (`process.parent.name`) replaces the whole dotted
+    // prefix already typed. Editors split words at `.`, so plain insertText
+    // would append after `process.`.
+    let before = &text[..offset.min(text.len())];
+    let dotted = &before[before
+        .rfind(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '@' | '-')))
+        .map_or(0, |i| i + 1)..];
+    let start = json!({
+        "line": pos.line,
+        "character": pos.character.saturating_sub(dotted.encode_utf16().count() as u32),
+    });
     let items: Vec<Value> = completions(&host, language, &text, offset)
         .into_iter()
         .map(|c| {
-            json!({
+            let edit = (c.label.contains('.') && !dotted.is_empty() && c.label.starts_with(dotted))
+                .then(|| {
+                    json!({
+                        "range": { "start": start, "end": { "line": pos.line, "character": pos.character } },
+                        "newText": c.label,
+                    })
+                });
+            let mut item = json!({
                 "label": c.label,
                 "detail": c.detail,
                 "documentation": c.documentation.as_ref().map(|d| json!({ "kind": "markdown", "value": d })),
@@ -463,10 +590,16 @@ fn handle_completion(session: &Session, params: &Value) -> Value {
                     "macro" => 23,
                     "enum" => 13,
                     "reference" => 18,
+                    "module" => 9,
                     _ => 1,
                 },
                 "insertText": c.label,
-            })
+            });
+            if let Some(edit) = edit {
+                item["textEdit"] = edit;
+                item["filterText"] = json!(c.label);
+            }
+            item
         })
         .collect();
     json!(items)
@@ -708,10 +841,13 @@ fn handle_code_action(session: &Session, params: &Value) -> Value {
         },
     );
     let requested = params.get("range");
-    let actions: Vec<Value> = response
+    let in_range: Vec<&opentide_core::Diagnostic> = response
         .diagnostics
         .iter()
         .filter(|d| range_overlaps_param(d.range, requested))
+        .collect();
+    let mut actions: Vec<Value> = in_range
+        .iter()
         .filter_map(|d| {
             let suggestion = d.suggestion.as_ref()?;
             Some(json!({
@@ -728,7 +864,97 @@ fn handle_code_action(session: &Session, params: &Value) -> Value {
             }))
         })
         .collect();
+    if let Some(root) = &session.root {
+        let path = root.join(VISIBILITY_CONFIGURATION);
+        // An open buffer may hold edits not yet saved: the edit applies to it.
+        let existing = session
+            .visibility
+            .clone()
+            .or_else(|| std::fs::read_to_string(&path).ok());
+        let target = path_to_uri(&path.display().to_string());
+        let mut seen = std::collections::BTreeSet::new();
+        for d in &in_range {
+            let Some((platform, kind, name)) = undeclared_dataset(d) else {
+                continue;
+            };
+            if !seen.insert((platform, kind, name.clone())) {
+                continue;
+            }
+            let edit = declare_dataset(existing.as_deref(), platform, kind, &name);
+            let text_edit = json!({ "range": range_json(edit.range), "newText": edit.new_text });
+            let workspace_edit = if existing.is_some() {
+                json!({ "changes": { target.clone(): [text_edit] } })
+            } else {
+                json!({ "documentChanges": [
+                    { "kind": "create", "uri": target, "options": { "ignoreIfExists": true } },
+                    { "textDocument": { "uri": target, "version": null }, "edits": [text_edit] }
+                ] })
+            };
+            actions.push(json!({
+                "title": edit.title,
+                "kind": "quickfix",
+                "diagnostics": [{
+                    "range": range_json(d.range),
+                    "code": d.code,
+                    "message": d.message,
+                }],
+                "edit": workspace_edit
+            }));
+        }
+    }
     json!(actions)
+}
+
+/// The dataset a "declare it in visibility.toml" diagnostic names: its
+/// platform, kind and name (quoted in the message: `'X'` for KQL, `` `X` ``
+/// for SPL and Elastic).
+fn undeclared_dataset(
+    d: &opentide_core::Diagnostic,
+) -> Option<(&'static str, DatasetKind, String)> {
+    let name = d.message.split('\'').nth(1).unwrap_or_default().to_string();
+    let in_defender = d
+        .field_path
+        .as_ref()
+        .is_some_and(|p| p.iter().any(|s| s == "defender_for_endpoint"));
+    match d.code.as_str() {
+        codes::KQL_TABLE_NOT_DECLARED => Some((
+            if in_defender {
+                "defender_for_endpoint"
+            } else {
+                "sentinel"
+            },
+            DatasetKind::Tables,
+            name,
+        )),
+        // #111's warning points at visibility.toml too (Sentinel only).
+        codes::KQL_UNKNOWN_TABLE if d.severity == opentide_core::Severity::Warning => {
+            Some(("sentinel", DatasetKind::Tables, name))
+        }
+        // `index `wineventlog` is not declared ...`, `macro `sysmon` ...`
+        codes::SPL_DATASET_NOT_DECLARED => {
+            let kind = match d.message.split(' ').next()? {
+                "index" => DatasetKind::Indexes,
+                "sourcetype" => DatasetKind::Sourcetypes,
+                "macro" => DatasetKind::Macros,
+                _ => return None,
+            };
+            Some(("splunk", kind, backticked(&d.message)?))
+        }
+        // `index pattern `logs-*` ...`, `data view `x` ...`
+        codes::ELASTIC_DATASET_NOT_DECLARED => {
+            let kind = if d.message.starts_with("data view") {
+                DatasetKind::DataViews
+            } else {
+                DatasetKind::Indices
+            };
+            Some(("elastic", kind, backticked(&d.message)?))
+        }
+        _ => None,
+    }
+}
+
+fn backticked(message: &str) -> Option<String> {
+    Some(message.split('`').nth(1)?.to_string())
 }
 
 fn handle_folding(session: &Session, params: &Value) -> Value {
@@ -1002,23 +1228,126 @@ fn range_json(range: Range) -> Value {
     })
 }
 
-fn load_catalog_deprecations(root: &Path) -> Vec<opentide_tide::FieldDeprecation> {
-    let path = root.join(".opentide/lsp/catalogs/generated/deprecations.json");
-    let Ok(text) = std::fs::read_to_string(&path) else {
-        return Vec::new();
+/// Where `opentide generate schemas` writes the workspace catalogs.
+pub const WORKSPACE_CATALOGS: &str = ".opentide/lsp/catalogs/generated";
+
+/// Install the workspace's `fields.json` and `deprecations.json` when they
+/// exist, and the bundled catalogs otherwise. A file that does not parse is
+/// reported on stderr and leaves the bundled catalogs in place.
+/// Set by a host that installed the catalogs itself
+/// ([`opentide_analysis::set_default_catalog`]): the server then leaves them
+/// alone at `initialize` instead of reading the workspace's.
+static HOST_CATALOGS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Keep the catalogs the host installed: `initialize` does not read
+/// `.opentide/lsp/catalogs/generated/`. opentide generates the catalogs from
+/// its own models for the workspace it serves, so a committed copy, possibly
+/// from an older opentide, must not replace them. Process-wide.
+pub fn use_host_catalogs() {
+    HOST_CATALOGS.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+pub fn install_workspace_catalog(root: &Path) {
+    if HOST_CATALOGS.load(std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let dir = root.join(WORKSPACE_CATALOGS);
+    let read = |name: &str| {
+        if root.as_os_str().is_empty() {
+            return None;
+        }
+        std::fs::read_to_string(dir.join(name)).ok()
     };
-    parse_deprecation_overlay(&text).unwrap_or_default()
+    let catalog = Catalog {
+        fields: read("fields.json"),
+        deprecations: read("deprecations.json"),
+        // visibility.toml is read on its own (reload_visibility), so edits apply live.
+        visibility: None,
+    };
+    if let Err(err) = install_catalog(&catalog) {
+        eprintln!(
+            "opentide-lsp: ignoring {}: {err}; using the bundled catalogs",
+            dir.display()
+        );
+        let _ = install_catalog(&Catalog::default());
+    }
 }
 
+/// A `file:` URI as a filesystem path: percent-decoded, an optional
+/// `localhost` authority dropped, and `/c:/x` read as the Windows path `c:/x`.
+/// Editors send `file:///home/u/My%20Detections` and `file:///c%3A/Users/...`.
+/// Anything that is not a `file:` URI is returned as it is.
 fn uri_to_path(uri: &str) -> String {
-    uri.strip_prefix("file://").unwrap_or(uri).to_string()
+    let Some(rest) = uri.strip_prefix("file://") else {
+        return uri.to_string();
+    };
+    let rest = rest.strip_prefix("localhost").unwrap_or(rest);
+    let decoded = percent_decode(rest);
+    let bytes = decoded.as_bytes();
+    if bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
+        return decoded[1..].to_string();
+    }
+    decoded
 }
 
+fn percent_decode(text: &str) -> String {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok();
+            if let Some(value) = hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                out.push(value);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap_or_else(|_| text.to_string())
+}
+
+/// A filesystem path as a `file:` URI, the inverse of [`uri_to_path`]: the
+/// characters a URI path cannot hold are percent-encoded, and a Windows path
+/// gets the leading `/` (`file:///c:/x`).
 fn path_to_uri(path: &str) -> String {
     if path.starts_with("file://") {
-        path.to_string()
+        return path.to_string();
+    }
+    let path = path.replace('\\', "/");
+    let mut encoded = String::with_capacity(path.len());
+    for byte in path.bytes() {
+        match byte {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'/'
+            | b'-'
+            | b'_'
+            | b'.'
+            | b'~'
+            | b':'
+            | b'@'
+            | b'!'
+            | b'$'
+            | b'&'
+            | b'\''
+            | b'('
+            | b')'
+            | b'*'
+            | b'+'
+            | b','
+            | b';'
+            | b'=' => encoded.push(byte as char),
+            other => encoded.push_str(&format!("%{other:02X}")),
+        }
+    }
+    if encoded.starts_with('/') {
+        format!("file://{encoded}")
     } else {
-        format!("file://{path}")
+        format!("file:///{encoded}")
     }
 }
 
@@ -1053,27 +1382,57 @@ fn position_to_offset(source: &str, position: Position) -> usize {
     source.len()
 }
 
-fn collect_objects(root: &Path) -> Result<Vec<(String, String)>, std::io::Error> {
+/// The workspace's object YAML. A file or directory that cannot be read (not
+/// UTF-8, no permission) is left out; the rest of the index still loads.
+fn collect_objects(root: &Path) -> Vec<(String, String)> {
     let objects = if root.join("objects").is_dir() {
         root.join("objects")
     } else {
         root.to_path_buf()
     };
     let mut out = Vec::new();
-    fn rec(dir: &Path, out: &mut Vec<(String, String)>) -> Result<(), std::io::Error> {
-        for e in std::fs::read_dir(dir)? {
-            let e = e?;
-            let p = e.path();
+    fn rec(dir: &Path, out: &mut Vec<(String, String)>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for p in entries.flatten().map(|e| e.path()) {
             if p.is_dir() {
-                rec(&p, out)?;
+                rec(&p, out);
             } else if matches!(p.extension().and_then(|s| s.to_str()), Some("yaml" | "yml")) {
-                out.push((p.display().to_string(), std::fs::read_to_string(&p)?));
+                if let Ok(text) = std::fs::read_to_string(&p) {
+                    out.push((p.display().to_string(), text));
+                }
             }
         }
-        Ok(())
     }
-    rec(&objects, &mut out)?;
-    Ok(out)
+    rec(&objects, &mut out);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{path_to_uri, uri_to_path};
+
+    #[test]
+    fn file_uris_become_paths_and_back() {
+        assert_eq!(
+            uri_to_path("file:///home/u/My%20Detections"),
+            "/home/u/My Detections"
+        );
+        assert_eq!(uri_to_path("file:///c%3A/Users/u/det"), "c:/Users/u/det");
+        assert_eq!(uri_to_path("file://localhost/srv/d%C3%A9t"), "/srv/dét");
+        assert_eq!(uri_to_path("file:///a/100%"), "/a/100%");
+        assert_eq!(uri_to_path("untitled:Untitled-1"), "untitled:Untitled-1");
+        for path in [
+            "/home/u/My Detections/a#1.yaml",
+            "/srv/dét/r.yaml",
+            "c:/Users/u/r.yaml",
+        ] {
+            assert_eq!(uri_to_path(&path_to_uri(path)), path, "{path}");
+        }
+        assert_eq!(path_to_uri("/a b"), "file:///a%20b");
+        assert_eq!(path_to_uri("c:/x"), "file:///c:/x");
+    }
 }
 
 #[cfg(test)]

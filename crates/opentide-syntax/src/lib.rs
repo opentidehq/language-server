@@ -1,11 +1,15 @@
 //! Tree-sitter language bindings. Parser C is vendored; do not hand-edit `parser.c`.
 
 use opentide_core::{ByteSpan, LanguageId};
-use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator, Tree};
+use tree_sitter::{Language, Node, Parser, Query, QueryCursor, StreamingIterator, Tree};
 
 unsafe extern "C" {
     fn tree_sitter_opentide_kql() -> *const ();
     fn tree_sitter_opentide_spl() -> *const ();
+    fn tree_sitter_opentide_esql() -> *const ();
+    fn tree_sitter_opentide_eql() -> *const ();
+    fn tree_sitter_opentide_kuery() -> *const ();
+    fn tree_sitter_opentide_lucene() -> *const ();
 }
 
 fn from_raw(ptr: *const ()) -> Language {
@@ -17,6 +21,10 @@ pub fn language(id: LanguageId) -> Option<Language> {
     match id {
         LanguageId::Kql => Some(kql_language()),
         LanguageId::Spl => Some(spl_language()),
+        LanguageId::Esql => Some(unsafe { from_raw(tree_sitter_opentide_esql()) }),
+        LanguageId::Eql => Some(unsafe { from_raw(tree_sitter_opentide_eql()) }),
+        LanguageId::Kuery => Some(unsafe { from_raw(tree_sitter_opentide_kuery()) }),
+        LanguageId::Lucene => Some(unsafe { from_raw(tree_sitter_opentide_lucene()) }),
         LanguageId::TideYaml => None,
     }
 }
@@ -38,6 +46,67 @@ pub fn parse(id: LanguageId, source: &str) -> Option<Tree> {
 
 pub fn has_error(tree: &Tree) -> bool {
     tree.root_node().has_error()
+}
+
+/// First `ERROR` or `MISSING` node in document order, for a parse-error range.
+///
+/// A MISSING token that the grammar hides (a `_`-prefixed rule) is not a
+/// visible node, so the smallest visible node that still reports the error
+/// stands in for it.
+pub fn first_error(node: Node<'_>) -> Option<Node<'_>> {
+    if !node.has_error() && !node.is_missing() {
+        return None;
+    }
+    // Down the first erroneous child at each level; iterative, so a deeply
+    // nested broken query cannot exhaust the stack.
+    let mut node = node;
+    loop {
+        if node.is_error() || node.is_missing() {
+            return Some(node);
+        }
+        let mut cursor = node.walk();
+        let next = node
+            .children(&mut cursor)
+            .find(|child| child.has_error() || child.is_missing());
+        match next {
+            Some(child) => node = child,
+            None => return Some(node),
+        }
+    }
+}
+
+/// Pre-order walk that hands each node its ancestors, root first. Iterative,
+/// so a query thousands of levels deep cannot exhaust the stack. Checks that
+/// look upward read `ancestors` instead of calling [`Node::parent`], which
+/// re-descends from the root on every call.
+pub fn walk_with_ancestors<'t>(root: Node<'t>, mut f: impl FnMut(Node<'t>, &[Node<'t>])) {
+    let mut cursor = root.walk();
+    let mut ancestors: Vec<Node<'t>> = Vec::new();
+    loop {
+        let node = cursor.node();
+        f(node, &ancestors);
+        if cursor.goto_first_child() {
+            ancestors.push(node);
+            continue;
+        }
+        loop {
+            if cursor.goto_next_sibling() {
+                break;
+            }
+            if !cursor.goto_parent() {
+                return;
+            }
+            ancestors.pop();
+        }
+    }
+}
+
+/// Byte span of a node, never empty so editors can show it.
+pub fn node_span(node: Node<'_>) -> ByteSpan {
+    ByteSpan::new(
+        node.start_byte(),
+        node.end_byte().max(node.start_byte() + 1),
+    )
 }
 
 /// Run a highlights.scm query. First capture wins for an identical span so
@@ -131,7 +200,10 @@ mod tests {
         let caps = query_captures(
             LanguageId::Kql,
             src,
-            include_str!("../../../highlights/queries/kql/highlights.scm"),
+            include_str!(concat!(
+                env!("OPENTIDE_ASSETS"),
+                "/highlights/queries/kql/highlights.scm"
+            )),
         )
         .expect("query");
         let keywords: Vec<_> = caps
@@ -144,14 +216,33 @@ mod tests {
     }
 
     #[test]
+    fn hidden_missing_tokens_still_report_an_error() {
+        let tree = parse(LanguageId::Esql, "FROM | LIMIT 10").unwrap();
+        assert!(has_error(&tree));
+        let err = first_error(tree.root_node()).expect("error node");
+        assert!(err.start_byte() <= 5, "{}", tree.root_node().to_sexp());
+    }
+
+    #[test]
     fn parses_spl_stats() {
         let tree = parse(LanguageId::Spl, "search index=main | stats count by host").unwrap();
         assert!(!has_error(&tree), "{}", tree.root_node().to_sexp());
     }
 
     #[test]
-    fn parses_spl_catalog_command() {
+    fn parses_spl_stats_family() {
         let tree = parse(LanguageId::Spl, "index=main | timechart count by host").unwrap();
+        assert!(!has_error(&tree), "{}", tree.root_node().to_sexp());
+        assert!(
+            tree.root_node().to_sexp().contains("stats_command"),
+            "{}",
+            tree.root_node().to_sexp()
+        );
+    }
+
+    #[test]
+    fn parses_spl_catalog_command() {
+        let tree = parse(LanguageId::Spl, "index=main | top limit=10 host").unwrap();
         assert!(!has_error(&tree), "{}", tree.root_node().to_sexp());
         assert!(
             tree.root_node().to_sexp().contains("catalog_command"),
@@ -233,7 +324,10 @@ mod highlight_cst_dump {
         let mut parser = tree_sitter::Parser::new();
         parser.set_language(&lang).unwrap();
         let tree = parser.parse(src, None).unwrap();
-        let scm = include_str!("../../../highlights/queries/kql/highlights.scm");
+        let scm = include_str!(concat!(
+            env!("OPENTIDE_ASSETS"),
+            "/highlights/queries/kql/highlights.scm"
+        ));
         let query = Query::new(&lang, scm).expect("compile kql highlights.scm");
         let mut cursor = QueryCursor::new();
         let mut iter = cursor.matches(&query, tree.root_node(), src.as_bytes());

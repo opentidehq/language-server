@@ -1,9 +1,9 @@
 ---
 name: lsp-host
-description: Implement the OpenTide stdio language server. Covers Content-Length JSON-RPC, UTF-16 positions, semantic tokens, and the opentide/* custom RPCs. The CLI never speaks JSON-RPC. Use when editing crates/opentide-lsp, editors/, or LSP tests. Do not introduce tower-lsp.
+description: Implement the opentide stdio language server. Covers Content-Length JSON-RPC, UTF-16 positions, semantic tokens, and the opentide/* custom RPCs. The CLI never speaks JSON-RPC. Use when editing crates/opentide-lsp, editors/, or LSP tests. Do not introduce tower-lsp.
 license: EUPL-1.2
 metadata:
-  author: OpenTideHQ
+  author: opentidehq
 ---
 
 # LSP host
@@ -13,6 +13,8 @@ metadata:
 Read `references/wire-format.md` before adding a method.
 
 ## Two protocols, one binary
+
+The server is also a library: `opentide_lsp::run_stdio()` is what the `opentide` Python package calls for `opentide lsp start`. Keep it free of process-wide side effects beyond stdin, stdout and the catalog install, and never print to stdout outside the protocol.
 
 | Invocation | Bytes on stdout |
 | --- | --- |
@@ -26,11 +28,11 @@ Read `references/wire-format.md` before adding a method.
 
 ## Session
 
-`Session` maps URI → (`LanguageId`, text). `language_for` uses a reported language id when `LanguageId::parse` accepts it, otherwise the URI suffix (`.kql`, `.spl`, else Tide YAML). An unknown reported id is ignored. `.sql` is Tide YAML and is not validated as SQL.
+`Session` maps URI → (`LanguageId`, text). `language_for` uses a reported language id when `LanguageId::parse` accepts it, otherwise the URI suffix through `LanguageId::from_extension` (`.kql`, `.spl`, `.esql`, `.eql`, `.kuery`, `.lucene`, else Tide YAML). An unknown reported id is ignored. `.sql` is Tide YAML and is not validated as SQL.
 
 The analysis crate sees a `MemoryWorkspace` built from open documents plus YAML files under the workspace `objects/` directory. The engine still does not call `std::fs`. The host does.
 
-`initialize` reads `rootUri` and installs the Tide deprecation overlay from `.opentide/lsp/catalogs/generated/deprecations.json` when that file exists. Capabilities are the JSON object in the `initialize` arm. When you add a provider, advertise it there and handle the method in the same change. An unhandled request that still has an `id` hits the `_` arm and returns `-32601`, so the client unblocks with a failure instead of waiting.
+`initialize` reads `rootUri` and installs the workspace catalogs from `.opentide/lsp/catalogs/generated/` (`fields.json`, `deprecations.json`) when they exist, through `opentide_analysis::install_catalog`; the install is process-wide. A host that supplies its own catalogs calls `opentide_analysis::set_default_catalog` (used wherever the bundled ones would be) and `opentide_lsp::use_host_catalogs()` (then `initialize` reads no workspace files): `opentide lsp start` does both. `Session::host` also hands the analysis layer `.opentide/configurations/platforms/elastic.toml` (`opentide_analysis::ELASTIC_CONFIGURATION`) when it exists: its tenants' `setup.version` decides the stack Elastic queries are checked against. The CLI `analyze` does the same. This reads one key; it is not the configuration engine (#64). Capabilities are the JSON object in the `initialize` arm. When you add a provider, advertise it there and handle the method in the same change. An unhandled request that still has an `id` hits the `_` arm and returns `-32601`, so the client unblocks with a failure instead of waiting.
 
 Current providers: incremental sync (`textDocumentSync: 2`), hover, completion (resolve, trigger characters), signature help, definition, references, document symbol, workspace symbol, document highlight, code action, folding, selection range, inlay hints, pull diagnostics, semantic tokens (full).
 
@@ -52,7 +54,7 @@ Inbound conversion is not the same function. `apply_content_changes` walks `cont
 
 Semantic tokens are the LSP integer array `[deltaLine, deltaStartChar, length, tokenType, tokenModifiers]` from `encode_lsp_semantic_tokens`. A token cannot cross a newline; `length` is the UTF-16 length on the start line. Split multiline comments and strings before encoding. `tokenModifiers` is 0.
 
-The legend advertised at `initialize` is `opentide_highlight::LSP_TOKEN_TYPES` (the standard VS Code token types: `keyword`, `function`, `operator`, …). It is **not** `HighlightSpec.legend`. Captures such as `operator.pipe` and `tide.keyword` are mapped onto those standard types in `lsp_token_type_index`, because default themes do not style OpenTide capture names. Do not replace `tokenTypes` with the HighlightSpec legend. TextMate / Monaco / Helix scopes still come from `highlights/spec.toml`.
+The legend advertised at `initialize` is `opentide_highlight::LSP_TOKEN_TYPES` (the standard VS Code token types: `keyword`, `function`, `operator`, …). It is **not** `HighlightSpec.legend`. Captures such as `operator.pipe` and `tide.keyword` are mapped onto those standard types in `lsp_token_type_index`, because default themes do not style opentide capture names. Do not replace `tokenTypes` with the HighlightSpec legend. TextMate / Monaco / Helix scopes still come from `highlights/spec.toml`.
 
 ## Diagnostics
 
@@ -62,9 +64,9 @@ CrowdStrike paths produce `crowdstrike_unsupported` or no fake success. Do not p
 
 ## Editors in this repo
 
-`editors/helix/languages.toml`, `editors/nvim/opentide.lua`, `editors/zed/opentide.json`. VS Code is `OpenTideHQ/vscode-extension`, a different repository. Samples disable yamlls on `objects/**`. Semantic tokens come from this server. TextMate grammars are generated (`generate-highlights`), never hand-authored in an editor repo.
+`editors/helix/languages.toml`, `editors/nvim/opentide.lua`, `editors/zed/opentide.json`. VS Code is `opentidehq/vscode-extension`, a different repository. Samples disable yamlls on `objects/**`. Semantic tokens come from this server. TextMate grammars are generated (`generate-highlights`), never hand-authored in an editor repo.
 
-Language ids in editors: `opentide-yaml`, `kql`, `spl`. Not `sql`. Not `otide`.
+Language ids in editors: `opentide-yaml`, `kql`, `spl`, `esql`, `eql`, `kuery`, `lucene`. Not `sql`. Not `otide`.
 
 ## Tests
 

@@ -584,3 +584,479 @@ fn tide_structure_methods_are_not_whole_buffer_stubs() {
         "{pull}"
     );
 }
+
+/// Open a document, return its published diagnostic codes.
+fn published_codes(lsp: &mut Lsp, uri: &str, language_id: &str, text: &str) -> Vec<String> {
+    lsp.notify(
+        "textDocument/didOpen",
+        json!({
+            "textDocument": {
+                "uri": uri,
+                "languageId": language_id,
+                "version": 1,
+                "text": text
+            }
+        }),
+    );
+    let msg = lsp.read();
+    assert_eq!(msg["method"], "textDocument/publishDiagnostics", "{msg}");
+    msg["params"]["diagnostics"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|d| d["code"].as_str().map(str::to_string))
+        .collect()
+}
+
+#[test]
+fn elastic_languages_over_stdio() {
+    let mut lsp = Lsp::spawn();
+    lsp.request("initialize", json!({ "capabilities": {} }));
+    lsp.notify("initialized", json!({}));
+    // The URI suffix selects the engine when the client reports no known id.
+    let cases = [
+        (
+            "file:///tmp/r.esql",
+            "plaintext",
+            "FROM logs-* METADATA _id | WEHRE x == 1",
+            "esql_unknown_command",
+        ),
+        (
+            "file:///tmp/r.eql",
+            "plaintext",
+            "sequence with maxspan=5w [a where true] [b where true]",
+            "eql_maxspan_unit",
+        ),
+        (
+            "file:///tmp/r.kuery",
+            "plaintext",
+            "message: cannot run",
+            "kuery_parse_error",
+        ),
+        (
+            "file:///tmp/r.lucene",
+            "plaintext",
+            "a:1 and b:2",
+            "lucene_lowercase_operator",
+        ),
+    ];
+    for (uri, language_id, text, code) in cases {
+        let codes = published_codes(&mut lsp, uri, language_id, text);
+        assert!(codes.iter().any(|c| c == code), "{uri}: {codes:?}");
+    }
+    let rule = "\
+name: Elastic rule
+metadata:
+  uuid: 00000000-0000-4000-8003-000000000077
+  schema: rule::1.1
+configurations:
+  elastic:
+    status: STAGING
+    query: 'process.name:cmd.exe and _exists_:host.name'
+    type: query
+";
+    let codes = published_codes(
+        &mut lsp,
+        "file:///tmp/objects/rules/elastic-rule.yaml",
+        "yaml",
+        rule,
+    );
+    assert!(
+        codes.iter().any(|c| c == "kuery_lucene_syntax"),
+        "the Elastic block's kuery query is analysed: {codes:?}"
+    );
+    let tokens = lsp.request(
+        "textDocument/semanticTokens/full",
+        json!({ "textDocument": { "uri": "file:///tmp/r.esql" } }),
+    );
+    let data = tokens["result"]["data"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(data.len() >= 10, "semantic tokens for .esql: {tokens}");
+
+    // ECS completion replaces the dotted prefix already typed.
+    let text = "host.name:x and process.pa";
+    published_codes(&mut lsp, "file:///tmp/c.kuery", "plaintext", text);
+    let items = lsp.request(
+        "textDocument/completion",
+        json!({
+            "textDocument": { "uri": "file:///tmp/c.kuery" },
+            "position": { "line": 0, "character": text.len() }
+        }),
+    );
+    let item = items["result"]
+        .as_array()
+        .and_then(|a| a.iter().find(|i| i["label"] == "process.parent.name"))
+        .cloned()
+        .unwrap_or_else(|| panic!("ECS field completion: {items}"));
+    assert_eq!(
+        item["textEdit"]["range"]["start"]["character"], 16,
+        "{item}"
+    );
+    assert_eq!(item["textEdit"]["newText"], "process.parent.name");
+}
+
+#[test]
+fn initialize_installs_the_workspace_field_catalog() {
+    let root = std::env::temp_dir().join(format!("opentide-lsp-catalog-{}", std::process::id()));
+    let catalogs = root.join(".opentide/lsp/catalogs/generated");
+    std::fs::create_dir_all(&catalogs).unwrap();
+    std::fs::create_dir_all(root.join("objects/rules")).unwrap();
+    std::fs::write(
+        catalogs.join("fields.json"),
+        r#"{"opentide": "0.19.0", "fields": [
+            {"schema": "rule", "path": "metadata", "name": "metadata", "type": "object"},
+            {"schema": "rule", "path": "metadata.tlp", "name": "tlp", "type": "string",
+             "enum": ["clear", "house"]}]}"#,
+    )
+    .unwrap();
+    let rule = "name: House Rule\nmetadata:\n  uuid: 00000000-0000-4000-8003-000000000001\n  schema: rule::1.0\n  tlp: house\n";
+    let uri = format!("file://{}/objects/rules/house-rule.yaml", root.display());
+
+    let mut lsp = Lsp::spawn();
+    lsp.request(
+        "initialize",
+        json!({ "capabilities": {}, "rootUri": format!("file://{}", root.display()) }),
+    );
+    let with_catalog = published_codes(&mut lsp, &uri, "opentide-yaml", rule);
+    drop(lsp);
+
+    let mut lsp = Lsp::spawn();
+    lsp.request("initialize", json!({ "capabilities": {} }));
+    let bundled = published_codes(&mut lsp, &uri, "opentide-yaml", rule);
+    std::fs::remove_dir_all(&root).ok();
+
+    assert!(
+        !with_catalog.contains(&"vocab_unknown".to_string()),
+        "{with_catalog:?}"
+    );
+    assert!(
+        bundled.contains(&"vocab_unknown".to_string()),
+        "{bundled:?}"
+    );
+}
+
+/// A fresh directory under the system temp dir, removed on drop.
+struct Scratch(PathBuf);
+
+impl Scratch {
+    fn new(name: &str) -> Self {
+        let dir = std::env::temp_dir().join(format!("opentide-e2e-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        Self(dir)
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for entry in std::fs::read_dir(from).unwrap() {
+        let path = entry.unwrap().path();
+        let target = to.join(path.file_name().unwrap());
+        if path.is_dir() {
+            copy_dir(&path, &target);
+        } else {
+            std::fs::copy(&path, &target).unwrap();
+        }
+    }
+}
+
+fn cli_codes(file: &std::path::Path) -> Vec<String> {
+    let out = Command::new(bin())
+        .args(["analyze", file.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let diagnostics: Vec<Value> = serde_json::from_slice(&out.stdout).unwrap();
+    let mut codes: Vec<String> = diagnostics
+        .iter()
+        .map(|d| d["code"].as_str().unwrap().to_string())
+        .collect();
+    codes.sort();
+    codes
+}
+
+/// One workspace file that is not UTF-8 is left out of the index. It used to
+/// fail `analyze` outright, and leave the stdio server with no index at all,
+/// so every reference to another object was reported as unresolved.
+#[test]
+fn an_unreadable_workspace_file_does_not_break_analysis() {
+    let corpus = repo_root().join("testdata/workspaces/tide_corpus");
+    let rule = "objects/rules/rule-0001-sentinel-kql.yaml";
+    let expected = cli_codes(&corpus.join(rule));
+
+    let scratch = Scratch::new("unreadable");
+    copy_dir(&corpus, &scratch.0);
+    std::fs::write(
+        scratch.0.join("objects/rules/broken.yaml"),
+        [0xff, 0xfe, 0x00],
+    )
+    .unwrap();
+    assert_eq!(cli_codes(&scratch.0.join(rule)), expected);
+
+    let mut lsp = Lsp::spawn();
+    lsp.request(
+        "initialize",
+        json!({ "capabilities": {}, "rootUri": format!("file://{}", scratch.0.display()) }),
+    );
+    lsp.notify("initialized", json!({}));
+    let path = scratch.0.join(rule);
+    let text = std::fs::read_to_string(&path).unwrap();
+    let mut published = published_codes(
+        &mut lsp,
+        &format!("file://{}", path.display()),
+        "opentide-yaml",
+        &text,
+    );
+    published.sort();
+    assert_eq!(published, expected);
+}
+
+/// A raw query is analysed on its own: the CLI does not read the directories
+/// around it, so an unreadable YAML there cannot fail it.
+#[test]
+fn a_raw_query_file_ignores_the_yaml_around_it() {
+    let scratch = Scratch::new("raw-query");
+    std::fs::write(scratch.0.join("broken.yaml"), [0xff, 0xfe, 0x00]).unwrap();
+    let dir = scratch.0.join("queries");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("query.kql");
+    std::fs::write(&file, "SecurityEvent | wher EventID == 1").unwrap();
+    assert!(!cli_codes(&file).is_empty());
+}
+
+#[test]
+fn an_undeclared_table_has_a_code_action_that_declares_it() {
+    let scratch = Scratch::new("declare-table");
+    let root = &scratch.0;
+    let visibility = "[[logsources]]\nname = \"VNet flow logs\"\ndescription = \"Flows.\"\nsystem = \"sentinel\"\ntables = [\"NTANetAnalytics\"]\n";
+    std::fs::create_dir_all(root.join(".opentide/configurations")).unwrap();
+    std::fs::write(
+        root.join(".opentide/configurations/visibility.toml"),
+        visibility,
+    )
+    .unwrap();
+    let uri = format!("file://{}/hunt.kql", root.display());
+
+    let mut lsp = Lsp::spawn();
+    lsp.request(
+        "initialize",
+        json!({ "capabilities": {}, "rootUri": format!("file://{}", root.display()) }),
+    );
+    let codes = published_codes(&mut lsp, &uri, "kql", "NTAIpDetails | take 1");
+    assert_eq!(codes, vec!["kql_table_not_declared".to_string()]);
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        json!({
+            "textDocument": { "uri": uri },
+            "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 3 } }
+        }),
+    );
+    let action = actions["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| {
+            a["title"]
+                .as_str()
+                .unwrap()
+                .starts_with("Declare 'NTAIpDetails'")
+        })
+        .unwrap_or_else(|| panic!("{actions}"))
+        .clone();
+    let changes = &action["edit"]["changes"];
+    let (target, edits) = changes.as_object().unwrap().iter().next().unwrap();
+    assert!(
+        target.ends_with("/.opentide/configurations/visibility.toml"),
+        "{target}"
+    );
+    assert_eq!(edits[0]["newText"], ", \"NTAIpDetails\"");
+    assert_eq!(edits[0]["range"]["start"]["line"], 4);
+}
+
+#[test]
+fn an_undeclared_splunk_index_has_a_code_action_that_adds_it() {
+    let scratch = Scratch::new("declare-index");
+    let root = &scratch.0;
+    std::fs::create_dir_all(root.join(".opentide/configurations")).unwrap();
+    std::fs::write(
+        root.join(".opentide/configurations/visibility.toml"),
+        "[[logsources]]\nname = \"Windows\"\ndescription = \"Events.\"\nsystem = \"splunk\"\nindexes = [\"wineventlog\"]\n",
+    )
+    .unwrap();
+    let uri = format!("file://{}/hunt.spl", root.display());
+    let mut lsp = Lsp::spawn();
+    lsp.request(
+        "initialize",
+        json!({ "capabilities": {}, "rootUri": format!("file://{}", root.display()) }),
+    );
+    let codes = published_codes(&mut lsp, &uri, "spl", "index=sysmon EventCode=1");
+    assert!(
+        codes.contains(&"spl_dataset_not_declared".to_string()),
+        "{codes:?}"
+    );
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        json!({
+            "textDocument": { "uri": uri },
+            "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 12 } }
+        }),
+    );
+    let action = actions["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["title"] == "Declare 'sysmon' in log source \"Windows\" (visibility.toml)")
+        .unwrap_or_else(|| panic!("{actions}"))
+        .clone();
+    let changes = &action["edit"]["changes"];
+    let (_, edits) = changes.as_object().unwrap().iter().next().unwrap();
+    assert_eq!(edits[0]["newText"], ", \"sysmon\"");
+}
+
+/// No visibility.toml: the quick fix on `kql_unknown_table` creates it.
+#[test]
+fn the_quick_fix_creates_visibility_toml_when_there_is_none() {
+    let scratch = Scratch::new("declare-create");
+    let root = &scratch.0;
+    let uri = format!("file://{}/hunt.kql", root.display());
+    let mut lsp = Lsp::spawn();
+    lsp.request(
+        "initialize",
+        json!({ "capabilities": {}, "rootUri": format!("file://{}", root.display()) }),
+    );
+    let codes = published_codes(&mut lsp, &uri, "kql", "MyCustom_CL | take 1");
+    assert_eq!(codes, vec!["kql_unknown_table".to_string()]);
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        json!({
+            "textDocument": { "uri": uri },
+            "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 3 } }
+        }),
+    );
+    let action = actions["result"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| {
+            a["title"] == "Add a [[logsources]] entry declaring 'MyCustom_CL' to visibility.toml"
+        })
+        .unwrap_or_else(|| panic!("{actions}"))
+        .clone();
+    let changes = action["edit"]["documentChanges"].as_array().unwrap();
+    assert_eq!(changes[0]["kind"], "create");
+    let text = changes[1]["edits"][0]["newText"].as_str().unwrap();
+    assert!(
+        text.contains("system = \"sentinel\"\ntables = [\"MyCustom_CL\"]"),
+        "{text}"
+    );
+}
+
+fn next_diagnostics(lsp: &mut Lsp, uri: &str) -> Vec<String> {
+    loop {
+        let msg = lsp.read();
+        if msg["method"] == "textDocument/publishDiagnostics" && msg["params"]["uri"] == uri {
+            return msg["params"]["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|d| d["code"].as_str().map(str::to_string))
+                .collect();
+        }
+    }
+}
+
+/// visibility.toml applies as it is edited: in the editor, before it is
+/// saved, and on disk, through the file watcher.
+#[test]
+fn editing_visibility_toml_rechecks_open_queries() {
+    let scratch = Scratch::new("visibility-live");
+    let root = &scratch.0;
+    let config = root.join(".opentide/configurations");
+    std::fs::create_dir_all(&config).unwrap();
+    let path = config.join("visibility.toml");
+    let visibility_uri = format!("file://{}", path.display());
+    let declare = |tables: &str| {
+        format!(
+            "[[logsources]]\nname = \"Flows\"\ndescription = \"Flows.\"\nsystem = \"sentinel\"\ntables = [{tables}]\n"
+        )
+    };
+    let uri = format!("file://{}/hunt.kql", root.display());
+
+    let mut lsp = Lsp::spawn();
+    let init = json!({
+        "capabilities": { "workspace": { "didChangeWatchedFiles": { "dynamicRegistration": true } } },
+        "rootUri": format!("file://{}", root.display())
+    });
+    lsp.request("initialize", init);
+    lsp.notify("initialized", json!({}));
+    let register = lsp.read();
+    assert_eq!(
+        register["method"], "client/registerCapability",
+        "{register}"
+    );
+    // The client's answer is not a request: the server says nothing back.
+    lsp.write(&json!({ "jsonrpc": "2.0", "id": register["id"], "result": null }));
+
+    // Nothing declared: a documented table is fine.
+    assert!(published_codes(&mut lsp, &uri, "kql", "NTAIpDetails | take 1").is_empty());
+
+    // Opened and edited in the editor, not saved.
+    lsp.notify(
+        "textDocument/didOpen",
+        json!({ "textDocument": {
+            "uri": visibility_uri, "languageId": "toml", "version": 1,
+            "text": declare("\"NTANetAnalytics\"")
+        } }),
+    );
+    assert_eq!(
+        next_diagnostics(&mut lsp, &uri),
+        vec!["kql_table_not_declared"]
+    );
+    // Mid-edit text that is not TOML keeps the declarations in use.
+    lsp.notify(
+        "textDocument/didChange",
+        json!({
+            "textDocument": { "uri": visibility_uri, "version": 2 },
+            "contentChanges": [{ "text": "[[logsources" }]
+        }),
+    );
+    lsp.notify(
+        "textDocument/didChange",
+        json!({
+            "textDocument": { "uri": visibility_uri, "version": 3 },
+            "contentChanges": [{ "text": declare("\"NTANetAnalytics\", \"NTAIpDetails\"") }]
+        }),
+    );
+    assert!(next_diagnostics(&mut lsp, &uri).is_empty());
+
+    // Closed unsaved: the file on disk (none) applies again.
+    lsp.notify(
+        "textDocument/didClose",
+        json!({ "textDocument": { "uri": visibility_uri } }),
+    );
+    assert!(next_diagnostics(&mut lsp, &uri).is_empty());
+
+    // Written outside the editor.
+    std::fs::write(&path, declare("\"NTANetAnalytics\"")).unwrap();
+    lsp.notify(
+        "workspace/didChangeWatchedFiles",
+        json!({ "changes": [{ "uri": visibility_uri, "type": 1 }] }),
+    );
+    assert_eq!(
+        next_diagnostics(&mut lsp, &uri),
+        vec!["kql_table_not_declared"]
+    );
+}

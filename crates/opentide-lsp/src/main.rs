@@ -1,9 +1,8 @@
-//! OpenTide language server — stdio JSON-RPC and CLI (`analyze` / `highlight`).
+//! opentide language server — stdio JSON-RPC and CLI (`analyze` / `highlight`).
 //!
 //! The CLI never speaks JSON-RPC. `--stdio` is the editor protocol.
 
-mod jsonrpc;
-mod server;
+use opentide_lsp::server;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -15,7 +14,7 @@ use opentide_highlight::{
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
-#[command(name = "opentide-lsp", version, about = "OpenTide language server")]
+#[command(name = "opentide-lsp", version, about = "opentide language server")]
 struct Cli {
     /// Speak LSP over stdin/stdout.
     #[arg(long)]
@@ -79,20 +78,32 @@ fn detect_language(path: &Path, override_lang: Option<&str>) -> Result<LanguageI
     if let Some(l) = override_lang {
         return LanguageId::parse(l).context("unknown language id");
     }
-    match path.extension().and_then(|s| s.to_str()) {
-        Some("kql") => Ok(LanguageId::Kql),
-        Some("spl") => Ok(LanguageId::Spl),
-        Some("yaml" | "yml") => Ok(LanguageId::TideYaml),
-        other => anyhow::bail!("cannot detect language from extension {other:?}; pass --language"),
+    let ext = path.extension().and_then(|s| s.to_str());
+    if matches!(ext, Some("yaml" | "yml")) {
+        return Ok(LanguageId::TideYaml);
     }
+    ext.and_then(LanguageId::from_extension)
+        .with_context(|| format!("cannot detect language from extension {ext:?}; pass --language"))
 }
 
 fn cmd_analyze(file: &Path, language: Option<&str>) -> Result<()> {
     let text = std::fs::read_to_string(file)?;
     let language = detect_language(file, language)?;
     let mut files = vec![(file.display().to_string(), text.clone())];
-    if let Some(root) = find_objects_root(file) {
-        collect_yaml(&root, &mut files)?;
+    // Only Tide YAML resolves references across the workspace; a raw query
+    // file is analysed on its own.
+    let root = (language == LanguageId::TideYaml)
+        .then(|| find_objects_root(file))
+        .flatten();
+    if let Some(root) = root {
+        collect_yaml(&root, &mut files);
+        if let Some(workspace) = root.parent() {
+            server::install_workspace_catalog(workspace);
+            let config = workspace.join(opentide_analysis::ELASTIC_CONFIGURATION);
+            if let Ok(text) = std::fs::read_to_string(&config) {
+                files.push((config.display().to_string(), text));
+            }
+        }
     }
     let host = MemoryWorkspace { files };
     let response = opentide_analysis::analyze(
@@ -137,6 +148,22 @@ fn cmd_generate_highlights(check: bool) -> Result<()> {
             serde_json::to_string_pretty(&generate_tm_language(LanguageId::TideYaml, &spec))?,
         ),
         (
+            root.join("esql.tmLanguage.json"),
+            serde_json::to_string_pretty(&generate_tm_language(LanguageId::Esql, &spec))?,
+        ),
+        (
+            root.join("eql.tmLanguage.json"),
+            serde_json::to_string_pretty(&generate_tm_language(LanguageId::Eql, &spec))?,
+        ),
+        (
+            root.join("kuery.tmLanguage.json"),
+            serde_json::to_string_pretty(&generate_tm_language(LanguageId::Kuery, &spec))?,
+        ),
+        (
+            root.join("lucene.tmLanguage.json"),
+            serde_json::to_string_pretty(&generate_tm_language(LanguageId::Lucene, &spec))?,
+        ),
+        (
             root.join("monaco.json"),
             serde_json::to_string_pretty(&generate_monaco(&spec))?,
         ),
@@ -178,36 +205,40 @@ fn find_objects_root(file: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-fn collect_yaml(root: &Path, files: &mut Vec<(String, String)>) -> Result<()> {
+/// The workspace YAML under `root`. A file that cannot be read as UTF-8 is
+/// left out rather than failing the file being analysed.
+fn collect_yaml(root: &Path, files: &mut Vec<(String, String)>) {
     if !root.is_dir() {
-        return Ok(());
+        return;
     }
-    for entry in walk(root)? {
-        if matches!(
+    for entry in walk(root) {
+        if !matches!(
             entry.extension().and_then(|s| s.to_str()),
             Some("yaml" | "yml")
         ) {
-            let text = std::fs::read_to_string(&entry)?;
+            continue;
+        }
+        if let Ok(text) = std::fs::read_to_string(&entry) {
             files.push((entry.display().to_string(), text));
         }
     }
-    Ok(())
 }
 
-fn walk(dir: &Path) -> Result<Vec<PathBuf>> {
+/// Every file under `dir`. A directory that cannot be listed is skipped.
+fn walk(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    fn rec(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
-        for e in std::fs::read_dir(dir)? {
-            let e = e?;
-            let p = e.path();
+    fn rec(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for p in entries.flatten().map(|e| e.path()) {
             if p.is_dir() {
-                rec(&p, out)?;
+                rec(&p, out);
             } else {
                 out.push(p);
             }
         }
-        Ok(())
     }
-    rec(dir, &mut out)?;
-    Ok(out)
+    rec(dir, &mut out);
+    out
 }

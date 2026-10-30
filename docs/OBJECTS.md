@@ -1,6 +1,6 @@
 # Tide objects
 
-OpenTide LSP owns Tide diagnostics. Disable Red Hat YAML / yamlls on `objects/**`.
+opentide LSP owns Tide diagnostics. Disable Red Hat YAML / yamlls on `objects/**`.
 
 There is **no YAML formatter**. The LSP does not rename object `name`.
 
@@ -8,9 +8,9 @@ There is **no YAML formatter**. The LSP does not rename object `name`.
 
 | schema | refs |
 | --- | --- |
-| `rule::1.0` | `detection_model` → objective UUID (optional; not schema-required) |
+| `rule::1.0`, `rule::1.1` | `detection_model` → objective UUID (optional; not schema-required). Each revision has its own fields: an object is checked against the revision its `metadata.schema` names (required fields, keys the revision does not define, enums). A revision the catalog does not know takes the newest one's fields, without the unknown-key check. `metadata.schema` offers both |
 | `objective::1.0` | `objective.threats[]` → threat UUIDs |
-| `threat::1.0` | `threat.impact` / `threat.leverage` are non-empty lists. `threat.chaining[].vector` / `relation` are not schema properties in 0.5.0 |
+| `threat::1.0` | `threat.impact` / `threat.leverage` are non-empty lists. `threat.chaining[].vector` / `relation` are not schema properties |
 
 ## Diagnostic codes (CLI-compatible)
 
@@ -32,6 +32,8 @@ Query extras (engine may add these inside `query: |`):
 - `kql_control_command_unsupported`
 - `kql_unknown_operator`
 - `kql_unknown_function`
+- `kql_deprecated_function`
+- `kql_deprecated_operator`
 - `kql_unknown_table`
 - `kql_render_not_valid`
 - `kql_parse_error`
@@ -40,17 +42,34 @@ Query extras (engine may add these inside `query: |`):
 - `kql_unscoped_union`
 - `kql_wildcard_table`
 - `kql_join_summarize_before_project`
+- `kql_table_not_declared`
+- `kql_unknown_column`
+- `kql_type_mismatch`
 - `spl_unknown_command`
 - `spl_parse_error`
 - `spl_wildcard`
 - `spl_leading_not`
 - `spl_subsearch_truncation`
+- `spl_unknown_datamodel` (error: a near miss of a CIM data model or dataset, with a suggestion)
+- `spl_unknown_datamodel_field` (error: a near miss of a CIM dataset field, `Processes.proces_name`, with a suggestion)
+- `spl_dataset_not_declared` (warning: an index, sourcetype or base-search macro the workspace's Splunk log sources do not declare, when they declare that kind)
+- `ecs_type_mismatch`, `ecs_unknown_field` (Elastic queries whose indices all hold ECS documents; `docs/LANGUAGE.md`, Elastic indices and ECS)
+- `elastic_dataset_not_declared` (`configurations.elastic.index`, `threat.index`, `data_view_id`, and ES|QL `FROM`, when the workspace declares Elastic datasets)
+- `spl_search_operator`
+- `spl_empty_command`
+- `spl_empty_stage`
+- `spl_command_without_pipe`
 - `crowdstrike_unsupported` (never faked)
 - `defender_output_columns`
 
 ## Catalogs
 
-Snapshot from `opentide generate schemas` into `catalogs/tide/`. A workspace file `.opentide/lsp/catalogs/generated/deprecations.json` (same shape as the bundled catalog) adds `deprecated_field` warnings on top of `catalogs/tide/generated/deprecations.json`.
+Snapshot from `opentide generate schemas` into `catalogs/tide/`. That is the fallback: a workspace that ran `opentide generate schemas` has its own catalogs under `.opentide/lsp/catalogs/generated/`, in the same shapes, and they replace the bundled ones when the server starts (`initialize`), in `opentide-lsp analyze`, and in the `opentide` CLI:
+
+- `fields.json` replaces `catalogs/tide/generated/fields.json`: hover, completion and the enum checks follow the workspace's schemas, custom vocabulary included.
+- `deprecations.json` adds `deprecated_field` warnings on top of `catalogs/tide/generated/deprecations.json`.
+
+A file that does not parse is reported on stderr, and the bundled catalogs are used. Hosts embedding the engine call `opentide_analysis::install_catalog`, `opentide_analysis::set_default_catalog` puts the host's own catalogs where the bundled ones would be used, and `opentide_analysis::bundled_catalog` returns the bundled catalogs so a host can check they match its own models.
 
 Snippets come from the same templates `opentide generate` writes (`catalogs/tide/templates/`).
 
