@@ -23,25 +23,33 @@
         "required": false,
         "types": [
           {
+            "type": "glob",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "function": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           }
         ]
       }
-    },
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "function_call",
-          "named": true
-        },
-        {
-          "type": "identifier",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -65,10 +73,22 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
         {
-          "type": "field_value",
+          "type": "command_option",
+          "named": true
+        },
+        {
+          "type": "comparison",
+          "named": true
+        },
+        {
+          "type": "function_call",
+          "named": true
+        },
+        {
+          "type": "glob",
           "named": true
         },
         {
@@ -81,6 +101,14 @@
         },
         {
           "type": "number",
+          "named": true
+        },
+        {
+          "type": "search_boolean",
+          "named": true
+        },
+        {
+          "type": "search_word",
           "named": true
         },
         {
@@ -105,6 +133,10 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "string",
+            "named": true
           }
         ]
       },
@@ -125,11 +157,19 @@
     "named": true,
     "fields": {
       "first": {
-        "multiple": false,
+        "multiple": true,
         "required": true,
         "types": [
           {
-            "type": "field_value",
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "search_boolean",
+            "named": true
+          },
+          {
+            "type": "search_term",
             "named": true
           }
         ]
@@ -139,6 +179,10 @@
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "search_boolean",
+          "named": true
+        },
         {
           "type": "search_term",
           "named": true
@@ -152,11 +196,11 @@
     "fields": {}
   },
   {
-    "type": "case_clause",
+    "type": "by_clause",
     "named": true,
     "fields": {
-      "value": {
-        "multiple": false,
+      "by": {
+        "multiple": true,
         "required": true,
         "types": [
           {
@@ -164,7 +208,45 @@
             "named": true
           },
           {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "prefix_clause",
+            "named": true
+          },
+          {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "subsearch",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "case_clause",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_text",
             "named": true
           }
         ]
@@ -203,6 +285,76 @@
     "fields": {}
   },
   {
+    "type": "chart_where",
+    "named": true,
+    "fields": {
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "limit": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "operator": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "!=",
+            "named": false
+          },
+          {
+            "type": "<",
+            "named": false
+          },
+          {
+            "type": "<=",
+            "named": false
+          },
+          {
+            "type": "=",
+            "named": false
+          },
+          {
+            "type": ">",
+            "named": false
+          },
+          {
+            "type": ">=",
+            "named": false
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "command",
     "named": true,
     "fields": {},
@@ -227,7 +379,19 @@
           "named": true
         },
         {
+          "type": "fillnull_command",
+          "named": true
+        },
+        {
+          "type": "foreach_command",
+          "named": true
+        },
+        {
           "type": "head_command",
+          "named": true
+        },
+        {
+          "type": "inputlookup_command",
           "named": true
         },
         {
@@ -247,6 +411,10 @@
           "named": true
         },
         {
+          "type": "outputlookup_command",
+          "named": true
+        },
+        {
           "type": "rename_command",
           "named": true
         },
@@ -263,6 +431,10 @@
           "named": true
         },
         {
+          "type": "spath_command",
+          "named": true
+        },
+        {
           "type": "stats_command",
           "named": true
         },
@@ -272,6 +444,10 @@
         },
         {
           "type": "tail_command",
+          "named": true
+        },
+        {
+          "type": "tojson_command",
           "named": true
         },
         {
@@ -287,6 +463,148 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "command_option",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean",
+            "named": true
+          },
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "glob",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "search_word",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "value_list",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "comparison",
+    "named": true,
+    "fields": {
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "operator": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "!=",
+            "named": false
+          },
+          {
+            "type": "<",
+            "named": false
+          },
+          {
+            "type": "<=",
+            "named": false
+          },
+          {
+            "type": ">",
+            "named": false
+          },
+          {
+            "type": ">=",
+            "named": false
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "boolean",
+            "named": true
+          },
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "glob",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "search_word",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "value_list",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -311,17 +629,65 @@
   {
     "type": "dedup_command",
     "named": true,
-    "fields": {},
+    "fields": {
+      "fields": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "field_name",
+            "named": true
+          }
+        ]
+      },
+      "sortby": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "sort_item",
+            "named": true
+          }
+        ]
+      }
+    },
     "children": {
       "multiple": true,
       "required": false,
       "types": [
         {
-          "type": "identifier",
+          "type": "dedup_option",
           "named": true
         },
         {
           "type": "number",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "dedup_option",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "boolean",
+          "named": true
+        },
+        {
+          "type": "identifier",
           "named": true
         }
       ]
@@ -363,22 +729,107 @@
     }
   },
   {
+    "type": "field_name",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "glob",
+          "named": true
+        },
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "macro",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "field_value",
     "named": true,
     "fields": {
       "field": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "search_word",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "operator": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "!=",
+            "named": false
+          },
+          {
+            "type": "!~",
+            "named": false
+          },
+          {
+            "type": "<",
+            "named": false
+          },
+          {
+            "type": "<=",
+            "named": false
+          },
+          {
+            "type": "<>",
+            "named": false
+          },
+          {
+            "type": "=",
+            "named": false
+          },
+          {
+            "type": "=<",
+            "named": false
+          },
+          {
+            "type": "==",
+            "named": false
+          },
+          {
+            "type": "=>",
+            "named": false
+          },
+          {
+            "type": ">",
+            "named": false
+          },
+          {
+            "type": ">=",
+            "named": false
           }
         ]
       },
       "value": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "glob",
@@ -389,7 +840,15 @@
             "named": true
           },
           {
+            "type": "macro",
+            "named": true
+          },
+          {
             "type": "number",
+            "named": true
+          },
+          {
+            "type": "search_word",
             "named": true
           },
           {
@@ -410,18 +869,80 @@
     "fields": {
       "fields": {
         "multiple": true,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": ",",
             "named": false
           },
           {
-            "type": "identifier",
+            "type": "field_name",
             "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "fillnull_command",
+    "named": true,
+    "fields": {
+      "fields": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "field_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "foreach_command",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "subsearch",
+            "named": true
+          }
+        ]
+      },
+      "fields": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "field_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -438,6 +959,30 @@
           },
           {
             "type": "expression",
+            "named": true
+          },
+          {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "glob",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "prefix_clause",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -468,7 +1013,22 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
     }
+  },
+  {
+    "type": "identifier",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "in_clause",
@@ -480,6 +1040,14 @@
         "types": [
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "search_word",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -497,11 +1065,59 @@
     }
   },
   {
+    "type": "inputlookup_command",
+    "named": true,
+    "fields": {
+      "table": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "where": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "search_expression",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
+        {
+          "type": "subsearch",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "join_command",
     "named": true,
     "fields": {
-      "type_or_field": {
-        "multiple": false,
+      "fields": {
+        "multiple": true,
         "required": false,
         "types": [
           {
@@ -512,9 +1128,13 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
         {
           "type": "subsearch",
           "named": true
@@ -526,12 +1146,48 @@
     "type": "lookup_command",
     "named": true,
     "fields": {
+      "inputs": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "lookup_field",
+            "named": true
+          }
+        ]
+      },
+      "outputs": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": ",",
+            "named": false
+          },
+          {
+            "type": "lookup_field",
+            "named": true
+          }
+        ]
+      },
       "table": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -542,10 +1198,44 @@
       "required": false,
       "types": [
         {
-          "type": "identifier",
+          "type": "command_option",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "lookup_field",
+    "named": true,
+    "fields": {
+      "alias": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "field": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -564,9 +1254,13 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
         {
           "type": "string",
           "named": true
@@ -603,6 +1297,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -615,6 +1319,40 @@
       "types": [
         {
           "type": "and_expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "outputlookup_command",
+    "named": true,
+    "fields": {
+      "table": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
           "named": true
         }
       ]
@@ -637,10 +1375,34 @@
           "named": true
         },
         {
+          "type": "inputlookup_command",
+          "named": true
+        },
+        {
           "type": "macro",
+          "named": true
+        },
+        {
+          "type": "search_command",
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "prefix_clause",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "term_text",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -678,6 +1440,10 @@
         {
           "type": "string",
           "named": true
+        },
+        {
+          "type": "subsearch",
+          "named": true
         }
       ]
     }
@@ -711,7 +1477,15 @@
         "required": true,
         "types": [
           {
+            "type": "glob",
+            "named": true
+          },
+          {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -721,7 +1495,19 @@
         "required": true,
         "types": [
           {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "glob",
+            "named": true
+          },
+          {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -733,11 +1519,15 @@
     "named": true,
     "fields": {
       "field": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -752,6 +1542,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -759,15 +1559,49 @@
     "named": true,
     "fields": {
       "clause": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "search_term",
+            "type": "search_expression",
             "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "search_expression",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "search_boolean",
+          "named": true
+        },
+        {
+          "type": "search_term",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "search_group",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "search_expression",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -807,6 +1641,14 @@
           "named": true
         },
         {
+          "type": "search_group",
+          "named": true
+        },
+        {
+          "type": "search_word",
+          "named": true
+        },
+        {
           "type": "string",
           "named": true
         },
@@ -825,6 +1667,16 @@
     "type": "sort_command",
     "named": true,
     "fields": {
+      "count": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
       "keys": {
         "multiple": true,
         "required": true,
@@ -841,11 +1693,11 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
         {
-          "type": "number",
+          "type": "command_option",
           "named": true
         }
       ]
@@ -859,6 +1711,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "function_call",
+          "named": true
+        },
         {
           "type": "identifier",
           "named": true
@@ -883,24 +1739,48 @@
     }
   },
   {
+    "type": "spath_command",
+    "named": true,
+    "fields": {
+      "path": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
+        {
+          "type": "subsearch",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "stats_command",
     "named": true,
     "fields": {
       "aggregates": {
-        "multiple": true,
-        "required": true,
-        "types": [
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "aggregate_item",
-            "named": true
-          }
-        ]
-      },
-      "by": {
         "multiple": true,
         "required": false,
         "types": [
@@ -909,11 +1789,59 @@
             "named": false
           },
           {
+            "type": "aggregate_item",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          }
+        ]
+      },
+      "over": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
+            "named": true
+          },
+          {
+            "type": "prefix_clause",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "subsearch",
             "named": true
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "by_clause",
+          "named": true
+        },
+        {
+          "type": "chart_where",
+          "named": true
+        },
+        {
+          "type": "command_option",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -944,7 +1872,7 @@
             "named": false
           },
           {
-            "type": "identifier",
+            "type": "field_name",
             "named": true
           }
         ]
@@ -973,18 +1901,44 @@
     "fields": {
       "value": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
-            "type": "identifier",
-            "named": true
-          },
-          {
-            "type": "string",
+            "type": "term_text",
             "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "tojson_command",
+    "named": true,
+    "fields": {
+      "fields": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "field_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
+        {
+          "type": "function_call",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1012,6 +1966,20 @@
           {
             "type": "identifier",
             "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "where": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "search_expression",
+            "named": true
           }
         ]
       }
@@ -1021,11 +1989,7 @@
       "required": false,
       "types": [
         {
-          "type": "expression",
-          "named": true
-        },
-        {
-          "type": "identifier",
+          "type": "by_clause",
           "named": true
         },
         {
@@ -1070,7 +2034,19 @@
             "named": true
           },
           {
+            "type": "function_call",
+            "named": true
+          },
+          {
+            "type": "glob",
+            "named": true
+          },
+          {
             "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "macro",
             "named": true
           },
           {
@@ -1078,7 +2054,15 @@
             "named": true
           },
           {
+            "type": "search_word",
+            "named": true
+          },
+          {
             "type": "string",
+            "named": true
+          },
+          {
+            "type": "value_list",
             "named": true
           }
         ]
@@ -1088,6 +2072,10 @@
       "multiple": false,
       "required": false,
       "types": [
+        {
+          "type": "command_option",
+          "named": true
+        },
         {
           "type": "macro",
           "named": true
@@ -1153,7 +2141,15 @@
           "named": true
         },
         {
+          "type": "macro",
+          "named": true
+        },
+        {
           "type": "number",
+          "named": true
+        },
+        {
+          "type": "search_word",
           "named": true
         },
         {
@@ -1169,7 +2165,7 @@
     "fields": {
       "predicate": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "expression",
@@ -1180,7 +2176,15 @@
     }
   },
   {
+    "type": "!",
+    "named": false
+  },
+  {
     "type": "!=",
+    "named": false
+  },
+  {
+    "type": "!~",
     "named": false
   },
   {
@@ -1212,6 +2216,10 @@
     "named": false
   },
   {
+    "type": ".",
+    "named": false
+  },
+  {
     "type": "/",
     "named": false
   },
@@ -1224,11 +2232,23 @@
     "named": false
   },
   {
+    "type": "<>",
+    "named": false
+  },
+  {
     "type": "=",
     "named": false
   },
   {
+    "type": "=<",
+    "named": false
+  },
+  {
     "type": "==",
+    "named": false
+  },
+  {
+    "type": "=>",
     "named": false
   },
   {
@@ -1241,10 +2261,6 @@
   },
   {
     "type": "AND",
-    "named": false
-  },
-  {
-    "type": "AS",
     "named": false
   },
   {
@@ -1269,6 +2285,10 @@
   },
   {
     "type": "OR",
+    "named": false
+  },
+  {
+    "type": "PREFIX",
     "named": false
   },
   {
@@ -1401,6 +2421,10 @@
     "named": false
   },
   {
+    "type": "consecutive",
+    "named": false
+  },
+  {
     "type": "contingency",
     "named": false
   },
@@ -1410,6 +2434,10 @@
   },
   {
     "type": "correlate",
+    "named": false
+  },
+  {
+    "type": "d",
     "named": false
   },
   {
@@ -1434,6 +2462,10 @@
   },
   {
     "type": "delta",
+    "named": false
+  },
+  {
+    "type": "desc",
     "named": false
   },
   {
@@ -1557,8 +2589,8 @@
     "named": false
   },
   {
-    "type": "identifier",
-    "named": true
+    "type": "in",
+    "named": false
   },
   {
     "type": "inputcsv",
@@ -1577,6 +2609,14 @@
     "named": false
   },
   {
+    "type": "keepempty",
+    "named": false
+  },
+  {
+    "type": "keepevents",
+    "named": false
+  },
+  {
     "type": "kmeans",
     "named": false
   },
@@ -1586,6 +2626,10 @@
   },
   {
     "type": "kvform",
+    "named": false
+  },
+  {
+    "type": "like",
     "named": false
   },
   {
@@ -1681,6 +2725,10 @@
     "named": false
   },
   {
+    "type": "notin",
+    "named": false
+  },
+  {
     "type": "number",
     "named": true
   },
@@ -1693,6 +2741,10 @@
     "named": false
   },
   {
+    "type": "output",
+    "named": false
+  },
+  {
     "type": "outputcsv",
     "named": false
   },
@@ -1701,7 +2753,15 @@
     "named": false
   },
   {
+    "type": "outputnew",
+    "named": false
+  },
+  {
     "type": "outputtext",
+    "named": false
+  },
+  {
+    "type": "over",
     "named": false
   },
   {
@@ -1789,6 +2849,14 @@
     "named": false
   },
   {
+    "type": "search_boolean",
+    "named": true
+  },
+  {
+    "type": "search_word",
+    "named": true
+  },
+  {
     "type": "searchtxn",
     "named": false
   },
@@ -1837,6 +2905,10 @@
     "named": false
   },
   {
+    "type": "sortby",
+    "named": false
+  },
+  {
     "type": "spath",
     "named": false
   },
@@ -1871,6 +2943,10 @@
   {
     "type": "tail",
     "named": false
+  },
+  {
+    "type": "term_text",
+    "named": true
   },
   {
     "type": "timechart",
@@ -1942,10 +3018,6 @@
   },
   {
     "type": "where",
-    "named": false
-  },
-  {
-    "type": "x11",
     "named": false
   },
   {

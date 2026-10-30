@@ -1,11 +1,11 @@
 //! Path-aware Tide hover, completions, inlay hints, and completion resolve.
 //!
-//! Field identity is `(schema family, YAML path)` from the generated OpenTide
+//! Field identity is `(schema family, YAML path)` from the generated opentide
 //! catalog. Enum completions come from that node's schema enum. Empty-enum
 //! sentinels are already dropped. Cross-object UUID fields use `ref`.
 
 use crate::IndexedObject;
-use crate::yaml_path::{YamlCursor, object_schema_kind, yaml_cursor};
+use crate::yaml_path::{YamlCursor, document_schema_id, yaml_cursor};
 use opentide_core::{CompletionItem, Position, offset_to_position};
 use opentide_highlight::{TideField, load_tide_fields, tide_children, tide_field_at};
 
@@ -59,7 +59,7 @@ fn field_for(source: &str, cursor: &YamlCursor) -> Option<&'static TideField> {
     if path.is_empty() {
         return None;
     }
-    let schema = object_schema_kind(source);
+    let schema = document_schema_id(source);
     if !schema.is_empty() {
         return tide_field_at(&schema, &path);
     }
@@ -138,7 +138,7 @@ pub fn completions_tide(
     workspace: &[IndexedObject],
 ) -> Vec<CompletionItem> {
     let cursor = yaml_cursor(source, offset);
-    let schema = object_schema_kind(source);
+    let schema = document_schema_id(source);
     if cursor.on_key || cursor.value.is_none() {
         return complete_keys(&cursor, &schema);
     }
@@ -246,6 +246,8 @@ fn complete_values(
             .with_detail(format!("{} {}", field.schema, field.path));
         if let Some(doc) = field.enum_docs.get(index).filter(|doc| !doc.is_empty()) {
             item = item.with_docs(doc.clone());
+        } else if let Some(doc) = crate::elastic::value_docs(&field.path, value) {
+            item = item.with_docs(doc);
         }
         items.push(item);
     }
@@ -392,6 +394,30 @@ description: |
   hello
 detection_model: 00000000-0000-4000-8002-000000000001
 "#;
+
+    #[test]
+    fn elastic_type_and_language_completions_name_the_query_language() {
+        let src = "name: r\nmetadata:\n  schema: rule::1.1\nconfigurations:\n  elastic:\n    type: \n    language: \n";
+        let off = src.find("type: ").unwrap() + "type: ".len();
+        let items = completions_tide(src, off, &[]);
+        let esql = items.iter().find(|i| i.label == "esql").expect("esql");
+        assert!(
+            esql.documentation
+                .as_deref()
+                .unwrap_or("")
+                .contains("ES|QL")
+        );
+        let off = src.find("language: ").unwrap() + "language: ".len();
+        let items = completions_tide(src, off, &[]);
+        let kuery = items.iter().find(|i| i.label == "kuery").expect("kuery");
+        assert!(
+            kuery
+                .documentation
+                .as_deref()
+                .unwrap_or("")
+                .contains("Kibana")
+        );
+    }
 
     #[test]
     fn hover_on_description_key() {

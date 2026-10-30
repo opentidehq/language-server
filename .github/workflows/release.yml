@@ -1,15 +1,60 @@
 name: Release
 
+# A release is either a pushed vX.Y.Z tag, or "Run workflow" on main, which
+# releases the version in Cargo.toml and creates its tag with the GitHub
+# Release.
 on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  # The tag, the crate pins, and CHANGELOG.md agree, and every crate builds from
+  # its packaged sources, before anything is built or published.
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+              echo "::error::Run the release from main, not ${GITHUB_REF_NAME}"
+              exit 1
+            fi
+            tag="v$(python3 scripts/release.py version)"
+            if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+              echo "::error::${tag} is already released; bump the version first (scripts/release.py bump)"
+              exit 1
+            fi
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      - run: python3 scripts/release.py check "${{ steps.tag.outputs.tag }}"
+      - run: python3 scripts/release.py vendor
+      - run: cargo package --workspace --allow-dirty
+      - name: license scan (no oracle references)
+        run: bash scripts/license-scan.sh target/package/*.crate
+
   native:
+    needs: verify
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
     strategy:
       fail-fast: false
       matrix:
@@ -24,7 +69,8 @@ jobs:
             target: aarch64-unknown-linux-musl
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13
+          # GitHub retired the Intel macOS runners; cross-compile on Apple silicon.
+          - os: macos-latest
             target: x86_64-apple-darwin
           - os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -53,13 +99,56 @@ jobs:
           size=$(wc -c < "$bin")
           echo "$bin is $size bytes"
           test "$size" -lt 31457280
+      # Every target's binary is named opentide-lsp: name each by its target, or
+      # the release job's merged download keeps only one.
+      - name: rename
+        shell: bash
+        run: |
+          set -euo pipefail
+          ext=""
+          case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/opentide-lsp${ext}" "dist/opentide-lsp-${TAG}-${{ matrix.target }}${ext}"
       - name: upload
         uses: actions/upload-artifact@v4
         with:
           name: opentide-lsp-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/opentide-lsp*
+          path: dist/*
+
+  wasm:
+    needs: verify
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: cargo install --locked wasm-bindgen-cli --version 0.2.128
+      - run: bash scripts/build-wasm.sh
+      - name: package
+        run: |
+          set -euo pipefail
+          VERSION="${TAG}"
+          mkdir -p dist
+          cp target/wasm32-wasip1/release/opentide-lsp.wasm "dist/opentide-lsp-wasm32-wasip1.wasm"
+          wasm-bindgen --target web --out-dir pkg target/wasm32-unknown-unknown/release/opentide_wasm.wasm
+          cp LICENSE NOTICE pkg/
+          cp -r licenses pkg/licenses
+          (cd pkg && zip -r "../dist/opentide-wasm-web-${VERSION}.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opentide-wasm
+          path: dist/*
 
   highlights:
+    needs: verify
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,57 +156,110 @@ jobs:
       - run: cargo run -p opentide-lsp -- generate-highlights
       - name: zip
         run: |
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${TAG}"
           mkdir -p dist
           cp highlights/spec.toml highlights/generated/* highlights/queries/kql/highlights.scm highlights/queries/spl/highlights.scm highlights/queries/tide/highlights.scm dist/ || true
           (cd highlights && zip -r "../highlights-${VERSION}.zip" spec.toml generated queries)
+          zip -j "highlights-${VERSION}.zip" LICENSE NOTICE
       - uses: actions/upload-artifact@v4
         with:
           name: highlights-zip
           path: highlights-v*.zip
 
-  # Wheel is always attached to the GitHub Release. PyPI upload runs when
-  # PYPI_API_TOKEN is set. abi3-py310; 3.14 free-threaded stays best-effort.
-  pypi:
+  release:
+    needs: [verify, native, wasm, highlights]
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.verify.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install "maturin>=1.7,<2"
-      - run: maturin build --release -m crates/opentide-lsp/Cargo.toml
-      - uses: actions/upload-artifact@v4
-        with:
-          name: opentide-lsp-wheel
-          path: target/wheels/*.whl
-      - name: publish to PyPI
-        env:
-          MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          if [ -z "${MATURIN_PYPI_TOKEN}" ]; then
-            echo "PYPI_API_TOKEN is unset; the wheel is attached to the GitHub Release only"
-            exit 0
-          fi
-          maturin publish -m crates/opentide-lsp/Cargo.toml
-
-  release:
-    needs: [native, highlights, pypi]
-    runs-on: ubuntu-latest
-    steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: license scan (no oracle references)
+        run: bash scripts/license-scan.sh dist
+      # The binaries embed third-party code and data: ship the notices with
+      # them. NOTICE covers ECS, Lucene, dk.brics, and the wasi-libc the WASM
+      # builds link (texts in licenses/wasi-libc, shipped as WASI-LIBC-LICENSES.txt); cargo-about lists every Rust
+      # crate in the workspace, the browser build's included, and fails on a
+      # licence about.toml does not accept.
+      - uses: dtolnay/rust-toolchain@stable
+      - name: licences and notices
+        run: |
+          set -euo pipefail
+          cargo install --locked cargo-about --version 0.8.4
+          cargo about generate --workspace about.hbs -o dist/THIRD-PARTY-LICENSES.html
+          cp LICENSE dist/LICENSE
+          cp NOTICE dist/NOTICE
+          for f in licenses/wasi-libc/*; do
+            printf '==> %s <==\n\n' "$f"; cat "$f"; printf '\n'
+          done > dist/WASI-LIBC-LICENSES.txt
       - name: attach GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -n "$(find dist -name 'highlights-*.zip' -print -quit)"
-          gh release create "${GITHUB_REF_NAME}" dist/* \
+          test -s dist/THIRD-PARTY-LICENSES.html && test -s dist/NOTICE && test -s dist/WASI-LIBC-LICENSES.txt
+          python3 scripts/release.py notes "${TAG}" > notes.md
+          # From "Run workflow", the tag does not exist yet: the release creates it
+          # on the commit this run built.
+          gh release create "${TAG}" dist/* \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "${GITHUB_REF_NAME}" \
-            --notes "OpenTide language server ${GITHUB_REF_NAME}. Tags are independent of the opentide package. npm @opentide/lsp-client is tracked separately." \
-            || gh release upload "${GITHUB_REF_NAME}" dist/* --repo "${GITHUB_REPOSITORY}" --clobber
+            --target "${GITHUB_SHA}" \
+            --title "opentide-lsp ${TAG}" \
+            --notes-file notes.md \
+            || gh release upload "${TAG}" dist/* --repo "${GITHUB_REPOSITORY}" --clobber
+
+  # crates.io is permanent: publish only once the GitHub Release exists. The
+  # crates go up in dependency order, each pinned to this version; a crate
+  # already published is skipped, so a re-run resumes. crates.io rate-limits
+  # new crates (one every ten minutes after the first few), which only the
+  # first release meets.
+  #
+  # Trusted publishing: once every crate exists, `release.py trust` registers
+  # this workflow as a trusted publisher for each (with CARGO_REGISTRY_TOKEN,
+  # which needs the trusted-publishing scope), and later releases log in with
+  # the workflow's OIDC identity instead of the token. The token then only
+  # publishes a crate that does not exist yet, which crates.io requires.
+  crates:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 scripts/release.py vendor
+      # Fails until trusted publishing is registered; the token covers that.
+      - name: crates.io login (trusted publishing)
+        id: trusted
+        continue-on-error: true
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: publish to crates.io
+        env:
+          TRUSTED_TOKEN: ${{ steps.trusted.outputs.token }}
+          STORED_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -n "${TRUSTED_TOKEN}" ]; then
+            echo "Publishing with trusted publishing"
+            export CARGO_REGISTRY_TOKEN="${TRUSTED_TOKEN}"
+          elif [ -n "${STORED_TOKEN}" ]; then
+            echo "Publishing with CARGO_REGISTRY_TOKEN"
+            export CARGO_REGISTRY_TOKEN="${STORED_TOKEN}"
+          else
+            echo "::error::No trusted publishing and no CARGO_REGISTRY_TOKEN; the crates were not published"
+            exit 1
+          fi
+          python3 scripts/release.py publish
+      - name: register trusted publishing
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: python3 scripts/release.py trust release.yml
