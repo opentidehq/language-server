@@ -2190,6 +2190,7 @@ configurations:
             path: "objects/rules/nested.yaml",
             source,
             workspace: &[],
+            elastic_tenants: &[],
         })
         .diagnostics
         .into_iter()
