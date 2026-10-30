@@ -1411,32 +1411,6 @@ fn collect_objects(root: &Path) -> Vec<(String, String)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{path_to_uri, uri_to_path};
-
-    #[test]
-    fn file_uris_become_paths_and_back() {
-        assert_eq!(
-            uri_to_path("file:///home/u/My%20Detections"),
-            "/home/u/My Detections"
-        );
-        assert_eq!(uri_to_path("file:///c%3A/Users/u/det"), "c:/Users/u/det");
-        assert_eq!(uri_to_path("file://localhost/srv/d%C3%A9t"), "/srv/dét");
-        assert_eq!(uri_to_path("file:///a/100%"), "/a/100%");
-        assert_eq!(uri_to_path("untitled:Untitled-1"), "untitled:Untitled-1");
-        for path in [
-            "/home/u/My Detections/a#1.yaml",
-            "/srv/dét/r.yaml",
-            "c:/Users/u/r.yaml",
-        ] {
-            assert_eq!(uri_to_path(&path_to_uri(path)), path, "{path}");
-        }
-        assert_eq!(path_to_uri("/a b"), "file:///a%20b");
-        assert_eq!(path_to_uri("c:/x"), "file:///c:/x");
-    }
-}
-
-#[cfg(test)]
-mod tests {
     use super::*;
 
     fn ranged(start_line: u64, start_char: u64, end_line: u64, end_char: u64, text: &str) -> Value {
@@ -1521,10 +1495,7 @@ mod tests {
 
     #[test]
     fn language_for_ignores_unknown_ids_and_sql() {
-        let session = Session {
-            docs: HashMap::new(),
-            root: None,
-        };
+        let session = Session::default();
         assert_eq!(
             session.language_for("file:///q.sql", Some("sql")),
             LanguageId::TideYaml
@@ -1612,5 +1583,26 @@ mod tests {
         let open_ended = json!({ "start": { "line": 4, "character": 0 } });
         assert!(position_in_param(Position::new(9, 0), Some(&open_ended)));
         assert!(!position_in_param(Position::new(3, 0), Some(&open_ended)));
+    }
+
+    #[test]
+    fn file_uris_become_paths_and_back() {
+        assert_eq!(
+            uri_to_path("file:///home/u/My%20Detections"),
+            "/home/u/My Detections"
+        );
+        assert_eq!(uri_to_path("file:///c%3A/Users/u/det"), "c:/Users/u/det");
+        assert_eq!(uri_to_path("file://localhost/srv/d%C3%A9t"), "/srv/dét");
+        assert_eq!(uri_to_path("file:///a/100%"), "/a/100%");
+        assert_eq!(uri_to_path("untitled:Untitled-1"), "untitled:Untitled-1");
+        for path in [
+            "/home/u/My Detections/a#1.yaml",
+            "/srv/dét/r.yaml",
+            "c:/Users/u/r.yaml",
+        ] {
+            assert_eq!(uri_to_path(&path_to_uri(path)), path, "{path}");
+        }
+        assert_eq!(path_to_uri("/a b"), "file:///a%20b");
+        assert_eq!(path_to_uri("c:/x"), "file:///c:/x");
     }
 }
