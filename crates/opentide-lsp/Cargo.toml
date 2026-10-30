@@ -4,8 +4,24 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "OpenTide language server binary (stdio LSP + analyze/highlight CLI)"
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "opentide language server binary (stdio LSP + analyze/highlight CLI)"
+readme = "../../README.md"
+keywords = ["lsp", "kql", "spl", "esql", "detection"]
+categories = ["development-tools", "command-line-utilities"]
 default-run = "opentide-lsp"
+
+# `cargo binstall opentide-lsp` downloads the binary each GitHub Release
+# carries for the target, instead of compiling the workspace.
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-{ target }{ binary-ext }"
+pkg-fmt = "bin"
+
+[lib]
+name = "opentide_lsp"
+path = "src/lib.rs"
 
 [[bin]]
 name = "opentide-lsp"

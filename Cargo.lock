@@ -338,29 +338,73 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "opentide-analysis"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "opentide-core",
+ "opentide-ecs",
+ "opentide-eql",
+ "opentide-esql",
  "opentide-highlight",
  "opentide-kql",
+ "opentide-kuery",
+ "opentide-lucene",
  "opentide-spl",
  "opentide-tide",
  "regex",
  "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]
 name = "opentide-core"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "serde",
  "thiserror",
+ "toml",
+]
+
+[[package]]
+name = "opentide-ecs"
+version = "0.6.0"
+dependencies = [
+ "opentide-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "opentide-eql"
+version = "0.6.0"
+dependencies = [
+ "opentide-core",
+ "opentide-ecs",
+ "opentide-highlight",
+ "opentide-lucene",
+ "opentide-syntax",
+ "serde",
+ "toml",
+ "tree-sitter",
+]
+
+[[package]]
+name = "opentide-esql"
+version = "0.6.0"
+dependencies = [
+ "opentide-core",
+ "opentide-ecs",
+ "opentide-highlight",
+ "opentide-lucene",
+ "opentide-syntax",
+ "serde",
+ "toml",
+ "tree-sitter",
 ]
 
 [[package]]
 name = "opentide-highlight"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "insta",
  "opentide-core",
@@ -373,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "opentide-kql"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "insta",
  "opentide-core",
@@ -387,8 +431,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentide-kuery"
+version = "0.6.0"
+dependencies = [
+ "opentide-core",
+ "opentide-ecs",
+ "opentide-highlight",
+ "opentide-syntax",
+ "regex",
+ "tree-sitter",
+]
+
+[[package]]
 name = "opentide-lsp"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -406,8 +462,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentide-lucene"
+version = "0.6.0"
+dependencies = [
+ "opentide-core",
+ "opentide-ecs",
+ "opentide-highlight",
+ "opentide-syntax",
+ "tree-sitter",
+]
+
+[[package]]
 name = "opentide-spl"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "insta",
  "opentide-core",
@@ -420,7 +487,7 @@ dependencies = [
 
 [[package]]
 name = "opentide-syntax"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "cc",
  "opentide-core",
@@ -430,12 +497,17 @@ dependencies = [
 
 [[package]]
 name = "opentide-tide"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "insta",
  "opentide-core",
+ "opentide-ecs",
+ "opentide-eql",
+ "opentide-esql",
  "opentide-highlight",
  "opentide-kql",
+ "opentide-kuery",
+ "opentide-lucene",
  "opentide-spl",
  "regex",
  "serde",
@@ -447,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "opentide-wasm"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "js-sys",
  "opentide-analysis",
@@ -778,7 +850,6 @@ version = "1.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
 dependencies = [
- "getrandom",
  "js-sys",
  "wasm-bindgen",
 ]

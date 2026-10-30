@@ -4,7 +4,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "I/O-free SPL engine (parse, catalog, diagnostics)"
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "opentide engine component: I/O-free SPL engine (parse, catalog, diagnostics). Depend on opentide-analysis."
+readme = "../COMPONENT.md"
 
 [dependencies]
 opentide-core.workspace = true
