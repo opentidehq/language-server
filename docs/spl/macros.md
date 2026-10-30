@@ -60,13 +60,14 @@ If a macro expands to a **generating** command (`tstats`, `from`, `inputlookup`,
 | `` `get_asset(dest)` `` / `` `get_identity(user)` `` | Asset / identity enrichment |
 | `` `notable` `` / `` `get_risk` `` | ES notable / risk plumbing (response path) |
 
-Exact names vary by app version; treat this table as a recognition aid for OpenTide `splunk.query` bodies, not as a closed catalog.
+Exact names vary by app version; treat this table as a recognition aid for opentide `splunk.query` bodies, not as a closed catalog.
 
-## OpenTide engine notes
+## opentide engine notes
 
 - Authored backticks must remain in the source (no macro expansion in the language server).
 - Grammar today folds some single-backtick spans into `comment` — that is an implementation gap (see [IMPLEMENTATION-GAPS.md](IMPLEMENTATION-GAPS.md)).
-- There is no macro-name completion catalog yet.
+- Macro names complete from `catalogs/spl/macros.toml`.
+- A workspace that declares `macros` on a `system = "splunk"` log source in `visibility.toml` gets `spl_dataset_not_declared` (warning) for a macro in the **base search** (before the first pipe) that it does not declare: `` `wineventlog_security` ``, `` `cim_Authentication_indexes` ``. That is where a dataset macro expands to indexes and sourcetypes. Macros after a pipe (`drop_dm_object_name`, `security_content_ctime`, filter macros) are utilities and never checked; neither are `comment` and `*_filter` macros. A call with arguments matches a declared `name` or `name(N)`. See [cim-fields.md](cim-fields.md#indexes-sourcetypes-and-macros).
 
 ## Detection examples
 

@@ -1,4 +1,4 @@
-# Helix — OpenTide
+# Helix — opentide
 
 [[language]]
 name = "opentide-yaml"
@@ -6,7 +6,7 @@ scope = "source.opentide-yaml"
 file-types = ["yaml", "yml"]
 roots = [".opentide", "objects"]
 language-servers = ["opentide-lsp"]
-# Disable yamlls on objects/** — OpenTide LSP owns Tide diagnostics.
+# Disable yamlls on objects/** — opentide LSP owns Tide diagnostics.
 
 [[language]]
 name = "kql"
@@ -18,6 +18,30 @@ language-servers = ["opentide-lsp"]
 name = "spl"
 scope = "source.spl"
 file-types = ["spl"]
+language-servers = ["opentide-lsp"]
+
+[[language]]
+name = "esql"
+scope = "source.esql"
+file-types = ["esql"]
+language-servers = ["opentide-lsp"]
+
+[[language]]
+name = "eql"
+scope = "source.eql"
+file-types = ["eql"]
+language-servers = ["opentide-lsp"]
+
+[[language]]
+name = "kuery"
+scope = "source.kuery"
+file-types = ["kuery"]
+language-servers = ["opentide-lsp"]
+
+[[language]]
+name = "lucene"
+scope = "source.lucene"
+file-types = ["lucene"]
 language-servers = ["opentide-lsp"]
 
 [language-server.opentide-lsp]
