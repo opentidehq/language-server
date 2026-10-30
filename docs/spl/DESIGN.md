@@ -1,6 +1,6 @@
 # SPL language design (ES / CIM / ESCU)
 
-Context base for the OpenTide SPL engine. Authored text is never rewritten
+Context base for the opentide SPL engine. Authored text is never rewritten
 with an implicit `| search`. `index=main | head 1` stays `bare_search`.
 
 Citations:
@@ -72,7 +72,10 @@ macro) is legal authored text.
 Hover on `Processes.user` resolves as field `user` on dataset `Processes`
 (or unprefixed `user` after the drop macro). Completions after
 `from datamodel=` offer model paths; after `by ` in a `tstats` they offer
-the prefixed field set for the active datamodel.
+the prefixed field set for the active datamodel, and after `Prefix.field=`
+the values CIM expects. The catalog holds every CIM model, dataset and
+field; a near miss of one is `spl_unknown_datamodel` or
+`spl_unknown_datamodel_field` ([cim-fields.md](cim-fields.md)).
 
 ## `tstats` option schema
 
@@ -108,20 +111,33 @@ Inside `search` / `bare_search` (not only `eval` comparisons):
 ## Slow and truncated shapes
 
 `crates/opentide-spl/src/perf.rs` emits **warnings** and does not rewrite
-the query. The same codes fire on a raw `.spl` file and inside
-`configurations.splunk.query` / legacy `configurations.splunk.search`.
+the query. The same codes fire on a raw `.spl` file and inside every Tide
+block analysed as SPL (the injection table in
+[ARCHITECTURE.md](../ARCHITECTURE.md#injection-table)).
+
+Stages come from splitting on `|` outside quotes, comments, macros and
+subsearch `[ ]` (`split_segments` in `crates/opentide-spl/src/scan.rs`).
+Parentheses do not hide a `|`, as in Splunk. Each `[ ]` subsearch is a
+pipeline of its own, checked with the same rules.
+
+`spl_wildcard` and `spl_leading_not` read only the **base search** of each
+pipeline (`base_search` in `scan.rs`): the first stage when the pipeline does
+not start with `|` and its first word is not a catalogued command other than
+`search` (`stats=1` is a field, so it starts a search), or a leading
+`| search`. A leading `| tstats` or `| inputlookup` has none. What they flag,
+and the `index=` / `sourcetype=` / `source=` / `host=` / `IN` / `TERM()` /
+`PREFIX()` / macro constraints that cover a wildcard:
+[search-syntax.md](search-syntax.md#wildcards). A constraint inside a
+subsearch does not cover the outer base search.
+
+### Truncated shapes
 
 | Code | Fires when |
 | --- | --- |
-| `spl_subsearch_truncation` | Command word is `join` or `append`. Message: silent truncation at 50,000 events or 60 seconds ([About subsearches](https://docs.splunk.com/Documentation/Splunk/latest/Search/Aboutsubsearches)). |
-| `spl_subsearch_truncation` | Command word is `transaction`. Different limit: events stay in memory until the group closes, and events past `maxopentxn` are dropped ([transaction](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Transaction)). This is not the 50,000-event subsearch cap. |
-| `spl_leading_not` | In a search clause, `NOT` is the first filter (optional wrapping `(` and an optional leading `search`). [Boolean expressions](https://docs.splunk.com/Documentation/Splunk/latest/Search/Booleanexpressions). |
-| `spl_wildcard` | In a search clause: a bare `*`, a leading wildcard (`*fail`, `process=*fail`), or a mid-token wildcard (`f*ail`). A trailing `fail*` is clean. [Search](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Search). |
+| `spl_subsearch_truncation` | A stage's command word is `join` or `append`, in any case. Message: silent truncation at 50,000 events or 60 seconds ([About subsearches](https://docs.splunk.com/Documentation/Splunk/latest/Search/Aboutsubsearches)). `appendcols` is not flagged. |
+| `spl_subsearch_truncation` | A stage's command word is `transaction`. Different limit: events stay in memory until the group closes, and events past `maxopentxn` are dropped ([transaction](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Transaction)). The message does not cite the 50,000-event subsearch cap. |
 
-Search-clause scanning runs for an empty command word, for `search`, and for
-a word that is not a catalogued command. `join`, `append`, and `transaction`
-get the truncation warning and are not also scanned as search clauses.
-Bracketed subsearches are walked with the same rules.
+The range is the command word.
 
 ## Highlight overlay
 

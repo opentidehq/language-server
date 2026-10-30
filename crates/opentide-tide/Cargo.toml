@@ -4,12 +4,21 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Tide YAML objects: schema, vocabs, UUID graph, query injection"
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+description = "opentide engine component: Tide YAML objects: schema, vocabs, UUID graph, query injection. Depend on opentide-analysis."
+readme = "../COMPONENT.md"
 
 [dependencies]
 opentide-core.workspace = true
+opentide-ecs.workspace = true
 opentide-kql.workspace = true
 opentide-spl.workspace = true
+opentide-esql.workspace = true
+opentide-eql.workspace = true
+opentide-kuery.workspace = true
+opentide-lucene.workspace = true
 opentide-highlight.workspace = true
 serde.workspace = true
 serde_json.workspace = true

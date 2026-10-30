@@ -31,21 +31,48 @@
 (keyword_operator "search" @keyword)
 (keyword_operator "find" @keyword)
 (keyword_operator "invoke" @keyword)
-(keyword_operator "evaluate" @keyword)
+(evaluate_operator "evaluate" @keyword)
 (keyword_operator "serialize" @keyword)
-(keyword_operator "scan" @keyword)
+(scan_operator "scan" @keyword)
 (keyword_operator "as" @keyword)
 (keyword_operator "getschema" @keyword)
-(keyword_operator "make-series" @keyword)
+(make_series_operator "make-series" @keyword)
 (keyword_operator "sample" @keyword)
-(keyword_operator "sample-distinct" @keyword)
-(keyword_operator "mv-apply" @keyword)
-(keyword_operator "datatable" @keyword)
-(keyword_operator "range" @keyword)
+(sample_distinct_operator "sample-distinct" @keyword)
+(mv_apply_operator "mv-apply" @keyword)
+(datatable_expression "datatable" @keyword)
+(externaldata_expression "externaldata" @keyword)
+(externaldata_expression "external_data" @keyword)
+(externaldata_expression "with" @keyword)
+(range_operator "from" @keyword)
+(range_operator "to" @keyword)
+(range_operator "step" @keyword)
+(project_reorder_operator "asc" @keyword)
+(project_reorder_operator "desc" @keyword)
+(project_reorder_operator "granny-asc" @keyword)
+(project_reorder_operator "granny-desc" @keyword)
+(top_nested_clause "of" @keyword)
+(top_nested_clause "with" @keyword)
+(top_nested_clause "others" @keyword)
+(top_nested_clause "by" @keyword)
+(sample_distinct_operator "of" @keyword)
+(facet_operator "by" @keyword)
+(facet_operator "with" @keyword)
+(partition_operator "by" @keyword)
+(scan_operator "order" @keyword)
+(scan_operator "partition" @keyword)
+(scan_operator "by" @keyword)
+(scan_operator "declare" @keyword)
+(scan_operator "with" @keyword)
+(scan_step "step" @keyword)
+(scan_step "optional" @keyword)
+(scan_step "output" @keyword)
+(scan_step "last" @keyword)
+(range_operator "range" @keyword)
 (keyword_operator "externaldata" @keyword)
-(keyword_operator "partition" @keyword)
-(keyword_operator "fork" @keyword)
-(keyword_operator "facet" @keyword)
+(partition_operator "partition" @keyword)
+(fork_operator "fork" @keyword)
+(facet_operator "facet" @keyword)
 (keyword_operator "consume" @keyword)
 (keyword_operator "reduce" @keyword)
 (keyword_operator "make-graph" @keyword)
@@ -54,7 +81,32 @@
 (keyword_operator "graph-to-table" @keyword)
 (keyword_operator "graph-mark-components" @keyword)
 (keyword_operator "top-hitters" @keyword)
-(keyword_operator "top-nested" @keyword)
+(top_nested_clause "top-nested" @keyword)
+
+(mv_expand_operator "limit" @keyword)
+(mv_expand_item "to" @keyword)
+(mv_expand_item "typeof" @keyword)
+(mv_apply_operator "on" @keyword)
+(make_series_operator "on" @keyword)
+(make_series_operator "from" @keyword)
+(make_series_operator "to" @keyword)
+(make_series_operator "step" @keyword)
+(make_series_operator "by" @keyword)
+(sort_item "nulls" @keyword)
+(sort_item "first" @keyword)
+(sort_item "last" @keyword)
+(operator_option name: _ @keyword)
+(mv_option name: _ @keyword)
+(series_aggregate "default" @keyword)
+(hint_option name: (hint_name) @keyword)
+(materialize_expression "materialize" @function.builtin)
+(toscalar_expression "toscalar" @function.builtin)
+(dynamic_literal "dynamic" @type)
+(type "dynamic" @type)
+(type (identifier) @type)
+(parameter name: (identifier) @variable)
+(member_expression member: (identifier) @property)
+(star) @operator
 
 (control_command "." @error)
 (control_command (identifier) @error)
@@ -68,6 +120,7 @@
 (number) @number
 (boolean) @boolean
 (null) @constant
+(typed_literal) @constant
 (timespan) @number
 (comment) @comment
 
@@ -98,6 +151,10 @@
 "!contains" @operator
 "contains_cs" @operator
 "!contains_cs" @operator
+"containscs" @operator
+"notcontains" @operator
+"notcontainscs" @operator
+"=>" @operator
 "startswith" @operator
 "!startswith" @operator
 "startswith_cs" @operator
@@ -124,10 +181,15 @@
 "!in~" @operator
 "between" @operator
 "!between" @operator
+".." @operator
 "matches" @operator
 "regex" @operator
 "(" @punctuation.bracket
 ")" @punctuation.bracket
+"[" @punctuation.bracket
+"]" @punctuation.bracket
+"{" @punctuation.bracket
+"}" @punctuation.bracket
 "," @punctuation.delimiter
 "=" @operator
 ";" @punctuation.delimiter

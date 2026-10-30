@@ -1,8 +1,8 @@
 # SPL search commands (detection-relevant)
 
-Inventory of Search Reference commands that appear in (or are adjacent to) Splunk ES / ESCU / OpenTide `splunk.query` pipelines.
+Inventory of Search Reference commands that appear in (or are adjacent to) Splunk ES / ESCU / opentide `splunk.query` pipelines.
 
-Kinds follow OpenTide’s catalog taxonomy (`generating | transforming | streaming | dataset | orchestrating`), mapped from Splunk [Command types](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Commandsbytype). Dual types are noted.
+Kinds follow opentide’s catalog taxonomy (`generating | transforming | streaming | dataset | orchestrating`), mapped from Splunk [Command types](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Commandsbytype). Dual types are noted.
 
 Canonical index: [Command quick reference](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/ListOfSearchCommands), [Commands by category](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Commandsbycategory).
 
@@ -93,7 +93,7 @@ Distributable unless noted. These are the workhorses after `search`/`tstats`.
 | `fields` | streaming | Keep listed fields (`fields dest, user`) or remove (`fields - _raw, punct`). | [Fields](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Fields) | `+` keep (default) `-` remove |
 | `fields -` | streaming | Removal form of `fields`. | [Fields](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Fields) | `fields - _bkt, _cd, _serial` |
 | `head` | centralized streaming | First N results. | [Head](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Head) | `limit=` / `N` `null=` `keeplast=` `eval` condition |
-| `tail` | dataset processing | Last N results (needs the full set). Catalog kind in OpenTide: streaming. | [Tail](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Tail) | `N` |
+| `tail` | dataset processing | Last N results (needs the full set). Catalog kind in opentide: streaming. | [Tail](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Tail) | `N` |
 | `fillnull` | streaming with field list; dataset without | Replace nulls with a value (default `0`). | [Fillnull](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Fillnull) | `value=` field list |
 | `filldown` | streaming | Fill null with last non-null. | [Filldown](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Filldown) | field list |
 | `convert` | streaming | Convert field values (`ctime`, `mktime`, `dur2sec`, `memk`, `rmcomma`, `none`). | [Convert](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Convert) | `timeformat=` `ctime()` `mktime()` `dur2sec()` `auto()` |
@@ -207,7 +207,7 @@ Documented in Search Reference but unusual (or dangerous) inside ES correlation 
 | `collect` / `stash` | Write to a summary index (not a detector body). | [Collect](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Collect) |
 | `delete` | Permanently delete matching events. Never in a detection. | [Delete](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Delete) |
 | `sendemail` / `sendalert` | Alert actions, not query logic. | [Sendemail](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Sendemail) |
-| `script` / `run` | External script. Not portable in OpenTide rules. | [Script](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Script) |
+| `script` / `run` | External script. Not portable in opentide rules. | [Script](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Script) |
 | `outputcsv` | Write a CSV on the search head. | [Outputcsv](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Outputcsv) |
 | `kmeans`, `anomalies`, `anomalousvalue`, `predict`, `trendline`, `x11` | ML / trending; occasional anomaly detections. | [List of commands](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/ListOfSearchCommands) |
 | `highlight`, `iconify`, `abstract`, `typer`, `findtypes` | UI / event typing. | same |
@@ -218,7 +218,24 @@ Documented in Search Reference but unusual (or dangerous) inside ES correlation 
 | `localize`, `rtorder` | Time localization / real-time ordering. | same |
 | `scrub` | Anonymize results. | [Scrub](https://docs.splunk.com/Documentation/Splunk/latest/SearchReference/Scrub) |
 
-Third-party / app commands (`dbxquery`, `snowincident`, `awssnsalert`, ESCU macros that expand to custom commands) are **not** core Search Reference and are out of scope for the catalog until explicitly added.
+Other third-party / app commands (`dbxquery`, `snowincident`, `awssnsalert`, ESCU macros that expand to custom commands) are **not** core Search Reference and are out of scope for the catalog until explicitly added (see [App commands](#app-commands)).
+
+---
+
+## App commands
+
+Commands a Splunk app adds to the search head. Catalogued with `app = "<App>"` in `catalogs/spl/commands.toml` because detections use them widely; stock Splunk lacks them, so `testdata/oracles/exceptions.toml` lists them.
+
+| Name | App | Kind | Short docs | Citation |
+| --- | --- | --- | --- | --- |
+| `fit` | MLTK | transforming | Train a machine learning model on the search results and add its predictions as fields. | [Search commands for machine learning](https://docs.splunk.com/Documentation/MLApp/latest/User/Customsearchcommands) |
+| `apply` | MLTK | streaming | Apply a model saved by `fit` to the search results. | same |
+| `score` | MLTK | transforming | Score a model's predictions against actual values with a statistical or ML metric. | same |
+| `summary` | MLTK | generating | Describe a model saved by `fit`: its algorithm, features and parameters. | same |
+| `listmodels` | MLTK | generating | List the models saved by `fit`. | same |
+| `deletemodel` | MLTK | generating | Delete a model saved by `fit`. | same |
+
+A command in neither the Search Reference nor this table is `spl_unknown_command`: a **warning**, because an app on the search head may provide it (`'mispsearch' is not a command opentide knows; if an app on the search head provides it, declare it`), with the nearest known command as a suggestion. One edit from a known command (`statz`, `stast`), it is an **error**: almost certainly a typo, which Splunk rejects.
 
 ---
 

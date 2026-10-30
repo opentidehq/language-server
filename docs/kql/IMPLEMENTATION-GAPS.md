@@ -1,6 +1,6 @@
 # KQL implementation gaps (punch-list)
 
-Exact names still missing from each OpenTide surface after the 2026-09-15 catalog expansion.
+Exact names still missing from each opentide surface after the 2026-09-15 catalog expansion.
 
 Related: [`coverage-gap.md`](coverage-gap.md), [`evaluate-plugins.md`](evaluate-plugins.md), [`control-commands.md`](control-commands.md), [`scalar-functions-geo-series.md`](scalar-functions-geo-series.md).
 
@@ -18,7 +18,7 @@ Detection-critical columns for SecurityEvent, SigninLogs, AuditLogs, Defender en
 
 **Missing primary operators vs inventory:** none.
 
-**Implemented slow-query warnings** (see [`DESIGN.md`](DESIGN.md)): `search *` → `kql_unscoped_search`, `union *` → `kql_unscoped_union`, leading `*` → `kql_wildcard_table`, late `where` → `kql_where_not_first`, `join` / `summarize` before a later `project` → `kql_join_summarize_before_project`.
+**Implemented slow-query warnings** (rules: [`DESIGN.md`](DESIGN.md#slow-query-warnings)): `search *` → `kql_unscoped_search`, `union *` → `kql_unscoped_union`, a `*` table → `kql_wildcard_table`, late `where` → `kql_where_not_first`, `join` / `summarize` before a later `project` → `kql_join_summarize_before_project`. They are warnings about cost, not a Sentinel legality check.
 
 **SHOULD — still not emitted:**
 
