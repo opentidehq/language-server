@@ -6,6 +6,10 @@ Each version's first paragraph is its summary: the GitHub Release and [opentide.
 
 ## [Unreleased]
 
+### Changed
+
+- The bundled Tide catalog pins `threat.actors.name` to `actors::1.2`, as opentide does: 60 groups and threat-actor clusters from ATT&CK 20.0 and the current MISP galaxy are known, and ATT&CK group names take their Enterprise prefix.
+
 ## [0.7.0] - 2026-11-02
 
 The table and column release: the KQL engine knows every Azure Monitor Logs, Defender XDR and ASIM table with its columns and tracks them through a query (`kql_unknown_column`, `kql_type_mismatch`, column hover with descriptions), SPL knows the whole CIM and accepts what Splunk's parser accepts, Elastic queries over ECS indices are checked against ECS, and a workspace's `visibility.toml` declares its own tables, indexes and index patterns.
