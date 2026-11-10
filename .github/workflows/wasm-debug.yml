@@ -24,13 +24,18 @@ jobs:
       - run: bash scripts/build-wasm.sh wasi || true
       - run: sudo apt-get install -y gdb >/dev/null
       - run: grep -m1 'model name' /proc/cpuinfo; node --version; sha256sum target/wasm32-wasip1/release/opentide-lsp.wasm
-      - name: smoke under gdb
+      - name: variants (5 runs each)
+        shell: bash
         run: |
-          gdb -q -batch -ex run -ex bt -ex 'info registers rip' -ex 'x/6i $pc' \
-            --args node scripts/wasm-smoke.mjs wasi target/wasm32-wasip1/release/opentide-lsp.wasm 2>&1 | tail -80
-      - name: five plain runs
-        run: for i in 1 2 3 4 5; do node scripts/wasm-smoke.mjs wasi target/wasm32-wasip1/release/opentide-lsp.wasm >/dev/null 2>&1; echo "run $i rc=$?"; done
+          w=target/wasm32-wasip1/release/opentide-lsp.wasm
+          try() { local label=$1; shift; local fails=0; for i in 1 2 3 4 5; do "$@" scripts/wasm-smoke.mjs wasi $w >/dev/null 2>&1 || fails=$((fails+1)); done; echo "$label: $fails/5 failed"; }
+          try "node22 default" node
+          try "node22 --no-turbo-fast-api-calls" node --no-turbo-fast-api-calls
+          try "node22 --no-liftoff" node --no-liftoff
+          try "node22 --max-old-space-size=8192" node --max-old-space-size=8192
+          for v in 24 25; do npx -y node@$v --version >/dev/null 2>&1; try "node$v" npx -y node@$v; done
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: opentide-lsp-wasi
           path: target/wasm32-wasip1/release/opentide-lsp.wasm
