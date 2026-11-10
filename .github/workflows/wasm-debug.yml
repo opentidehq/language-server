@@ -1,0 +1,36 @@
+# TEMPORARY: reproduce the WASI smoke segfault of #227 with a native backtrace
+# and keep the built artifact. Never merged.
+name: wasm-debug
+on:
+  pull_request:
+    branches: [claude/yara-1-toolchain-plumbing]
+jobs:
+  wasm-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.128
+      - run: bash scripts/build-wasm.sh wasi || true
+      - run: sudo apt-get install -y gdb >/dev/null
+      - run: grep -m1 'model name' /proc/cpuinfo; node --version; sha256sum target/wasm32-wasip1/release/opentide-lsp.wasm
+      - name: smoke under gdb
+        run: |
+          gdb -q -batch -ex run -ex bt -ex 'info registers rip' -ex 'x/6i $pc' \
+            --args node scripts/wasm-smoke.mjs wasi target/wasm32-wasip1/release/opentide-lsp.wasm 2>&1 | tail -80
+      - name: five plain runs
+        run: for i in 1 2 3 4 5; do node scripts/wasm-smoke.mjs wasi target/wasm32-wasip1/release/opentide-lsp.wasm >/dev/null 2>&1; echo "run $i rc=$?"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opentide-lsp-wasi
+          path: target/wasm32-wasip1/release/opentide-lsp.wasm
